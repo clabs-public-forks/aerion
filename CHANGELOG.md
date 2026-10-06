@@ -3,7 +3,7 @@
 **v0.3.6 - 10-02-2026**
 ---
 
-- 
+- Added Japanse translation - @theluckystrike
 
 
 **v0.3.5 - 09-21-2026**

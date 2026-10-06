@@ -897,6 +897,19 @@ Special thanks to translation contributors for making Aerion more accessible:
 <table align="left">
   <tr>
     <td align="center" width="180">
+      <a href="https://github.com/theluckystrike">
+        <img src="https://github.com/theluckystrike.png" width="80"><br>
+        <sub><b>theluckystrike</b></sub>
+      </a><br>
+      <sub>Japanese (ja)</sub><br>
+      <sub>&nbsp;</sub>
+    </td>
+  </tr>
+</table>
+
+<table align="left">
+  <tr>
+    <td align="center" width="180">
       <a href="https://github.com/dexblasnoot">
         <img src="https://github.com/dexblasnoot.png" width="80"><br>
         <sub><b>dexblasnoot</b></sub>
