@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
 	"github.com/hkdb/aerion/internal/oauth2"
 )
@@ -22,6 +24,9 @@ type bearerRefreshTransport struct {
 	oauthManager   *oauth2.Manager
 	accountID      string
 	clientConfigID string
+	// scopes the client was issued for; reported back if the refresh token
+	// is rejected and the user must re-consent.
+	scopes []coreapi.AuthScope
 
 	mu sync.Mutex // guards token retrieval/refresh
 }
@@ -61,6 +66,16 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	refreshed, err := t.oauthManager.RefreshTokenWithProvider(provider, tokens.RefreshToken)
+	if errors.Is(err, oauth2.ErrInvalidGrant) && slotSupportsIncrementalConsent(t.clientConfigID) {
+		// The refresh token is dead (expired/revoked). Surface it as a consent
+		// requirement so extensions offer their grant flow instead of a raw
+		// error the user has no way to act on.
+		return nil, &coreapi.ErrAdditionalConsentRequired{
+			AccountID:      t.accountID,
+			ClientConfigID: coreapi.ClientConfigID(t.clientConfigID),
+			MissingScopes:  t.scopes,
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("auth broker: refresh: %w", err)
 	}
@@ -73,6 +88,19 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	return t.do(req, refreshed.AccessToken)
+}
+
+// slotSupportsIncrementalConsent reports whether an extension grant flow
+// (StartIncrementalConsent) can write fresh tokens into the given slot. That
+// flow resolves the slot via oauth2.GetProvider, which only knows the
+// extension-owned slots (*-contacts, *-calendar). Mail slots — custom-mail
+// and the google-/microsoft-mail slots extensions borrow core-routed scopes
+// from — can only be repaired by mail re-authorization, so a dead refresh
+// token there must keep its original error rather than prompt a grant that
+// can't fix it.
+func slotSupportsIncrementalConsent(clientConfigID string) bool {
+	_, err := oauth2.GetProvider(clientConfigID)
+	return err == nil
 }
 
 // resolveProvider returns the OAuth2 provider config for refreshing this account's

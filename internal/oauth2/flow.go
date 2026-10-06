@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -215,6 +216,12 @@ func (m *Manager) RefreshToken(providerName, refreshToken string) (*TokenRespons
 	return m.RefreshTokenWithProvider(provider, refreshToken)
 }
 
+// ErrInvalidGrant is returned (wrapped) by RefreshTokenWithProvider when the
+// provider rejects the refresh token itself — expired (e.g. Google's 7-day
+// limit for apps in Testing), revoked, or issued to a different client. No
+// retry can recover; only a fresh consent flow can.
+var ErrInvalidGrant = errors.New("token refresh failed: invalid_grant")
+
 // RefreshTokenWithProvider runs the OAuth2 refresh flow against the given
 // ProviderConfig. Used by the extension Auth Broker to refresh tokens issued
 // under non-mail client configurations (e.g., google-extensions).
@@ -253,6 +260,9 @@ func (m *Manager) RefreshTokenWithProvider(provider ProviderConfig, refreshToken
 			ErrorDescription string `json:"error_description"`
 		}
 		_ = json.Unmarshal(body, &errResp)
+		if errResp.Error == "invalid_grant" {
+			return nil, fmt.Errorf("%w - %s", ErrInvalidGrant, errResp.ErrorDescription)
+		}
 		return nil, fmt.Errorf("token refresh failed: %s - %s", errResp.Error, errResp.ErrorDescription)
 	}
 

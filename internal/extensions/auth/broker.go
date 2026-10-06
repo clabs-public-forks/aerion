@@ -91,6 +91,7 @@ func (b *Broker) HTTPClient(accountID string, scopes []coreapi.AuthScope) (*http
 			oauthManager:   b.oauthManager,
 			accountID:      accountID,
 			clientConfigID: string(clientConfigID),
+			scopes:         scopes,
 		},
 	}, nil
 }
@@ -148,6 +149,7 @@ func (b *Broker) HTTPClientForExtension(
 				oauthManager:   b.oauthManager,
 				accountID:      accountID,
 				clientConfigID: string(clientConfigID),
+				scopes:         scopes,
 			},
 		}, nil
 	}
@@ -220,6 +222,7 @@ func (b *Broker) HTTPClientForExtension(
 			oauthManager:   b.oauthManager,
 			accountID:      accountID,
 			clientConfigID: clientConfigID,
+			scopes:         scopes,
 		},
 	}, nil
 }
