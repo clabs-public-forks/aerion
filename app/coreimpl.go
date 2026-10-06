@@ -254,23 +254,11 @@ func (a *extensionAuth) StartIncrementalConsent(req coreapi.StartIncrementalCons
 		return fmt.Errorf("incremental consent: exactly one of accountID / sourceID must be set")
 	}
 
-	// Validate the EXTENSION's own slot has creds via the proper resolver
-	// (user override → registered providers, NOT inherited from mail-side
-	// ldflags via the legacy GetProvider fallback).
-	slotCreds, slotOK := oauth2.ClientConfigForID(string(req.ClientConfigID))
-	if !slotOK || slotCreds.ClientID == "" {
-		return fmt.Errorf("incremental consent: no OAuth credentials configured for %q — set them up in Settings → Extensions → Contacts → OAuth Credentials", req.ClientConfigID)
-	}
-
-	// Pull the provider's URLs + default scope set. We override ClientID/
-	// Secret with the slot creds resolved above so we always run against the
-	// extension's project.
-	baseProvider, err := oauth2.GetProvider(string(req.ClientConfigID))
+	// Resolve the extension's own slot (URLs, default scopes, slot creds).
+	baseProvider, err := oauth2.IncrementalConsentProvider(string(req.ClientConfigID))
 	if err != nil {
 		return fmt.Errorf("incremental consent: %w", err)
 	}
-	baseProvider.ClientID = slotCreds.ClientID
-	baseProvider.ClientSecret = slotCreds.ClientSecret
 	baseProvider.LoginHint = req.LoginHint
 
 	have := make(map[string]struct{}, len(baseProvider.Scopes))

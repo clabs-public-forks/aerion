@@ -84,16 +84,7 @@ func (b *Broker) HTTPClient(accountID string, scopes []coreapi.AuthScope) (*http
 		}
 	}
 
-	return &http.Client{
-		Transport: &bearerRefreshTransport{
-			base:           b.baseTransport,
-			credStore:      b.credStore,
-			oauthManager:   b.oauthManager,
-			accountID:      accountID,
-			clientConfigID: string(clientConfigID),
-			scopes:         scopes,
-		},
-	}, nil
+	return b.newClient(accountID, string(clientConfigID), scopes), nil
 }
 
 // HTTPClientForExtension is the Phase 2b entry point that knows WHICH extension
@@ -142,16 +133,7 @@ func (b *Broker) HTTPClientForExtension(
 			}
 			return nil, fmt.Errorf("auth broker: check tokens: %w", terr)
 		}
-		return &http.Client{
-			Transport: &bearerRefreshTransport{
-				base:           b.baseTransport,
-				credStore:      b.credStore,
-				oauthManager:   b.oauthManager,
-				accountID:      accountID,
-				clientConfigID: string(clientConfigID),
-				scopes:         scopes,
-			},
-		}, nil
+		return b.newClient(accountID, string(clientConfigID), scopes), nil
 	}
 
 	// Classify each requested scope: does it use Aerion core's mail OAuth
@@ -215,16 +197,7 @@ func (b *Broker) HTTPClientForExtension(
 		}
 	}
 
-	return &http.Client{
-		Transport: &bearerRefreshTransport{
-			base:           b.baseTransport,
-			credStore:      b.credStore,
-			oauthManager:   b.oauthManager,
-			accountID:      accountID,
-			clientConfigID: clientConfigID,
-			scopes:         scopes,
-		},
-	}, nil
+	return b.newClient(accountID, clientConfigID, scopes), nil
 }
 
 // IMAPClient returns an authenticated IMAP client for the account. Phase 1
@@ -241,4 +214,19 @@ func (b *Broker) IMAPClient(accountID string, requiredCaps []string) (coreapi.IM
 // (delayed-send queues, etc.) will wire this in Phase 2+.
 func (b *Broker) SMTPClient(accountID string) (coreapi.SMTPClient, error) {
 	return nil, coreapi.ErrUnimplemented
+}
+
+// newClient returns an HTTP client that authenticates as accountID using the
+// tokens in the given slot, refreshing them as needed.
+func (b *Broker) newClient(accountID, clientConfigID string, scopes []coreapi.AuthScope) *http.Client {
+	return &http.Client{
+		Transport: &bearerRefreshTransport{
+			base:           b.baseTransport,
+			credStore:      b.credStore,
+			oauthManager:   b.oauthManager,
+			accountID:      accountID,
+			clientConfigID: clientConfigID,
+			scopes:         scopes,
+		},
+	}
 }

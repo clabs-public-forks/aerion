@@ -66,10 +66,11 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	refreshed, err := t.oauthManager.RefreshTokenWithProvider(provider, tokens.RefreshToken)
-	if errors.Is(err, oauth2.ErrInvalidGrant) && slotSupportsIncrementalConsent(t.clientConfigID) {
+	if errors.Is(err, oauth2.ErrInvalidGrant) && canRegrant(t.clientConfigID) {
 		// The refresh token is dead (expired/revoked). Surface it as a consent
 		// requirement so extensions offer their grant flow instead of a raw
-		// error the user has no way to act on.
+		// error the user has no way to act on. Mail slots keep the refresh
+		// error: only mail re-auth can repair them.
 		return nil, &coreapi.ErrAdditionalConsentRequired{
 			AccountID:      t.accountID,
 			ClientConfigID: coreapi.ClientConfigID(t.clientConfigID),
@@ -90,16 +91,10 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	return t.do(req, refreshed.AccessToken)
 }
 
-// slotSupportsIncrementalConsent reports whether an extension grant flow
-// (StartIncrementalConsent) can write fresh tokens into the given slot. That
-// flow resolves the slot via oauth2.GetProvider, which only knows the
-// extension-owned slots (*-contacts, *-calendar). Mail slots — custom-mail
-// and the google-/microsoft-mail slots extensions borrow core-routed scopes
-// from — can only be repaired by mail re-authorization, so a dead refresh
-// token there must keep its original error rather than prompt a grant that
-// can't fix it.
-func slotSupportsIncrementalConsent(clientConfigID string) bool {
-	_, err := oauth2.GetProvider(clientConfigID)
+// canRegrant reports whether StartIncrementalConsent can write fresh tokens
+// into the given slot.
+func canRegrant(clientConfigID string) bool {
+	_, err := oauth2.IncrementalConsentProvider(clientConfigID)
 	return err == nil
 }
 

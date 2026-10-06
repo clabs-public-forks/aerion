@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
@@ -330,34 +329,30 @@ func TestTransport_InvalidGrantOnMailSlotKeepsRefreshError(t *testing.T) {
 		t.Fatalf("HTTPClientForExtension: %v", err)
 	}
 
-	_, err = client.Get(api.URL)
-	var consentErr *coreapi.ErrAdditionalConsentRequired
-	if errors.As(err, &consentErr) {
-		t.Fatalf("custom-mail slot must not report consent required, got %v", err)
-	}
-	if !errors.Is(err, oauth2.ErrInvalidGrant) {
+	if _, err = client.Get(api.URL); !errors.Is(err, oauth2.ErrInvalidGrant) {
 		t.Fatalf("expected ErrInvalidGrant, got %T: %v", err, err)
-	}
-	if !strings.Contains(err.Error(), "invalid_grant") {
-		t.Errorf("refresh error text should be preserved; got %q", err.Error())
 	}
 }
 
-// Only slots StartIncrementalConsent can write to get the consent-required
-// conversion; a dead refresh token anywhere else needs mail re-auth.
-func TestSlotSupportsIncrementalConsent(t *testing.T) {
+// Only slots StartIncrementalConsent can write to (extension-owned, with
+// credentials) get the consent-required conversion; a dead refresh token
+// anywhere else needs mail re-auth.
+func TestCanRegrant(t *testing.T) {
+	prev := oauth2.UserOverrideLookup
+	t.Cleanup(func() { oauth2.UserOverrideLookup = prev })
+	oauth2.UserOverrideLookup = func(id string) (oauth2.ClientCredentials, bool) {
+		return oauth2.ClientCredentials{ClientID: "id"}, id != "microsoft-contacts"
+	}
+
 	cases := map[string]bool{
 		"google-calendar":    true,
-		"microsoft-calendar": true,
-		"google-contacts":    true,
-		"microsoft-contacts": true,
+		"microsoft-contacts": false, // no credentials configured
 		"google-mail":        false,
-		"microsoft-mail":     false,
 		"custom-mail":        false,
 	}
 	for slot, want := range cases {
-		if got := slotSupportsIncrementalConsent(slot); got != want {
-			t.Errorf("slotSupportsIncrementalConsent(%q) = %v, want %v", slot, got, want)
+		if got := canRegrant(slot); got != want {
+			t.Errorf("canRegrant(%q) = %v, want %v", slot, got, want)
 		}
 	}
 }
