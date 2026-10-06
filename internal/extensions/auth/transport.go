@@ -75,6 +75,7 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 			AccountID:      t.accountID,
 			ClientConfigID: coreapi.ClientConfigID(t.clientConfigID),
 			MissingScopes:  t.scopes,
+			Reason:         "refresh token expired or revoked",
 		}
 	}
 	if err != nil {

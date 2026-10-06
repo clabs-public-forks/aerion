@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
@@ -226,7 +227,7 @@ func (b *Broker) newClient(accountID, clientConfigID string, scopes []coreapi.Au
 			oauthManager:   b.oauthManager,
 			accountID:      accountID,
 			clientConfigID: clientConfigID,
-			scopes:         scopes,
+			scopes:         slices.Clone(scopes),
 		},
 	}
 }
