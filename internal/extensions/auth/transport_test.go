@@ -147,3 +147,43 @@ func TestTransport_UnreplayableBodyReturns401AfterRefresh(t *testing.T) {
 		t.Fatalf("follow-up: status %d after %d API requests, want 200 on the first try", resp.StatusCode, len(*bodies))
 	}
 }
+
+// A truncated 401 body must report its real length, not the server's.
+func TestTransport_HandedBack401LengthMatchesBody(t *testing.T) {
+	big := strings.Repeat("x", 100_000)
+	api := func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusUnauthorized, ContentLength: int64(len(big)),
+			Header: http.Header{"Content-Length": {"100000"}}, Body: io.NopCloser(strings.NewReader(big)), Request: r}, nil
+	}
+	client := newCustomAccountClient(t, api, tokenResponse(http.StatusOK, `{"access_token":"fresh-token","expires_in":3600}`))
+
+	req, _ := http.NewRequest(http.MethodPut, "https://api.test/", io.NopCloser(strings.NewReader("BEGIN:VCALENDAR")))
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("PUT: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil || resp.ContentLength != int64(len(body)) || resp.Header.Get("Content-Length") != "" {
+		t.Fatalf("ContentLength=%d header=%q, read %d bytes (err %v)", resp.ContentLength, resp.Header.Get("Content-Length"), len(body), err)
+	}
+}
+
+// When the refresh fails there's no retry, so no fresh body may be opened.
+func TestTransport_FailedRefreshDoesNotOpenRetryBody(t *testing.T) {
+	api := func(r *http.Request) (*http.Response, error) { return respond(r, http.StatusUnauthorized), nil }
+	token := tokenResponse(http.StatusBadRequest, `{"error":"invalid_grant","error_description":"Bad Request"}`)
+	client := newCustomAccountClient(t, api, token)
+
+	req, _ := http.NewRequest(http.MethodPost, "https://api.test/", strings.NewReader("BEGIN:VCALENDAR"))
+	opened := 0
+	getBody := req.GetBody
+	req.GetBody = func() (io.ReadCloser, error) { opened++; return getBody() }
+
+	if _, err := client.Do(req); !errors.Is(err, oauth2.ErrInvalidGrant) {
+		t.Fatalf("expected ErrInvalidGrant, got %v", err)
+	}
+	if opened != 0 {
+		t.Fatalf("GetBody called %d times on a failed refresh, want 0", opened)
+	}
+}

@@ -46,17 +46,14 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	if resp.StatusCode != http.StatusUnauthorized {
 		return resp, nil
 	}
-	retry, canRetry, err := rewind(req)
-	if err != nil {
-		_ = resp.Body.Close()
-		return nil, err
-	}
-
 	// 401: buffer + close body; it's handed back if the request can't be resent.
+	// ContentLength must match what was kept, which may be truncated.
 	body401, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
 	resp.Body = io.NopCloser(bytes.NewReader(body401))
+	resp.ContentLength = int64(len(body401))
+	resp.Header.Del("Content-Length")
 
 	// Refresh under lock to avoid thundering herd.
 	t.mu.Lock()
@@ -97,6 +94,11 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 		return nil, fmt.Errorf("auth broker: persist refreshed tokens: %w", err)
 	}
 
+	// Rewind only now: a fresh body taken earlier would leak on the error paths above.
+	retry, canRetry, err := rewind(req)
+	if err != nil {
+		return nil, err
+	}
 	if !canRetry {
 		// The token is fresh now, so the caller's own retry will succeed.
 		return resp, nil
