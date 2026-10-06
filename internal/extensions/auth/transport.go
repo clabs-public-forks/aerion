@@ -45,6 +45,11 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	if resp.StatusCode != http.StatusUnauthorized {
 		return resp, nil
 	}
+	// The first attempt consumed the body; without GetBody there's nothing to
+	// resend, so hand the 401 back rather than retry with an empty body.
+	if req.Body != nil && req.Body != http.NoBody && req.GetBody == nil {
+		return resp, nil
+	}
 
 	// 401: drain + close body before retrying
 	_, _ = io.Copy(io.Discard, resp.Body)
@@ -89,6 +94,14 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 		return nil, fmt.Errorf("auth broker: persist refreshed tokens: %w", err)
 	}
 
+	if req.GetBody != nil {
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, fmt.Errorf("auth broker: rewind request body: %w", err)
+		}
+		req = req.Clone(req.Context())
+		req.Body = body
+	}
 	return t.do(req, refreshed.AccessToken)
 }
 

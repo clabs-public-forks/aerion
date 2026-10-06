@@ -11,6 +11,7 @@ import (
 	"github.com/hkdb/aerion/internal/credentials"
 	"github.com/hkdb/aerion/internal/database"
 	"github.com/hkdb/aerion/internal/oauth2"
+	gokeyring "github.com/zalando/go-keyring"
 )
 
 // newTestBroker spins up a temp DB + credentials store + OAuth manager for
@@ -20,6 +21,8 @@ import (
 // ErrAdditionalConsentRequired paths.
 func newTestBroker(t *testing.T) (*Broker, *credentials.Store, *database.DB) {
 	t.Helper()
+	// Keep tokens out of the developer's real OS keyring, and out of other tests.
+	gokeyring.MockInit()
 	tmp := t.TempDir()
 	db, err := database.Open(filepath.Join(tmp, "test.db"))
 	if err != nil {
