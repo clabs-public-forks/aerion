@@ -1,107 +1,37 @@
 name: Bug Report
-description: Report a bug in Aerion
-labels: ["bug"]
+description: Report a bug in this downstream fork
 body:
-  - type: dropdown
-    id: os
+  - type: markdown
     attributes:
-      label: Operating System
-      options:
-        - Linux
-        - Mac
-        - Windows
-    validations:
-      required: true
-
-  - type: dropdown
-    id: architecture
-    attributes:
-      label: Architecture
-      options:
-        - x86_64
-        - arm64
-    validations:
-      required: true
-
-  - type: input
-    id: distro
-    attributes:
-      label: Linux Distro
-      description: Required if OS is Linux
-      placeholder: e.g. Ubuntu, Fedora, Arch
-
-  - type: input
-    id: distro-version
-    attributes:
-      label: Linux Distro Version
-      description: Required if OS is Linux
-      placeholder: e.g. 24.04, 41, Rolling
-
-  - type: dropdown
-    id: webkit2gtk
-    attributes:
-      label: Is webkit2gtk 4.1 installed?
-      description: Required if OS is Linux
-      options:
-        - "Yes"
-        - "No"
-
-  - type: dropdown
-    id: install-method
-    attributes:
-      label: Install Method
-      options:
-        - Windows Binary
-        - MacOS DMG
-        - Linux Binary
-        - Flatpak
-        - Compile from Source
-    validations:
-      required: true
-
+      value: For vulnerabilities, follow SECURITY.md. Remove credentials and private mail data from reports.
   - type: input
     id: version
     attributes:
-      label: Aerion Version
-      description: "Find out what version you are running from Aerion at ⚙️ (settings) --> About."
-      placeholder: e.g. v0.1.25
+      label: Fork version or commit
+      description: Include the commit hash for custom builds.
     validations:
       required: true
-      pattern: "^(v|0)\\d*\\.\\d+\\.\\d+"
-      validation_message: "Version must start with 'v' or '0' and follow the format (e.g. v0.1.25 or 0.1.25)"
-
   - type: textarea
-    id: description
+    id: environment
     attributes:
-      label: Description
-      description: A clear description of the bug
+      label: Environment
+      description: OS and version, architecture, build or install method, and WebKitGTK version if relevant.
     validations:
       required: true
-
   - type: textarea
     id: steps
     attributes:
-      label: Steps to Reproduce
-      description: How can we reproduce this bug?
-      placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. See error
+      label: Steps to reproduce
     validations:
       required: true
-
   - type: textarea
-    id: expected
+    id: behavior
     attributes:
-      label: Expected Behavior
-      description: What did you expect to happen?
+      label: Expected and actual behavior
     validations:
       required: true
-
   - type: textarea
-    id: actual
+    id: context
     attributes:
-      label: Actual Behavior
-      description: What actually happened?
-    validations:
-      required: true
+      label: Additional context
+      description: Include sanitized logs or screenshots and whether this reproduces upstream, if known.

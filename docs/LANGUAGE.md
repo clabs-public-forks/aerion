@@ -1,14 +1,12 @@
 # Contributing Translations
 
-If your language already exists in the code base and you are looking to improve the existing translation, comment in the existing contribution issue of your language to propose the change. With verification of at least one participant in the issue, submit a PR. If you are unfamiliar or uncomfortable with git ops, suggestions to see if someone will pick it up are also welcomed.
-
-If your language translation does not currently exist and you'd like to submit a translation PR:
+This guide covers translation work in the personal downstream fork. Follow [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow. Translation issues are optional coordination tools; local changes do not require upstream approval or another participant's verification.
 
 ## Checklist
 
 Use this checklist to ensure your submission is complete:
 
-- [ ] **Claimed language** — filed a [Translation issue](https://github.com/hkdb/aerion/issues/new?template=translation.yml) to avoid duplicate efforts
+- [ ] **Coordination, if needed** — checked this fork’s translation issues for overlapping work
 - [ ] **Core locale JSON** — `frontend/src/lib/i18n/locales/<code>.json` created with all core mail/UI keys translated
 - [ ] **Extension locale JSONs** — one `extensions/<name>/frontend/i18n/locales/<code>.json` per shipping extension (e.g., `extensions/contacts/frontend/i18n/locales/<code>.json`). Optional per locale — extensions you skip fall back to English at runtime; see [§ Extension translations](#extension-translations).
 - [ ] **Register locale** — added `register()` call in `frontend/src/lib/i18n/index.ts` (core locale only — extensions self-register via Vite glob)
@@ -21,17 +19,11 @@ Use this checklist to ensure your submission is complete:
 - [ ] **Live tested** — app launched with `make dev`, language switched, all strings verified (including any enabled extensions' UI)
 - [ ] **Detached composer** — composer window also displays the correct language
 
-## Claim Your Language
+## Coordination and Branch Target
 
-Check [existing translation issues](https://github.com/hkdb/aerion/issues?q=label%3Atranslate) first — if someone is already working on your language, consider collaborating with them instead.
+Check [this fork's translation issues](https://github.com/clabs-public-forks/aerion/issues?q=label%3Atranslate) when coordinating with other contributors. You may open a Translation issue to track work, but it is not required.
 
-Before starting any translation work, **file a [Translation issue](https://github.com/hkdb/aerion/issues/new?template=translation.yml)** to declare your intent. This prevents duplicate efforts and lets maintainers coordinate with contributors.
-
-## Branch Target
-
-- **Fork from and submit PRs to the latest release branch** (e.g., `v0.2.1-dev`), never `main`.
-- The `main` branch tracks the current production release and is not the target for new contributions.
-- Check the repository for the latest release branch name before starting, then fork from that branch to ensure your PR has the correct base.
+Use the intended downstream branch, or the fork's default branch for PRs unless another target is specified. Upstream release-branch requirements apply only when submitting upstream.
 
 ## Before Submitting
 
@@ -299,7 +291,7 @@ For each extension you want to translate (you can do one at a time — extension
 
 ### What if you translate the core but skip an extension
 
-That's fine. Submit a PR with just the core file. The extension's UI falls back to English via svelte-i18n's `fallbackLocale: 'en'` setting. A follow-up PR (from you or another contributor) can fill in the extension translation later — the translation issue you filed stays open as the soft-handoff point.
+That's fine. Submit a PR with just the core file. The extension's UI falls back to English via svelte-i18n's `fallbackLocale: 'en'` setting. A follow-up PR (from you or another contributor) can fill in the extension translation later — an optional translation issue can track remaining work.
 
 ### Listing every extension
 
@@ -376,4 +368,4 @@ Future extensions add their own top-level namespace (e.g., `calendar.*` for a Ca
 
 ## Translation Issue
 
-After a PR is merged, the translation issue will remain open permanently. This is where users can go to to provide feedback on any translation or propose their additional contributions.
+Close translation issues when their tracked work is complete. Open a follow-up issue for additional work or feedback when useful.

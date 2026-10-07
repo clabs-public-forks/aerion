@@ -1,7 +1,13 @@
 ![Logo](frontend/src/assets/images/logo-universal.png)
 
 # Aerion - An Open Source Lightweight E-Mail Client
-Maintained by: @hkdb
+## Personal Downstream Fork
+
+This repository, [clabs-public-forks/aerion](https://github.com/clabs-public-forks/aerion), is a personal fork for custom development. Upstream Aerion is maintained by [@hkdb](https://github.com/hkdb) at [hkdb/aerion](https://github.com/hkdb/aerion).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the downstream workflow, source build instructions, and coding guidance. Track fork-specific work in [this fork's issues](https://github.com/clabs-public-forks/aerion/issues). Custom behavior should be documented alongside the changes that introduce it.
+
+The project overview, roadmap, news, sponsorship, and contributor history below describe upstream Aerion. Upstream downloads and documentation may differ from this fork. Upstream certification and OAuth verification statements do not establish certification or verification of custom builds.
 
 ![screenshot](docs/ss.png)
 
@@ -82,13 +88,13 @@ Although Linux is a first-class citizen here, it also works on:
 ### 🚀 Installation
 ---
 
-- [Official Installation Guide](https://aerion.3df.io/docs/getting-started/installation/)
+- [Upstream Installation Guide](https://aerion.3df.io/docs/getting-started/installation/)
 
 
 ### 📖 Documentation
 ---
 
-- [Official Documentation](https://aerion.3df.io/docs/intro)
+- [Upstream Documentation](https://aerion.3df.io/docs/intro)
 
 
 ### ⚗️ Tech Stack
@@ -131,7 +137,7 @@ Potential features in the future:
 [CHANGELOG.md](CHANGELOG.md)
 
 
-### 💰 Sponsorship
+### 💰 Upstream Sponsorship
 ---
 
 [3DF](https://3df.io) is sponsoring by way of dedicating its cloud infrastructure resources and the team's time to work on this. There's otherwise currently no sponsorship. If you like this project, please feel free to give us a star or buy us a coffee:
@@ -147,7 +153,7 @@ Google verification requires apps like Aerion to recertify for CASA Tier 2 every
 Please see [CONTRIBUTING.md](CONTRIBUTING.md)
 
 
-### 🙏 Issue Contributors
+### 🙏 Upstream Issue Contributors
 ---
 
 Aerion is largely driven by community feedback. Big thanks to the following non-exhaustive list of contributors who submitted issues which led to meaningful improvements we all now enjoy. This project would not be the same without them!
