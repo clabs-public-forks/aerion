@@ -38,6 +38,10 @@ When a change affects user-visible behavior, commands, configuration, or develop
 
 Use Go's `testing` package, `*_test.go` files, and `TestXxx` functions. Cover critical paths and edge cases with table-driven tests where appropriate. Start with checks relevant to the change. Run `make test` for changes affecting multiple Go packages or shared behavior, or when focused checks leave unresolved risks. No numeric coverage threshold or frontend test script is configured; use frontend lint and type checks plus manual UI verification for frontend changes.
 
+- Before marking a milestone done, run `/code-review` on the diff and have a subagent check it against that milestone's acceptance criteria, followed by a `/simplify`. Fix gaps that affect correctness or stated requirements; treat style-only findings as optional.
+- Commit locally at milestone boundaries; rewind checkpoints do not capture changes made through Bash. Never push.
+- When compacting, preserve: the current milestone and sub-step, files modified so far, failing checks with their exact commands, and discoveries not yet written to the plan.
+
 ## Project Planning, Task Management, and Issue Tracking
 
 - Use the PLAN.md file to guide your work when building new features.
