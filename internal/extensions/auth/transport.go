@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -45,10 +46,14 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	if resp.StatusCode != http.StatusUnauthorized {
 		return resp, nil
 	}
-
-	// 401: drain + close body before retrying
+	// 401: buffer + close body; it's handed back if the request can't be resent.
+	// ContentLength must match what was kept, which may be truncated.
+	body401, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewReader(body401))
+	resp.ContentLength = int64(len(body401))
+	resp.Header.Del("Content-Length")
 
 	// Refresh under lock to avoid thundering herd.
 	t.mu.Lock()
@@ -89,7 +94,35 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 		return nil, fmt.Errorf("auth broker: persist refreshed tokens: %w", err)
 	}
 
-	return t.do(req, refreshed.AccessToken)
+	// Rewind only now: a fresh body taken earlier would leak on the error paths above.
+	retry, canRetry, err := rewind(req)
+	if err != nil {
+		return nil, err
+	}
+	if !canRetry {
+		// The token is fresh now, so the caller's own retry will succeed.
+		return resp, nil
+	}
+	return t.do(retry, refreshed.AccessToken)
+}
+
+// rewind returns req with a fresh body for resending after a refresh. The
+// first attempt consumed the body, so ok is false when it can't be replayed
+// (no GetBody) — resending would send it empty.
+func rewind(req *http.Request) (retry *http.Request, ok bool, err error) {
+	if req.Body == nil || req.Body == http.NoBody {
+		return req, true, nil
+	}
+	if req.GetBody == nil {
+		return nil, false, nil
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, false, fmt.Errorf("auth broker: rewind request body: %w", err)
+	}
+	r := *req // shallow copy is enough: do() clones before mutating
+	r.Body = body
+	return &r, true, nil
 }
 
 // canRegrant reports whether StartIncrementalConsent can write fresh tokens
