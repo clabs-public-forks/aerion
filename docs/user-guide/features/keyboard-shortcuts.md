@@ -21,6 +21,7 @@ These work anywhere in the application (unless you're typing in a text field).
 | `Ctrl+Shift+S` | Sync selected folder |
 | `Ctrl+Tab` | Switch to next extension on the rail (Mail / Contacts / ...) |
 | `` Ctrl+` `` | Switch to previous extension on the rail |
+| `Ctrl+Shift+B` | Hide/show the left sidebar of the current view |
 
 ### Pane Navigation
 
@@ -28,6 +29,8 @@ These work anywhere in the application (unless you're typing in a text field).
 |----------|--------|
 | `Alt+Left` / `Alt+H` | Focus previous pane (viewer -> list -> sidebar) |
 | `Alt+Right` / `Alt+L` | Focus next pane (sidebar -> list -> viewer) |
+
+A hidden sidebar is skipped when cycling panes.
 
 ### Folder Navigation
 
@@ -198,7 +201,7 @@ Aerion has three main panes:
 2. **Message List** - Conversations in the current folder
 3. **Conversation Viewer** - The selected conversation
 
-A visual indicator shows which pane is focused. Use `Alt+Left/Right` or `Alt+H/L` to move focus between panes.
+A visual indicator shows which pane is focused. Use `Alt+Left/Right` or `Alt+H/L` to move focus between panes. Hide the sidebar with the toolbar's sidebar button or `Ctrl+Shift+B`; it stays hidden per view (Mail, Contacts, Calendar) until you show it again.
 
 ## Bulk Selection
 

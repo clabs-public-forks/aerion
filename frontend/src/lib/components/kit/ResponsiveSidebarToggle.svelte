@@ -1,9 +1,9 @@
 <script lang="ts">
   // ResponsiveSidebarToggle — drop-in left-sidebar toggle for every view's
   // list/toolbar header (mail's MessageList, kit ListHeader, Calendar's
-  // ViewSwitcher). Fires toggleActiveSidebar(): in narrow mode that opens the
-  // slide-in overlay; in full/medium mode it collapses or expands the active
-  // view's sidebar (persisted per view).
+  // ViewSwitcher). Fires toggleActiveSidebar(): in narrow mode that opens or
+  // closes the slide-in overlay; in full/medium mode it collapses or expands
+  // the active view's sidebar (persisted per view).
   //
   // Consumers just compose:
   //

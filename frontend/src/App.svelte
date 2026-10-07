@@ -41,7 +41,7 @@
   } from '$lib/stores/keyboard.svelte'
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
-  import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive, isSidebarHidden } from '$lib/stores/layout.svelte'
+  import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive, isSidebarHidden, toggleActiveSidebar } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
   import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled, GetLastSeenVersion, SetLastSeenVersion, GetAppInfo } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
@@ -797,6 +797,15 @@
   // Mail's own collapse flag — the mail tree stays mounted under other rail
   // views, so it must not follow the active extension's flag.
   const mailSidebarHidden = $derived(isSidebarHidden('mail'))
+
+  // A hidden sidebar can't hold pane focus — covers collapsing, switching to a
+  // view whose sidebar is collapsed, and leaving narrow mode.
+  $effect(() => {
+    if (isSidebarHidden() && getFocusedPane() === 'sidebar') {
+      setFocusedPane('messageList')
+    }
+  })
+
   let listWidth = $state(420)
 
   // Resizing state
@@ -934,6 +943,11 @@
     const isMailActive = () => getActiveExtension() === 'mail'
     if (e.ctrlKey || e.metaKey) {
       // GLOBAL Ctrl/Cmd shortcuts — fire regardless of active rail pane.
+      if (KEY.SIDEBAR_TOGGLE(e)) {
+        e.preventDefault()
+        if (!e.repeat) toggleActiveSidebar()
+        return
+      }
       switch (e.key.toLowerCase()) {
         case 'q':
           e.preventDefault()

@@ -221,14 +221,11 @@ export function isSidebarCollapsed(view: string = activeExtensionState): boolean
   return collapsedSidebarsState[view] === true
 }
 
-export function setSidebarCollapsed(view: string, collapsed: boolean): void {
+function setSidebarCollapsed(view: string, collapsed: boolean): void {
   collapsedSidebarsState = { ...collapsedSidebarsState, [view]: collapsed }
   saveUIState({ collapsedSidebars: collapsedSidebarsState })
 }
 
-// Flips the view's flag and returns the new collapsed state.
-export function toggleSidebarCollapsed(view: string = activeExtensionState): boolean {
-  const collapsed = !isSidebarCollapsed(view)
-  setSidebarCollapsed(view, collapsed)
-  return collapsed
+export function toggleSidebarCollapsed(view: string = activeExtensionState): void {
+  setSidebarCollapsed(view, !isSidebarCollapsed(view))
 }

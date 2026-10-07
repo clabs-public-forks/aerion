@@ -4,6 +4,8 @@
  * Tracks which pane is focused and manages focus state for keyboard navigation.
  */
 
+import { isSidebarHidden } from './layout.svelte'
+
 export type FocusablePane = 'sidebar' | 'messageList' | 'viewer'
 
 // Pane cycle order for navigation
@@ -70,22 +72,29 @@ export function setFocusedPane(pane: FocusablePane) {
   }
 }
 
+// Step through PANE_ORDER in the given direction, skipping a hidden sidebar.
+function stepPane(direction: 1 | -1) {
+  let i = PANE_ORDER.indexOf(focusedPane)
+  do {
+    i = (i + direction + PANE_ORDER.length) % PANE_ORDER.length
+  } while (PANE_ORDER[i] === 'sidebar' && isSidebarHidden())
+  setFocusedPane(PANE_ORDER[i])
+}
+
 /**
  * Focus the previous pane in the cycle: viewer -> messageList -> sidebar -> viewer
+ * (the sidebar is skipped while collapsed)
  */
 export function focusPreviousPane() {
-  const currentIndex = PANE_ORDER.indexOf(focusedPane)
-  const previousIndex = currentIndex === 0 ? PANE_ORDER.length - 1 : currentIndex - 1
-  setFocusedPane(PANE_ORDER[previousIndex])
+  stepPane(-1)
 }
 
 /**
  * Focus the next pane in the cycle: sidebar -> messageList -> viewer -> sidebar
+ * (the sidebar is skipped while collapsed)
  */
 export function focusNextPane() {
-  const currentIndex = PANE_ORDER.indexOf(focusedPane)
-  const nextIndex = (currentIndex + 1) % PANE_ORDER.length
-  setFocusedPane(PANE_ORDER[nextIndex])
+  stepPane(1)
 }
 
 /**

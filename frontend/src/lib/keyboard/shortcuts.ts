@@ -90,6 +90,10 @@ export const SIDEBAR_FIRST = (e: KeyboardEvent): boolean =>
 export const SIDEBAR_LAST = (e: KeyboardEvent): boolean =>
   altOnly(e) && e.shiftKey && (e.key === 'G' || e.key === 'g')
 
+// Collapse/expand the active view's left sidebar — Ctrl/Cmd+Shift+B
+export const SIDEBAR_TOGGLE = (e: KeyboardEvent): boolean =>
+  ctrlOrMeta(e) && e.shiftKey && e.key.toLowerCase() === 'b'
+
 // Move/Copy folder-picker dialog for the focused message-list row — Alt+M / Alt+C
 export const LIST_MOVE_TO = (e: KeyboardEvent): boolean =>
   altOnly(e) && e.key === 'm'
@@ -116,6 +120,7 @@ export const KEY = {
   SIDEBAR_PREV,
   SIDEBAR_FIRST,
   SIDEBAR_LAST,
+  SIDEBAR_TOGGLE,
   LIST_MOVE_TO,
   LIST_COPY_TO,
 }

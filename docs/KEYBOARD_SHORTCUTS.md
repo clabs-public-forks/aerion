@@ -17,6 +17,7 @@ These shortcuts work anywhere in the application (unless in composer).
 | `Ctrl+Shift+S` | Sync selected folder |
 | `Ctrl+Tab` | Switch to next extension on the rail (Mail / Contacts / ...) |
 | `` Ctrl+` `` | Switch to previous extension on the rail |
+| `Ctrl+Shift+B` | Hide/show the left sidebar of the current view |
 
 ### Pane Navigation
 
@@ -24,6 +25,8 @@ These shortcuts work anywhere in the application (unless in composer).
 |----------|--------|
 | `Alt+Left` / `Alt+H` | Focus previous pane (viewer -> list -> sidebar) |
 | `Alt+Right` / `Alt+L` | Focus next pane (sidebar -> list -> viewer) |
+
+A hidden sidebar is skipped when cycling panes.
 
 ### Folder Navigation
 
@@ -153,6 +156,7 @@ NAVIGATION
   Alt + Enter         Expand/collapse account
   Ctrl + Tab          Switch to next extension on rail
   Ctrl + `            Switch to previous extension on rail
+  Ctrl + Shift + B    Hide/show left sidebar
   Arrow Keys / HJKL   Navigate within focused pane
   Enter               Open conversation / Expand account
   Space               Toggle checkbox / Expand account

@@ -2,7 +2,6 @@
 // Three modes: full (>1024px), medium (768-1024px), narrow (<768px)
 
 import { isSidebarCollapsed, toggleSidebarCollapsed } from './uiState.svelte'
-import { getFocusedPane, setFocusedPane } from './keyboard.svelte'
 
 export type LayoutMode = 'full' | 'medium' | 'narrow'
 export type ResponsiveView = 'default' | 'viewer' | 'sidebar'
@@ -81,14 +80,15 @@ export function isSidebarHidden(view?: string): boolean {
   return layoutMode !== 'narrow' && isSidebarCollapsed(view)
 }
 
-// Single toggle action for the active view's sidebar: opens the overlay in
-// narrow mode, otherwise flips the persisted per-view collapse flag.
+// Single toggle action for the active view's sidebar: opens/closes the
+// overlay in narrow mode, otherwise flips the persisted per-view collapse flag.
+// App moves pane focus off a sidebar once it is hidden.
 export function toggleActiveSidebar() {
-  if (layoutMode === 'narrow') {
+  if (layoutMode !== 'narrow') {
+    toggleSidebarCollapsed()
+  } else if (responsiveView === 'sidebar') {
+    hideSidebar()
+  } else {
     showSidebar()
-    return
-  }
-  if (toggleSidebarCollapsed() && getFocusedPane() === 'sidebar') {
-    setFocusedPane('messageList')
   }
 }

@@ -1802,7 +1802,7 @@ Does **not** own:
 <ResponsiveSidebarToggle />
 ```
 
-Zero-prop drop-in `mdi:dock-left` icon button that fires `toggleActiveSidebar()` (layout store). In narrow mode it opens the slide-in sidebar overlay; in full and medium modes it collapses or expands the active view's sidebar. The collapse state is persisted per rail id in `UIState.collapsedSidebars`, and `SidebarFrame` hides itself (staying mounted) while collapsed, so extensions built on `SidebarFrame` / `SourceSidebar` get collapsing for free. Auto-included inside `ListHeader`; mount it directly only when an extension renders its own custom toolbar (as Calendar's `ViewSwitcher` does).
+Zero-prop drop-in `mdi:dock-left` icon button that fires `toggleActiveSidebar()` (layout store). In narrow mode it opens or closes the slide-in sidebar overlay; in full and medium modes it collapses or expands the active view's sidebar. The collapse state is persisted per rail id in `UIState.collapsedSidebars`, and `SidebarFrame` hides itself (staying mounted) while collapsed, so extensions built on `SidebarFrame` / `SourceSidebar` get collapsing for free. Auto-included inside `ListHeader`; mount it directly only when an extension renders its own custom toolbar (as Calendar's `ViewSwitcher` does).
 
 #### `ConfirmDialog` — destructive-action confirmation
 
