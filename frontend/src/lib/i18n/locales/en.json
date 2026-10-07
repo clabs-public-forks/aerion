@@ -974,8 +974,7 @@
     "showAllResults": "Show all {total} results"
   },
   "responsive": {
-    "back": "Back",
-    "folders": "Folders"
+    "back": "Back"
   },
   "images": {
     "addresses": "Addresses",
