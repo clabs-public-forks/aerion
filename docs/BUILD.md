@@ -43,3 +43,5 @@ make build
 ./build/bin/aerion
 ```
 
+The `make` build and dev targets write the OAuth credentials from `.env` / `.env.local` into the gitignored `internal/oauth2/credentials_gen.go` and compile it with the `aerion_creds` build tag, so the values never appear in build output. `make clean` removes the file.
+

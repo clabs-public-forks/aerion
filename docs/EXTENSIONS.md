@@ -1975,7 +1975,7 @@ Each extension's package contains:
 - `extensions/<name>/manifest.json` — declares the extension
 - `extensions/<name>/manifest.go` — embeds the manifest JSON
 
-**No per-extension OAuth credentials live in extension packages.** All slot resolution is centralized in [`internal/oauth2/core_provider.go`](../internal/oauth2/core_provider.go), backed by three build-time ldflags variable pairs in `internal/oauth2/config.go`:
+**No per-extension OAuth credentials live in extension packages.** All slot resolution is centralized in [`internal/oauth2/core_provider.go`](../internal/oauth2/core_provider.go), backed by three build-time variable pairs in `internal/oauth2/config.go`:
 
 | Variable | Slots backed | Surfaced in picker as | Notes |
 |---|---|---|---|
@@ -1983,7 +1983,7 @@ Each extension's package contains:
 | `GoogleTestingClientID` / `GoogleTestingClientSecret` | `google-contacts`, `google-calendar` | "Aerion - Google (Testing)" | **Single shared un-Google-verified test project** that backs every first-party extension needing broader Google scopes (contacts.readwrite, full Calendar). When the mail project eventually gets verified for those scopes, the default in the picker UI switches to "Aerion - Google" and this slot becomes a fallback. |
 | `MicrosoftClientID` | `microsoft-mail`, `microsoft-contacts`, `microsoft-calendar` | "Aerion - Microsoft" | One Azure AD app registration covers all three surfaces. Microsoft Graph doesn't gate scopes behind verification, so adding `Contacts.ReadWrite` / `Calendars.ReadWrite` to the existing mail registration is free. |
 
-ldflags injection happens via the root `Makefile`'s LDFLAGS rules from the root `.env` / `.env.local`. Extension packages stay focused on domain logic — no `creds.go`, no `OAuthClients()`, no per-extension env file. If a slot's underlying variable is empty, the slot resolves to `(zero, false)` and the picker UI omits the corresponding option.
+The root `Makefile`'s `credentials` target writes the values from the root `.env` / `.env.local` into the gitignored `internal/oauth2/credentials_gen.go` (compiled only with the `aerion_creds` build tag), so they never appear on a command line or in Wails build output. Extension packages stay focused on domain logic — no `creds.go`, no `OAuthClients()`, no per-extension env file. If a slot's underlying variable is empty, the slot resolves to `(zero, false)` and the picker UI omits the corresponding option.
 
 ### Manifest OAuth routing — `first_party_uses_core_for_scopes`
 

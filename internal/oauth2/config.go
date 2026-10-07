@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 )
 
-// Build-time variables injected via ldflags
-// These are set during compilation using:
+// Build-time OAuth credentials. `make` writes them from .env into the
+// gitignored credentials_gen.go (build tag aerion_creds) so they never appear
+// on a command line; see build/gencreds.go. They can also be injected with
 //
 //	go build -ldflags "-X 'github.com/hkdb/aerion/internal/oauth2.GoogleClientID=xxx'"
 //
-// See Makefile for the complete build command.
-// If ldflags are not set, credentials are loaded from the aerion-creds shim binary.
+// If neither is set, credentials are loaded from the aerion-creds shim binary.
 var (
 	// GoogleClientID is the OAuth2 client ID for Google/Gmail (Mail-scoped project).
 	// Same client also backs first-party extensions' Google flows for any scopes
@@ -48,7 +48,6 @@ var (
 	GoogleTestingClientSecret string
 )
 
-
 func init() {
 	if GoogleClientID != "" {
 		return
@@ -79,16 +78,25 @@ func loadFromShim() {
 		if err := json.Unmarshal(out, &creds); err != nil {
 			continue
 		}
-		GoogleClientID = creds["google_client_id"]
-		GoogleClientSecret = creds["google_client_secret"]
-		MicrosoftClientID = creds["microsoft_client_id"]
-		// Optional shared testing client for the un-verified Google
-		// project that backs extensions needing broader scopes. Empty
-		// until provisioned — picker simply omits the "(Testing)" option.
-		GoogleTestingClientID = creds["google_testing_client_id"]
-		GoogleTestingClientSecret = creds["google_testing_client_secret"]
+		setCredentials(creds)
 		return
 	}
+}
+
+// setCredentials assigns the build-time credential variables from a map keyed
+// like the aerion-creds shim's JSON output. Missing keys clear the variable.
+// It returns true so generated code can call it from a package-level var
+// initializer, which runs before init().
+func setCredentials(creds map[string]string) bool {
+	GoogleClientID = creds["google_client_id"]
+	GoogleClientSecret = creds["google_client_secret"]
+	MicrosoftClientID = creds["microsoft_client_id"]
+	// Optional shared testing client for the un-verified Google
+	// project that backs extensions needing broader scopes. Empty
+	// until provisioned — picker simply omits the "(Testing)" option.
+	GoogleTestingClientID = creds["google_testing_client_id"]
+	GoogleTestingClientSecret = creds["google_testing_client_secret"]
+	return true
 }
 
 // IsGoogleConfigured returns true if Google OAuth credentials are

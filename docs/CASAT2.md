@@ -299,7 +299,7 @@ All external HTTP calls are made server-side by the Go backend. The frontend has
 
 Aerion uses a **Makefile** with well-defined, repeatable build targets:
 
-- `make build` — Production binary with compile-time ldflags
+- `make build` — Production binary with compile-time OAuth credentials
 - `make build-linux` — Linux-specific build with production tags
 - `make flatpak` — Flatpak package build
 - `make test` — Automated test suite
@@ -321,7 +321,7 @@ All build steps are deterministic and automated — no manual intervention requi
 
 ### Secrets Management
 
-- **OAuth client secrets**: Injected at compile time via environment variables and ldflags — never hardcoded in source code
+- **OAuth client secrets**: Injected at compile time from environment variables via a gitignored generated Go file (`internal/oauth2/credentials_gen.go`) — never hardcoded in committed source or passed on the build command line
 - **`.env` / `.env.local`**: Used only for local development builds, listed in `.gitignore`
 - **No secrets in repository**: Private credentials and signing keys are excluded from version control
 

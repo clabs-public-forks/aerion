@@ -57,3 +57,6 @@ npm-debug.log*
 # Cache
 .cache/
 .gitnexus
+
+# Generated OAuth credentials (make credentials)
+internal/oauth2/credentials_gen.go

@@ -63,7 +63,7 @@ Companion docs:
 - **R13.** Each extension owns its OAuth client-config slots, declared in
   `extensions/<name>/creds.go` as `coreapi.OAuthProviderRegistration`.
   Slot IDs are `<provider>-<extensionID>` (e.g., `google-calendar`,
-  `microsoft-contacts`). Credentials are ldflag-injected at build time.
+  `microsoft-contacts`). Credentials are compiled in at build time.
 - **R14.** Settings key for each extension is reserved in
   `internal/settings/store.go` as `KeyExtension<Name>Enabled =
   "extension_<name>_enabled"` and added to `AllExtensionKeys`. Default

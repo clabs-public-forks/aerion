@@ -8,7 +8,7 @@
 # OAuth credentials are loaded from .env or .env.local files
 # See .env.example for required variables
 
-.PHONY: all build build-linux dev dev-race generate clean test lint help \
+.PHONY: all build build-linux dev dev-race credentials generate clean test lint help \
         install uninstall install-linux uninstall-linux \
         install-darwin uninstall-darwin build-windows-installer flatpak flatpak-install flatpak-dev
 
@@ -19,11 +19,10 @@
 -include .env.local
 export
 
-# Go module path
-MODULE := github.com/hkdb/aerion
-PYTHON ?= python3
-
-# Build flags for injecting OAuth credentials at compile time.
+# OAuth credentials compiled into the app. The `credentials` target writes
+# them to the gitignored internal/oauth2/credentials_gen.go (built only with
+# the aerion_creds tag) instead of passing -ldflags, so Wails and Go never
+# print them.
 #
 #   GOOGLE_CLIENT_ID/SECRET   — mail's Google-verified client. Also backs
 #                               first-party extensions for any scopes their
@@ -43,14 +42,8 @@ PYTHON ?= python3
 #                               Single client backs google-contacts AND
 #                               google-calendar slots. Surfaced as
 #                               "Aerion - Google (Testing)".
-LDFLAGS := -X '$(MODULE)/internal/oauth2.GoogleClientID=$(GOOGLE_CLIENT_ID)' \
-           -X '$(MODULE)/internal/oauth2.GoogleClientSecret=$(GOOGLE_CLIENT_SECRET)' \
-           -X '$(MODULE)/internal/oauth2.MicrosoftClientID=$(MICROSOFT_CLIENT_ID)' \
-           -X '$(MODULE)/internal/oauth2.GoogleTestingClientID=$(GOOGLE_TESTING_CLIENT_ID)' \
-           -X '$(MODULE)/internal/oauth2.GoogleTestingClientSecret=$(GOOGLE_TESTING_CLIENT_SECRET)'
-
 # Wails build tags
-BUILD_TAGS := webkit2_41
+BUILD_TAGS := webkit2_41,aerion_creds
 
 # NOTE: AppImage build target has been removed due to webkit bundling incompatibility.
 # See archive/AppImage/README.md for details on what was tried and why it didn't work.
@@ -68,23 +61,27 @@ all: build
 
 ## Build Targets
 
+# Write OAuth credentials from .env into a gitignored Go source file
+credentials:
+	@go run build/gencreds.go
+
 # Build production binary
-build:
+build: credentials
 	@echo "Building Aerion..."
 	@if [ -z "$(GOOGLE_CLIENT_ID)" ] && [ -z "$(MICROSOFT_CLIENT_ID)" ]; then \
 		echo "Warning: No OAuth credentials configured. Gmail/Outlook OAuth will not work."; \
 		echo "See .env.example for required variables."; \
 	fi
-	@$(PYTHON) build/wails-output.py wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	@wails build -tags $(BUILD_TAGS)
 ifeq ($(UNAME_S),Darwin)
 	@echo "Ad-hoc signing Aerion.app (required for macOS notifications)..."
 	codesign --force --deep --sign - build/bin/Aerion.app
 endif
 
 # Build for Linux specifically
-build-linux:
+build-linux: credentials
 	@echo "Building Aerion for Linux..."
-	@$(PYTHON) build/wails-output.py wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS),linux,production
+	@wails build -tags $(BUILD_TAGS),linux,production
 
 # Build Flatpak (recommended for Linux distribution)
 flatpak:
@@ -102,18 +99,18 @@ flatpak-dev:
 	./build/flatpak/build-flatpak.sh
 
 # Run in development mode with hot reload
-dev:
+dev: credentials
 	@echo "Starting Aerion in development mode..."
-	@$(PYTHON) build/wails-output.py wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	@wails dev -tags $(BUILD_TAGS)
 
 # Run in development mode with Go's race detector enabled. Builds significantly
 # slower and adds ~5-10x runtime overhead, but instruments every memory access
 # and prints exactly which line + goroutines collide on any unsynchronized
 # shared-memory access. Use this when chasing a suspected data race —
 # reproduce the crash and the detector report points right at it.
-dev-race:
+dev-race: credentials
 	@echo "Starting Aerion in development mode with -race..."
-	@$(PYTHON) build/wails-output.py wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
+	@wails dev -tags $(BUILD_TAGS) -race
 
 # Generate Wails TypeScript bindings
 generate:
@@ -154,6 +151,7 @@ clean:
 	rm -rf frontend/dist
 	rm -rf AppDir
 	rm -f aerion
+	rm -f internal/oauth2/credentials_gen.go
 
 # Clean downloaded tools (deprecated - AppImage removed)
 tools-clean:
@@ -257,9 +255,9 @@ uninstall-darwin:
 ## Windows Installation
 
 # Build Windows installer (requires NSIS)
-build-windows-installer:
+build-windows-installer: credentials
 	@echo "Building Windows installer..."
-	@$(PYTHON) build/wails-output.py wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -nsis
+	@wails build -tags $(BUILD_TAGS) -nsis
 	@echo ""
 	@echo "Installer created at build/bin/aerion-amd64-installer.exe"
 
@@ -307,5 +305,6 @@ help:
 	@echo "  GOOGLE_CLIENT_ID     - Google OAuth Client ID"
 	@echo "  GOOGLE_CLIENT_SECRET - Google OAuth Client Secret (optional)"
 	@echo "  MICROSOFT_CLIENT_ID  - Microsoft OAuth Client ID"
+	@echo "  GOOGLE_TESTING_CLIENT_ID/SECRET - Google testing client for extensions"
 	@echo ""
 	@echo "See .env.example for details on obtaining OAuth credentials."
