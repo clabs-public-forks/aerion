@@ -57,7 +57,3 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 ### [P2] Unlimited-history sync never reconciles an empty mailbox
 
 `internal/sync/messages.go` `SyncMessages` skips deletion reconciliation when a successful remote search returns zero messages, local rows remain, and `syncPeriodDays == 0`. Emptying a folder in another client leaves stale messages indefinitely. Distinguish search errors from valid empty results and reconcile confirmed empty mailboxes.
-
-### [P3] Narrow-layout sidebar toggle not verified manually
-
-The collapsible-sidebar feature changed the narrow (<768px) toggle path: the toolbar button and `Ctrl+Shift+B` now open and close the slide-in overlay through `toggleActiveSidebar()`. This was checked only statically, because the test window could not be resized. In a narrow window, confirm in Mail, Contacts, and Calendar that the overlay opens, closes, and that the scrim and back button still dismiss it.
