@@ -2,7 +2,7 @@
 
 ## Open
 
-### Old Flatpak build cache holds OAuth secrets
+### [P2] Old Flatpak build cache holds OAuth secrets
 
 Before the dev manifest was restricted to packaging inputs, local Flatpak builds copied `.env.local` and `internal/oauth2/credentials_gen.go` into `.flatpak-builder/` (synced folder). Delete it with `rm -rf .flatpak-builder` (it is only a cache), and rotate the OAuth client secrets if the sync service may have uploaded them.
 
