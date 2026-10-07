@@ -8,7 +8,8 @@ aerion-creds
 build/bin/
 build/linux/AppDir
 .tools/
-.claude
+.claude/*
+!.claude/skills/
 .crush
 
 # Flatpak build artifacts
