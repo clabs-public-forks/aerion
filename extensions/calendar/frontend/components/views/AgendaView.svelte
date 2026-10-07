@@ -113,7 +113,7 @@
 </script>
 
 <div class="flex-1 flex flex-col min-h-0 bg-background">
-  <ListHeader label={headerLabel} />
+  <ListHeader label={headerLabel} showSidebarToggle={false} />
 
   <ListPane
     items={rows}

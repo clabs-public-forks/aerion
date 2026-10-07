@@ -14,6 +14,7 @@
   import { onMount, onDestroy } from 'svelte'
   import Icon from '@iconify/svelte'
   import ConversationRow from './ConversationRow.svelte'
+  import ResponsiveSidebarToggle from '$lib/components/kit/ResponsiveSidebarToggle.svelte'
   import { DropdownMenu } from 'bits-ui'
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
@@ -42,8 +43,6 @@
     onRowActionComplete?: () => void
     isFocused?: boolean
     isFlashing?: boolean
-    showFolderToggle?: boolean
-    onToggleSidebar?: () => void
   }
 
   let {
@@ -56,8 +55,6 @@
     onRowActionComplete,
     isFocused: _isFocused = false,
     isFlashing = false,
-    showFolderToggle = false,
-    onToggleSidebar,
   }: Props = $props()
 
   // State
@@ -1409,16 +1406,7 @@
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
     <div class="flex items-center gap-2">
-      {#if showFolderToggle}
-        <button
-          class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors"
-          title={$_('responsive.folders')}
-          aria-label={$_('aria.toggleSidebar')}
-          onclick={onToggleSidebar}
-        >
-          <Icon icon="mdi:dock-left" class="w-5 h-5 text-muted-foreground" />
-        </button>
-      {/if}
+      <ResponsiveSidebarToggle />
       {#if showSearch}
         <!-- Search input -->
         <div class="flex items-center gap-1 bg-muted rounded-md px-2 flex-1">

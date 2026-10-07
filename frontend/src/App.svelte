@@ -41,7 +41,7 @@
   } from '$lib/stores/keyboard.svelte'
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
-  import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
+  import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive, isSidebarHidden } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
   import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled, GetLastSeenVersion, SetLastSeenVersion, GetAppInfo } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
@@ -59,6 +59,7 @@
   let messageListRef: MessageList | null = null
   let viewerRef: ConversationViewer | null = null
   let messageListContainerRef: HTMLElement | null = null
+  let sidebarContainerRef: HTMLElement | null = null
 
   // React to theme mode changes from settings store
   $effect(() => {
@@ -793,29 +794,38 @@
 
   // Pane sizing state
   let sidebarWidth = $state(240)
+  // Mail's own collapse flag — the mail tree stays mounted under other rail
+  // views, so it must not follow the active extension's flag.
+  const mailSidebarHidden = $derived(isSidebarHidden('mail'))
   let listWidth = $state(420)
 
   // Resizing state
   let isResizingSidebar = $state(false)
   let isResizingList = $state(false)
+  // Left edge of the pane being resized, measured once at drag start so the
+  // extension rail and a collapsed sidebar don't skew the width.
+  let resizeOriginX = 0
 
   function startResizeSidebar(e: MouseEvent) {
     if (isResponsive()) return
+    resizeOriginX = sidebarContainerRef?.getBoundingClientRect().left ?? 0
     isResizingSidebar = true
     e.preventDefault()
   }
 
   function startResizeList(e: MouseEvent) {
     if (isResponsive()) return
+    resizeOriginX = messageListContainerRef?.getBoundingClientRect().left ?? sidebarWidth
     isResizingList = true
     e.preventDefault()
   }
 
   function handleMouseMove(e: MouseEvent) {
+    const width = e.clientX - resizeOriginX
     if (isResizingSidebar) {
-      sidebarWidth = Math.max(paneConstraints.sidebar.min, Math.min(paneConstraints.sidebar.max, e.clientX))
+      sidebarWidth = Math.max(paneConstraints.sidebar.min, Math.min(paneConstraints.sidebar.max, width))
     } else if (isResizingList) {
-      listWidth = Math.max(paneConstraints.list.min, Math.min(paneConstraints.list.max, e.clientX - sidebarWidth))
+      listWidth = Math.max(paneConstraints.list.min, Math.min(paneConstraints.list.max, width))
     }
   }
 
@@ -1588,7 +1598,8 @@
     <div style:display={getActiveExtension() === 'mail' ? 'contents' : 'none'}>
     <!-- Sidebar (Folder List) -->
     <aside
-      class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'}"
+      bind:this={sidebarContainerRef}
+      class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'} {mailSidebarHidden ? 'hidden' : ''}"
       style="{getLayoutMode() === 'full' ? `width: ${sidebarWidth}px` : ''}"
       role="presentation"
       onclick={() => handlePaneClick('sidebar')}
@@ -1623,7 +1634,7 @@
     {/if}
 
     <!-- Sidebar Resize Handle -->
-    {#if getLayoutMode() === 'full'}
+    {#if getLayoutMode() === 'full' && !mailSidebarHidden}
     <button
       type="button"
       class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingSidebar
@@ -1655,8 +1666,6 @@
         onRowActionComplete={() => viewerRef?.refreshFlags()}
         isFocused={getFocusedPane() === 'messageList'}
         isFlashing={isPaneFlashing('messageList')}
-        showFolderToggle={getLayoutMode() === 'narrow'}
-        onToggleSidebar={showSidebar}
       />
     </section>
 

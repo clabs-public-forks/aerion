@@ -22,6 +22,8 @@ export interface UIState {
   collapsedFolders: Record<string, boolean>  // folderId -> isCollapsed (default: true/collapsed, false = explicitly expanded)
   // Active extension pane: 'mail' (default) or an extension id like 'contacts'.
   activeExtension: string
+  // Per-view left sidebar collapse: rail id ('mail', 'contacts', ...) -> collapsed.
+  collapsedSidebars: Record<string, boolean>
 }
 
 // Pane width constraints
@@ -45,6 +47,7 @@ const defaultState: UIState = {
   unifiedInboxExpanded: true,
   collapsedFolders: {},
   activeExtension: 'mail',
+  collapsedSidebars: {},
 }
 
 // Current state (in-memory cache)
@@ -59,6 +62,10 @@ let uiStateLoadedVersion = $state(0)
 // module level keeps them in sync without prop drilling. currentState still
 // holds the persisted value; this mirror is what consumers read.
 let activeExtensionState = $state<string>('mail')
+
+// Reactive mirror of collapsedSidebars (currentState isn't reactive), read by
+// the sidebar toggle and the sidebars themselves.
+let collapsedSidebarsState = $state<Record<string, boolean>>({})
 
 // Clamp a value within bounds
 function clamp(value: number, min: number, max: number): number {
@@ -88,8 +95,10 @@ export async function loadUIState(): Promise<UIState> {
         unifiedInboxExpanded: state.unifiedInboxExpanded !== false, // default true
         collapsedFolders: state.collapsedFolders || {},
         activeExtension: state.activeExtension || 'mail',
+        collapsedSidebars: state.collapsedSidebars || {},
       }
       activeExtensionState = currentState.activeExtension
+      collapsedSidebarsState = currentState.collapsedSidebars
     }
   } catch (err) {
     console.error('Failed to load UI state:', err)
@@ -138,6 +147,7 @@ export function saveUIState(updates: Partial<UIState>): void {
         unifiedInboxExpanded: currentState.unifiedInboxExpanded,
         collapsedFolders: currentState.collapsedFolders,
         activeExtension: currentState.activeExtension,
+        collapsedSidebars: currentState.collapsedSidebars,
       }
       await SaveUIState(backendState)
     } catch (err) {
@@ -203,4 +213,22 @@ export function setActiveExtension(name: string): void {
 export const paneConstraints = {
   sidebar: { min: SIDEBAR_MIN, max: SIDEBAR_MAX },
   list: { min: LIST_MIN, max: LIST_MAX },
+}
+
+// Left sidebar collapse helpers. Keyed by rail id so each view (mail and
+// every extension) remembers its own state. Missing entry -> expanded.
+export function isSidebarCollapsed(view: string = activeExtensionState): boolean {
+  return collapsedSidebarsState[view] === true
+}
+
+export function setSidebarCollapsed(view: string, collapsed: boolean): void {
+  collapsedSidebarsState = { ...collapsedSidebarsState, [view]: collapsed }
+  saveUIState({ collapsedSidebars: collapsedSidebarsState })
+}
+
+// Flips the view's flag and returns the new collapsed state.
+export function toggleSidebarCollapsed(view: string = activeExtensionState): boolean {
+  const collapsed = !isSidebarCollapsed(view)
+  setSidebarCollapsed(view, collapsed)
+  return collapsed
 }

@@ -1784,7 +1784,7 @@ Zero props. Just compose your three kit-based panes inside. Extensions don't imp
 
 Owns:
 - Toolbar wrapper styling (`flex items-center justify-between px-4 py-3 border-b border-border`) so every kit consumer's list column shares mail's `MessageList` toolbar rhythm.
-- Leading `<ResponsiveSidebarToggle />` auto-included.
+- Leading `<ResponsiveSidebarToggle />` auto-included. Pass `showSidebarToggle={false}` when an outer toolbar above the list already renders one (Calendar's `AgendaView` sits under `ViewSwitcher`).
 - `<h2>` title + count badge layout.
 - Search-mode swap (when `searchMode === true`, the title area is replaced by the consumer's `search` snippet).
 - Trailing `actions` snippet for per-extension toolbar buttons.
@@ -1794,7 +1794,7 @@ Does **not** own:
 - Search input markup (debounce, refs, clear-button logic stays in the consumer).
 - The action buttons themselves (sort / add / etc. are extension-specific).
 
-#### `ResponsiveSidebarToggle` — hamburger for narrow mode
+#### `ResponsiveSidebarToggle` — left-sidebar toggle
 
 [`frontend/src/lib/components/kit/ResponsiveSidebarToggle.svelte`](../frontend/src/lib/components/kit/ResponsiveSidebarToggle.svelte)
 
@@ -1802,7 +1802,7 @@ Does **not** own:
 <ResponsiveSidebarToggle />
 ```
 
-Zero-prop drop-in. Renders nothing when not narrow; renders an `mdi:dock-left` icon button when narrow that fires `showSidebar()` on click. Auto-included inside `ListHeader` so extensions composing the canonical toolbar don't need to mount this directly — it appears here in the kit's component list only for the case where an extension renders its own custom toolbar and wants the canonical hamburger placement.
+Zero-prop drop-in `mdi:dock-left` icon button that fires `toggleActiveSidebar()` (layout store). In narrow mode it opens the slide-in sidebar overlay; in full and medium modes it collapses or expands the active view's sidebar. The collapse state is persisted per rail id in `UIState.collapsedSidebars`, and `SidebarFrame` hides itself (staying mounted) while collapsed, so extensions built on `SidebarFrame` / `SourceSidebar` get collapsing for free. Auto-included inside `ListHeader`; mount it directly only when an extension renders its own custom toolbar (as Calendar's `ViewSwitcher` does).
 
 #### `ConfirmDialog` — destructive-action confirmation
 

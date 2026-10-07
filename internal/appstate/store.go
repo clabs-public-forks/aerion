@@ -65,6 +65,18 @@ func (s *Store) Delete(key string) error {
 	return nil
 }
 
+// defaultUIState returns the UI state used when none is saved or it is unreadable.
+func defaultUIState() *UIState {
+	return &UIState{
+		SidebarWidth:         240,
+		ListWidth:            420,
+		ExpandedAccounts:     make(map[string]bool),
+		UnifiedInboxExpanded: true,
+		CollapsedFolders:     make(map[string]bool),
+		CollapsedSidebars:    make(map[string]bool),
+	}
+}
+
 // GetUIState retrieves the saved UI state
 func (s *Store) GetUIState() (*UIState, error) {
 	value, err := s.Get(KeyUIState)
@@ -73,25 +85,13 @@ func (s *Store) GetUIState() (*UIState, error) {
 	}
 	if value == "" {
 		// Return default state if not set
-		return &UIState{
-			SidebarWidth:         240,
-			ListWidth:            420,
-			ExpandedAccounts:     make(map[string]bool),
-			UnifiedInboxExpanded: true,
-			CollapsedFolders:     make(map[string]bool),
-		}, nil
+		return defaultUIState(), nil
 	}
 
 	var state UIState
 	if err := json.Unmarshal([]byte(value), &state); err != nil {
 		s.log.Warn().Err(err).Msg("Failed to parse UI state, returning default")
-		return &UIState{
-			SidebarWidth:         240,
-			ListWidth:            420,
-			ExpandedAccounts:     make(map[string]bool),
-			UnifiedInboxExpanded: true,
-			CollapsedFolders:     make(map[string]bool),
-		}, nil
+		return defaultUIState(), nil
 	}
 
 	// Ensure maps are initialized (for older saved states)
@@ -100,6 +100,9 @@ func (s *Store) GetUIState() (*UIState, error) {
 	}
 	if state.CollapsedFolders == nil {
 		state.CollapsedFolders = make(map[string]bool)
+	}
+	if state.CollapsedSidebars == nil {
+		state.CollapsedSidebars = make(map[string]bool)
 	}
 
 	return &state, nil

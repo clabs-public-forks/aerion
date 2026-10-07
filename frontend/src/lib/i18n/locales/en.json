@@ -948,6 +948,8 @@
     "selectPresetColor": "Select {color}",
     "backToList": "Back to message list",
     "toggleSidebar": "Toggle sidebar",
+    "showSidebar": "Show sidebar",
+    "hideSidebar": "Hide sidebar",
     "closeSidebar": "Close sidebar",
     "showAllToasts": "Show all notifications",
     "collapseToasts": "Collapse notifications"

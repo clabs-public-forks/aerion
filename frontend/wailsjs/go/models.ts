@@ -779,6 +779,7 @@ export namespace appstate {
 	    unifiedInboxExpanded: boolean;
 	    collapsedFolders: Record<string, boolean>;
 	    activeExtension?: string;
+	    collapsedSidebars?: Record<string, boolean>;
 	
 	    static createFrom(source: any = {}) {
 	        return new UIState(source);
@@ -799,6 +800,7 @@ export namespace appstate {
 	        this.unifiedInboxExpanded = source["unifiedInboxExpanded"];
 	        this.collapsedFolders = source["collapsedFolders"];
 	        this.activeExtension = source["activeExtension"];
+	        this.collapsedSidebars = source["collapsedSidebars"];
 	    }
 	}
 

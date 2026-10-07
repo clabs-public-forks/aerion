@@ -6,7 +6,7 @@
   //      extension's list column renders with the same visual rhythm as mail's
   //      MessageList toolbar.
   //   2. The leading <ResponsiveSidebarToggle /> — auto-included so extensions
-  //      don't have to remember to place a hamburger toggle for narrow mode.
+  //      don't have to remember to place a sidebar toggle.
   //   3. The title <h2> + optional count badge layout matching mail.
   //   4. A search-mode swap: when `searchMode` is true, the title area is
   //      replaced by the consumer's `search` snippet (so the consumer can
@@ -42,6 +42,9 @@
     search?: Snippet
     /** Trailing toolbar buttons (sort, add, etc.). Rendered right-aligned. */
     actions?: Snippet
+    /** Render the leading sidebar toggle. Disable when an outer toolbar
+     *  (e.g. Calendar's ViewSwitcher) already provides one. */
+    showSidebarToggle?: boolean
   }
 
   const {
@@ -50,12 +53,15 @@
     searchMode = false,
     search,
     actions,
+    showSidebarToggle = true,
   }: Props = $props()
 </script>
 
 <div class="flex items-center justify-between px-4 py-3 border-b border-border">
   <div class="flex items-center gap-2 flex-1 min-w-0">
-    <ResponsiveSidebarToggle />
+    {#if showSidebarToggle}
+      <ResponsiveSidebarToggle />
+    {/if}
     {#if searchMode && search}
       {@render search()}
     {:else}

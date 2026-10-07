@@ -44,6 +44,9 @@ func TestGetUIStateDefault(t *testing.T) {
 	if state.CollapsedFolders == nil {
 		t.Error("CollapsedFolders is nil, want initialized map")
 	}
+	if state.CollapsedSidebars == nil {
+		t.Error("CollapsedSidebars is nil, want initialized map")
+	}
 }
 
 func TestSaveGetUIState(t *testing.T) {
@@ -60,6 +63,7 @@ func TestSaveGetUIState(t *testing.T) {
 		ExpandedAccounts:     map[string]bool{"acct-1": true, "acct-2": false},
 		UnifiedInboxExpanded: false,
 		CollapsedFolders:     map[string]bool{"folder-2": true},
+		CollapsedSidebars:    map[string]bool{"mail": true, "calendar": false},
 	}
 
 	if err := store.SaveUIState(saved); err != nil {
@@ -93,6 +97,34 @@ func TestSaveGetUIState(t *testing.T) {
 	}
 	if !got.CollapsedFolders["folder-2"] {
 		t.Error("CollapsedFolders[folder-2] = false, want true")
+	}
+	if !got.CollapsedSidebars["mail"] {
+		t.Error("CollapsedSidebars[mail] = false, want true")
+	}
+	if got.CollapsedSidebars["calendar"] || got.CollapsedSidebars["contacts"] {
+		t.Error("CollapsedSidebars[calendar|contacts] = true, want false")
+	}
+}
+
+// TestGetUIStateLegacyNoCollapsedSidebars covers state saved before the
+// collapsedSidebars field existed: every sidebar must load expanded.
+func TestGetUIStateLegacyNoCollapsedSidebars(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+
+	if err := store.Set(KeyUIState, `{"sidebarWidth":260,"listWidth":420,"unifiedInboxExpanded":true}`); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
+
+	got, err := store.GetUIState()
+	if err != nil {
+		t.Fatalf("GetUIState() error = %v", err)
+	}
+	if got.CollapsedSidebars == nil {
+		t.Fatal("CollapsedSidebars is nil, want initialized map")
+	}
+	if len(got.CollapsedSidebars) != 0 {
+		t.Errorf("CollapsedSidebars = %v, want empty", got.CollapsedSidebars)
 	}
 }
 

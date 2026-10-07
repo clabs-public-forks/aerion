@@ -1,6 +1,9 @@
 // Responsive layout store for tiled/narrow windows
 // Three modes: full (>1024px), medium (768-1024px), narrow (<768px)
 
+import { isSidebarCollapsed, toggleSidebarCollapsed } from './uiState.svelte'
+import { getFocusedPane, setFocusedPane } from './keyboard.svelte'
+
 export type LayoutMode = 'full' | 'medium' | 'narrow'
 export type ResponsiveView = 'default' | 'viewer' | 'sidebar'
 
@@ -68,5 +71,24 @@ export function hideSidebar() {
   if (layoutMode !== 'narrow') return
   if (responsiveView === 'sidebar') {
     responsiveView = 'default'
+  }
+}
+
+// True when a view's left sidebar (default: the active view's) is collapsed.
+// Narrow mode ignores the collapse flag: there the sidebar is always an
+// on-demand overlay.
+export function isSidebarHidden(view?: string): boolean {
+  return layoutMode !== 'narrow' && isSidebarCollapsed(view)
+}
+
+// Single toggle action for the active view's sidebar: opens the overlay in
+// narrow mode, otherwise flips the persisted per-view collapse flag.
+export function toggleActiveSidebar() {
+  if (layoutMode === 'narrow') {
+    showSidebar()
+    return
+  }
+  if (toggleSidebarCollapsed() && getFocusedPane() === 'sidebar') {
+    setFocusedPane('messageList')
   }
 }

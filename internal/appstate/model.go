@@ -26,4 +26,8 @@ type UIState struct {
 	// The frontend uses this to decide whether to render Mail or an extension's
 	// pane after the rail is shown. Missing field -> Mail.
 	ActiveExtension string `json:"activeExtension,omitempty"`
+
+	// Per-view left sidebar collapse: rail id ("mail", "contacts", "calendar",
+	// ...) -> collapsed. Missing entry -> expanded.
+	CollapsedSidebars map[string]bool `json:"collapsedSidebars,omitempty"`
 }
