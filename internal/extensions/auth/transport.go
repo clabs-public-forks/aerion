@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
 	"github.com/hkdb/aerion/internal/oauth2"
 )
@@ -22,6 +24,9 @@ type bearerRefreshTransport struct {
 	oauthManager   *oauth2.Manager
 	accountID      string
 	clientConfigID string
+	// scopes the client was issued for; reported back if the refresh token
+	// is rejected and the user must re-consent.
+	scopes []coreapi.AuthScope
 
 	mu sync.Mutex // guards token retrieval/refresh
 }
@@ -61,6 +66,18 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	refreshed, err := t.oauthManager.RefreshTokenWithProvider(provider, tokens.RefreshToken)
+	if errors.Is(err, oauth2.ErrInvalidGrant) && canRegrant(t.clientConfigID) {
+		// The refresh token is dead (expired/revoked). Surface it as a consent
+		// requirement so extensions offer their grant flow instead of a raw
+		// error the user has no way to act on. Mail slots keep the refresh
+		// error: only mail re-auth can repair them.
+		return nil, &coreapi.ErrAdditionalConsentRequired{
+			AccountID:      t.accountID,
+			ClientConfigID: coreapi.ClientConfigID(t.clientConfigID),
+			MissingScopes:  t.scopes,
+			Reason:         "refresh token expired or revoked",
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("auth broker: refresh: %w", err)
 	}
@@ -73,6 +90,13 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	}
 
 	return t.do(req, refreshed.AccessToken)
+}
+
+// canRegrant reports whether StartIncrementalConsent can write fresh tokens
+// into the given slot.
+func canRegrant(clientConfigID string) bool {
+	_, err := oauth2.IncrementalConsentProvider(clientConfigID)
+	return err == nil
 }
 
 // resolveProvider returns the OAuth2 provider config for refreshing this account's

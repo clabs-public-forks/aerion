@@ -52,9 +52,16 @@ type ErrAdditionalConsentRequired struct {
 	AccountID      string
 	ClientConfigID ClientConfigID
 	MissingScopes  []AuthScope
+	// Reason, when set, replaces the "N scope(s) missing" detail in Error() —
+	// e.g. the existing grant was revoked rather than too narrow.
+	Reason string
 }
 
 func (e *ErrAdditionalConsentRequired) Error() string {
-	return fmt.Sprintf("additional consent required for account %s under %s: %d scope(s) missing",
-		e.AccountID, e.ClientConfigID, len(e.MissingScopes))
+	detail := e.Reason
+	if detail == "" {
+		detail = fmt.Sprintf("%d scope(s) missing", len(e.MissingScopes))
+	}
+	return fmt.Sprintf("additional consent required for account %s under %s: %s",
+		e.AccountID, e.ClientConfigID, detail)
 }

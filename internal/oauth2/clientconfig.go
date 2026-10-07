@@ -254,3 +254,22 @@ func GetProviderForClientConfig(clientConfigID string) (ProviderConfig, error) {
 		return ProviderConfig{}, fmt.Errorf("cannot determine provider for client config: %s", clientConfigID)
 	}
 }
+
+// IncrementalConsentProvider returns the provider config an extension grant
+// flow runs against for the given slot: the slot's URLs and default scopes
+// with the slot's own credentials (user override → registered providers, NOT
+// inherited from mail-side ldflags via the legacy GetProvider fallback). It
+// errors for slots no grant flow can write — mail slots need mail re-auth.
+func IncrementalConsentProvider(clientConfigID string) (ProviderConfig, error) {
+	creds, ok := ClientConfigForID(clientConfigID)
+	if !ok || creds.ClientID == "" {
+		return ProviderConfig{}, fmt.Errorf("no OAuth credentials configured for %q — set them up in Settings → Extensions → Contacts → OAuth Credentials", clientConfigID)
+	}
+	cfg, err := GetProvider(clientConfigID)
+	if err != nil {
+		return ProviderConfig{}, err
+	}
+	cfg.ClientID = creds.ClientID
+	cfg.ClientSecret = creds.ClientSecret
+	return cfg, nil
+}

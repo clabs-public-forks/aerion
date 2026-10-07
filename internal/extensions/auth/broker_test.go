@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -282,5 +285,74 @@ func TestBrokerSMTPClient_Unimplemented(t *testing.T) {
 	_, err := broker.SMTPClient("any")
 	if err != coreapi.ErrUnimplemented {
 		t.Fatalf("expected ErrUnimplemented, got %v", err)
+	}
+}
+
+// A refresh token the provider rejects (invalid_grant: expired, revoked) on a
+// custom ("bring your own app") account lives in the custom-mail slot, which no
+// extension grant flow can re-grant. The transport must keep the refresh error
+// (so mail re-auth handles it) instead of offering a "Grant access" button that
+// would loop.
+func TestTransport_InvalidGrantOnMailSlotKeepsRefreshError(t *testing.T) {
+	broker, credStore, db := newTestBroker(t)
+	insertTestAccount(t, db, "acct-dead")
+
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(api.Close)
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"Bad Request"}`))
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	if err := credStore.SetOAuthTokens("acct-dead", &credentials.OAuthTokens{
+		Provider:     "custom",
+		AccessToken:  "expired-access-token",
+		RefreshToken: "dead-refresh-token",
+	}); err != nil {
+		t.Fatalf("set tokens: %v", err)
+	}
+	if err := credStore.SetCustomOAuthProvider("acct-dead", credentials.CustomOAuthProvider{
+		AuthURL:  tokenSrv.URL + "/auth",
+		TokenURL: tokenSrv.URL,
+		ClientID: "client-id",
+	}); err != nil {
+		t.Fatalf("set custom provider: %v", err)
+	}
+
+	scopes := []coreapi.AuthScope{{Resource: "https://example.com/calendar"}}
+	client, err := broker.HTTPClientForExtension("calendar", coreapi.Manifest{}, "acct-dead", scopes)
+	if err != nil {
+		t.Fatalf("HTTPClientForExtension: %v", err)
+	}
+
+	if _, err = client.Get(api.URL); !errors.Is(err, oauth2.ErrInvalidGrant) {
+		t.Fatalf("expected ErrInvalidGrant, got %T: %v", err, err)
+	}
+}
+
+// Only slots StartIncrementalConsent can write to (extension-owned, with
+// credentials) get the consent-required conversion; a dead refresh token
+// anywhere else needs mail re-auth.
+func TestCanRegrant(t *testing.T) {
+	prev := oauth2.UserOverrideLookup
+	t.Cleanup(func() { oauth2.UserOverrideLookup = prev })
+	oauth2.UserOverrideLookup = func(id string) (oauth2.ClientCredentials, bool) {
+		return oauth2.ClientCredentials{ClientID: "id"}, id != "microsoft-contacts"
+	}
+
+	cases := map[string]bool{
+		"google-calendar":    true,
+		"microsoft-contacts": false, // no credentials configured
+		"google-mail":        false,
+		"custom-mail":        false,
+	}
+	for slot, want := range cases {
+		if got := canRegrant(slot); got != want {
+			t.Errorf("canRegrant(%q) = %v, want %v", slot, got, want)
+		}
 	}
 }
