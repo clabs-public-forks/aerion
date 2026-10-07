@@ -1,0 +1,44 @@
+---
+title: Proton Bridge Certificate
+pagination_prev: null
+pagination_next: null
+---
+
+In order to use Proton Bridge with Aerion, you must first install the certificate on your system. If you are unsure how to accomplish this, follow the below steps.
+
+
+1. Open Proton Bridge
+2. Click on the gear icon to go to the settings screen
+3. Click on `Advanced settings` at the bottom to expand Proton Bridge advanced settings
+4. Look for `Export TLS certificates` and click the `Export` button next to it.
+5. Save the file (cert.pem) to a safe location
+7. From the terminal, cd into the location of `cert.pem` and install it to:
+
+    - Arch based systems:
+      ```base
+      sudo cp cert.pem /etc/ca-certificate/trust-source/anchor/proton-bridge.pem
+      sudo update-ca-trust
+      ```    
+    - Debian based systems:
+      ```bash
+      sudo cp cert.pem /usr/local/share/ca-certificates/proton-bridge.crt
+      sudo update-ca-certificates
+      ```
+    - Redhat based systems:
+      ```bash
+      sudo cp cert.pem /etc/pki/ca-trust/source/anchors/proton-bridge.pem
+      sudo update-ca-trust
+      ```
+    - Void Linux:
+      ```bash
+      sudo cp cert.pem /etc/ssl/certs/proton-bridge.pem
+      sudo update-ca-certificates
+      ```
+
+This will make it so that any software on your system will now recognize the Proton Bridge cert as a valid SSL certificate.
+
+import Link from '@docusaurus/Link';
+
+<div style={{marginTop: '2rem'}}>
+  <Link className="button button--secondary button--outline" to="/docs/getting-started/first-account/other-providers#protonmail-via-proton-bridge">← Back to ProtonMail Setup</Link>
+</div>

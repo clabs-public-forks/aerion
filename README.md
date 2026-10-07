@@ -1,37 +1,21 @@
 ![Logo](frontend/src/assets/images/logo-universal.png)
 
-# Aerion - An Open Source Lightweight E-Mail Client
-## Personal Downstream Fork
+# Aerion Email Client (Personal Fork)
 
-This repository, [clabs-public-forks/aerion](https://github.com/clabs-public-forks/aerion), is a personal fork for custom development. Upstream Aerion is maintained by [@hkdb](https://github.com/hkdb) at [hkdb/aerion](https://github.com/hkdb/aerion).
+## Overview
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the downstream workflow, source build instructions, and coding guidance. Track fork-specific work in [this fork's issues](https://github.com/clabs-public-forks/aerion/issues). Custom behavior should be documented alongside the changes that introduce it.
+_Aerion_ is a cross-platform email client created by [hkdb/aerion](https://github.com/hkdb/aerion).
 
-The project overview, roadmap, news, sponsorship, and contributor history below describe upstream Aerion. Upstream downloads and documentation may differ from this fork. Upstream certification and OAuth verification statements do not establish certification or verification of custom builds.
+[This repository](https://github.com/clabs-public-forks/aerion) is a personal fork for custom development. 
 
+<details>
+<summary>[App Screenshot]</summary>
 ![screenshot](docs/ss.png)
+</details>
 
-
-### ❓ Why?
 ---
 
-Windows has Outlook
-
-Mac has Mail
-
-Linux has.....
- - Thunderbird - Clunky and too much legacy structure
- - Geary - Crippled by Gnome Online Accounts and search is unreliable
- - Mailspring - Electron...
- - Evolution - ... 1999
-
-All are not necessarily always light on resource consumption...
-
-
-### 👁️‍🗨️ Summary
----
-
-A standalone lightweight e-mail client inspired by [Geary](https://wiki.gnome.org/Apps/Geary) focused on achieving the following goals:
+## Features
 
 - Resource Efficiency - Minimal CPU, RAM, and battery consumption
 - Modern UX - Clean, intuitive interface with dark mode support
@@ -39,62 +23,16 @@ A standalone lightweight e-mail client inspired by [Geary](https://wiki.gnome.or
 - Independence - No dependency on Gnome Online Accounts or other system services
 - Search That Works - Basic search that actually finds your emails
 
-### 🖥 OS Support
 ---
 
-Although Linux is a first-class citizen here, it also works on:
+## Installation
 
-- MacOS
-- Windows
+- [Installation Guide](docs/user-guide/getting-started/installation/index.md)
 
-
-### 🪶 Features
+### Documentation
 ---
 
-- Multiple Accounts
-- Providers: (🧪 = NOT YET TESTED)
-    - Generic IMAP/SMTP
-    - GMail
-    - Microsoft 365 / Outlook
-    - Yahoo 
-    - Proton Mail (via Proton Bridge)
-    - iCloud Mail 
-    - Mailfence
-    - Murena
-    - Fastmail 🧪
-    - Zoho Mail 🧪
-    - AOL Mail 🧪
-    - GMX Mail 
-    - Mail.com 🧪
-    - Mailbox.org
-- Unified Inbox (Color Code Accounts)
-- Conversation Threads
-- Basic Removal of Tracking Elements in Mail Content
-- WYSIWYG Detachable Composer ([TipTap Editor](https://github.com/ueberdosis/tiptap))
-- WYSIWYG Signatures ([TipTap Editor](https://github.com/ueberdosis/tiptap))
-- CardDav/Google/Microsoft Contact Sync for auto-complete
-- Basic Local and IMAP Search
-- Notification that brings focus to the e-mail when clicked
-- Auto-Sync when system wakes from suspend
-- Multiple color themes (More to come...)
-- PGP & S/MIME support
-- 1st party extension system with the following shipped:
-    - Calendar (ALPHA) - Disabled by Default
-    - Contacts (ALPHA) - Disabled by Default
-- Custom oAuth2 support for generic IMAP, SMTP, CarDAV, and CalDAV (Tested w/ [Stalwart](https://stalw.art))
-- [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
-
-
-### 🚀 Installation
----
-
-- [Upstream Installation Guide](https://aerion.3df.io/docs/getting-started/installation/)
-
-
-### 📖 Documentation
----
-
-- [Upstream Documentation](https://aerion.3df.io/docs/intro)
+- [User Guide](docs/user-guide/intro.md)
 
 
 ### ⚗️ Tech Stack
