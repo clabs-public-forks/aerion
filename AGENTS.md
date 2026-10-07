@@ -28,6 +28,8 @@ Format Go with `gofmt` or `make fmt`; use tabs, explicit error handling, exporte
 
 Frontend ESLint requires two-space indentation, single quotes, and no semicolons. Use PascalCase component names, descriptive camelCase variables, and Svelte 5 runes such as `$state` and `$derived`. Keep components focused and under 500 lines; preserve keyboard accessibility.
 
+This fork targets English. For custom UI changes, update English locale files only. Exclude non-English locale files from routine searches and reviews unless the task concerns localization. Preserve the existing i18n structure to ease upstream merges.
+
 ## Documentation
 
 When a change affects user-visible behavior, commands, configuration, or developer workflows, check the relevant documentation and update it in the same task so it remains accurate. Documentation updates are not required for internal changes that do not alter documented behavior or workflows. Prefer correcting existing guidance over adding duplicate instructions.
