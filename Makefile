@@ -21,6 +21,7 @@ export
 
 # Go module path
 MODULE := github.com/hkdb/aerion
+PYTHON ?= python3
 
 # Build flags for injecting OAuth credentials at compile time.
 #
@@ -74,7 +75,7 @@ build:
 		echo "Warning: No OAuth credentials configured. Gmail/Outlook OAuth will not work."; \
 		echo "See .env.example for required variables."; \
 	fi
-	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	@$(PYTHON) build/wails-output.py wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 ifeq ($(UNAME_S),Darwin)
 	@echo "Ad-hoc signing Aerion.app (required for macOS notifications)..."
 	codesign --force --deep --sign - build/bin/Aerion.app
@@ -83,7 +84,7 @@ endif
 # Build for Linux specifically
 build-linux:
 	@echo "Building Aerion for Linux..."
-	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS),linux,production
+	@$(PYTHON) build/wails-output.py wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS),linux,production
 
 # Build Flatpak (recommended for Linux distribution)
 flatpak:
@@ -103,7 +104,7 @@ flatpak-dev:
 # Run in development mode with hot reload
 dev:
 	@echo "Starting Aerion in development mode..."
-	wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	@$(PYTHON) build/wails-output.py wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 
 # Run in development mode with Go's race detector enabled. Builds significantly
 # slower and adds ~5-10x runtime overhead, but instruments every memory access
@@ -112,7 +113,7 @@ dev:
 # reproduce the crash and the detector report points right at it.
 dev-race:
 	@echo "Starting Aerion in development mode with -race..."
-	wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
+	@$(PYTHON) build/wails-output.py wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
 
 # Generate Wails TypeScript bindings
 generate:
@@ -258,7 +259,7 @@ uninstall-darwin:
 # Build Windows installer (requires NSIS)
 build-windows-installer:
 	@echo "Building Windows installer..."
-	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -nsis
+	@$(PYTHON) build/wails-output.py wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -nsis
 	@echo ""
 	@echo "Installer created at build/bin/aerion-amd64-installer.exe"
 
