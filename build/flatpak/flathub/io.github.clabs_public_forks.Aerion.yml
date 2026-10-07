@@ -1,4 +1,4 @@
-app-id: io.github.hkdb.Aerion
+app-id: io.github.clabs_public_forks.Aerion
 runtime: org.gnome.Platform
 runtime-version: '50'
 sdk: org.gnome.Sdk
@@ -53,19 +53,19 @@ modules:
       - install -Dm755 aerion-creds /app/lib/aerion/aerion-creds
 
       # Install desktop file with correct app ID
-      - install -Dm644 build/linux/aerion.desktop /app/share/applications/io.github.hkdb.Aerion.desktop
+      - install -Dm644 build/linux/aerion.desktop /app/share/applications/io.github.clabs_public_forks.Aerion.desktop
 
       # Install themed icons with correct app ID (32-256 + scalable). A lone
       # 256 is skipped by hicolor MinSize=64 at small lookup sizes (#395).
       - |
         for sz in 32 48 64 128 256; do
-          install -Dm644 "build/linux/icons/${sz}x${sz}/io.github.hkdb.Aerion.png" \
-            "/app/share/icons/hicolor/${sz}x${sz}/apps/io.github.hkdb.Aerion.png"
+          install -Dm644 "build/linux/icons/${sz}x${sz}/io.github.clabs_public_forks.Aerion.png" \
+            "/app/share/icons/hicolor/${sz}x${sz}/apps/io.github.clabs_public_forks.Aerion.png"
         done
-      - install -Dm644 build/linux/icons/scalable/io.github.hkdb.Aerion.svg /app/share/icons/hicolor/scalable/apps/io.github.hkdb.Aerion.svg
+      - install -Dm644 build/linux/icons/scalable/io.github.clabs_public_forks.Aerion.svg /app/share/icons/hicolor/scalable/apps/io.github.clabs_public_forks.Aerion.svg
 
       # Install metainfo (AppStream metadata)
-      - install -Dm644 build/flatpak/io.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/io.github.hkdb.Aerion.metainfo.xml
+      - install -Dm644 build/flatpak/io.github.clabs_public_forks.Aerion.metainfo.xml /app/share/metainfo/io.github.clabs_public_forks.Aerion.metainfo.xml
 
     sources:
       # Application source code (tag and commit updated by calculate-hashes.sh)

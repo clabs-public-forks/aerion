@@ -64,14 +64,14 @@ echo "Packaging into Flatpak..."
 echo ""
 
 flatpak-builder --force-clean --user $INSTALL_FLAG --install-deps-from=flathub \
-    --repo=repo build-dir build/flatpak/io.github.hkdb.Aerion-dev.yml
+    --repo=repo build-dir build/flatpak/io.github.clabs_public_forks.Aerion-dev.yml
 
 # Create bundle for distribution/testing on other machines
 echo ""
 echo "Creating .flatpak bundle..."
 mkdir -p build/bin
 
-flatpak build-bundle repo build/bin/Aerion-dev.flatpak io.github.hkdb.Aerion
+flatpak build-bundle repo build/bin/Aerion-dev.flatpak io.github.clabs_public_forks.Aerion
 
 echo ""
 echo "Build complete!"
@@ -82,4 +82,4 @@ echo "To install:"
 echo "  flatpak install --user build/bin/Aerion-dev.flatpak"
 echo ""
 echo "To run:"
-echo "  flatpak run io.github.hkdb.Aerion"
+echo "  flatpak run io.github.clabs_public_forks.Aerion"

@@ -54,7 +54,7 @@ echo "This will take a few minutes..."
 echo ""
 
 flatpak-builder --force-clean --user --install-deps-from=flathub \
-    --repo=repo build-dir build/flatpak/flathub/io.github.hkdb.Aerion.yml
+    --repo=repo build-dir build/flatpak/flathub/io.github.clabs_public_forks.Aerion.yml
 
 # Create bundle for distribution
 echo ""
@@ -65,7 +65,7 @@ mkdir -p build/bin
 VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "dev")
 BUNDLE_NAME="Aerion-${VERSION}.flatpak"
 
-flatpak build-bundle repo "build/bin/${BUNDLE_NAME}" io.github.hkdb.Aerion
+flatpak build-bundle repo "build/bin/${BUNDLE_NAME}" io.github.clabs_public_forks.Aerion
 
 echo ""
 echo "✅ Build complete!"
@@ -76,4 +76,4 @@ echo "To install locally:"
 echo "  flatpak install --user build/bin/${BUNDLE_NAME}"
 echo ""
 echo "To run:"
-echo "  flatpak run io.github.hkdb.Aerion"
+echo "  flatpak run io.github.clabs_public_forks.Aerion"

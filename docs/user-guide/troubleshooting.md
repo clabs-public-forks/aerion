@@ -125,21 +125,21 @@ If libwebkit2gtk is already installed and Aerion still won't start, try one of t
 **Flatpak**
 
 ```bash
-flatpak run --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.hkdb.Aerion
+flatpak run --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.clabs_public_forks.Aerion
 ```
 
 ```bash
-flatpak run --env=WEBKIT_DISABLE_COMPOSITING_MODE=1 io.github.hkdb.Aerion
+flatpak run --env=WEBKIT_DISABLE_COMPOSITING_MODE=1 io.github.clabs_public_forks.Aerion
 ```
 
 ```bash
-flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 io.github.hkdb.Aerion
+flatpak run --env=LIBGL_ALWAYS_SOFTWARE=1 io.github.clabs_public_forks.Aerion
 ```
 
 After figuring out which works, to make the workaround permanent, for example, if DMABUF was the issue:
 
 ```bash
-flatpak override --user --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.hkdb.Aerion
+flatpak override --user --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.clabs_public_forks.Aerion
 ```
 
 **Binary**
@@ -244,7 +244,7 @@ aerion --debug
 Linux Flatpak:
 
 ```bash
-flatpak run --env=AERION_DEBUG=1 io.github.hkdb.Aerion
+flatpak run --env=AERION_DEBUG=1 io.github.clabs_public_forks.Aerion
 
 ```
 Copy only the portion that relates to your issue and be sure to redact any potentially personally identifiable information as needed.

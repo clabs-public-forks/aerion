@@ -122,7 +122,7 @@ if remove_file "$BIN_DIR/aerion" "binary"; then
 fi
 
 # Remove new desktop file
-if remove_file "$APPS_DIR/io.github.hkdb.Aerion.desktop" "desktop file"; then
+if remove_file "$APPS_DIR/io.github.clabs_public_forks.Aerion.desktop" "desktop file"; then
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
 fi
 
@@ -139,11 +139,25 @@ fi
 # Remove icons: every shipped hicolor size + scalable SVG (#395). Keep in
 # sync with ICON_SIZES in install.sh / Makefile.
 for sz in 32 48 64 128 256; do
-    if remove_file "$ICONS_BASE/${sz}x${sz}/apps/io.github.hkdb.Aerion.png" "${sz}px icon"; then
+    if remove_file "$ICONS_BASE/${sz}x${sz}/apps/io.github.clabs_public_forks.Aerion.png" "${sz}px icon"; then
         REMOVED_COUNT=$((REMOVED_COUNT + 1))
     fi
 done
-if remove_file "$ICONS_BASE/scalable/apps/io.github.hkdb.Aerion.svg" "scalable icon"; then
+if remove_file "$ICONS_BASE/scalable/apps/io.github.clabs_public_forks.Aerion.svg" "scalable icon"; then
+    REMOVED_COUNT=$((REMOVED_COUNT + 1))
+fi
+
+# Remove files installed under the upstream app ID
+LEGACY_ID="io.github.hkdb.Aerion"
+if remove_file "$APPS_DIR/$LEGACY_ID.desktop" "old app ID desktop file"; then
+    REMOVED_COUNT=$((REMOVED_COUNT + 1))
+fi
+for sz in 32 48 64 128 256; do
+    if remove_file "$ICONS_BASE/${sz}x${sz}/apps/$LEGACY_ID.png" "old app ID ${sz}px icon"; then
+        REMOVED_COUNT=$((REMOVED_COUNT + 1))
+    fi
+done
+if remove_file "$ICONS_BASE/scalable/apps/$LEGACY_ID.svg" "old app ID scalable icon"; then
     REMOVED_COUNT=$((REMOVED_COUNT + 1))
 fi
 

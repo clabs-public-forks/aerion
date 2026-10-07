@@ -21,7 +21,7 @@ cp .env.example .env
 make flatpak-install
 
 # Run
-flatpak run io.github.hkdb.Aerion
+flatpak run io.github.clabs_public_forks.Aerion
 ```
 
 `make flatpak-install` installs into your user Flatpak scope and also writes a bundle under `build/bin/`. See [build/flatpak/README.md](../build/flatpak/README.md) for other build paths and Flathub submission details.

@@ -48,16 +48,16 @@ if [[ ! -f "aerion" ]]; then
 fi
 
 # Check if desktop file exists
-if [[ ! -f "io.github.hkdb.Aerion.desktop" ]]; then
-    print_error "io.github.hkdb.Aerion.desktop file not found in current directory"
+if [[ ! -f "io.github.clabs_public_forks.Aerion.desktop" ]]; then
+    print_error "io.github.clabs_public_forks.Aerion.desktop file not found in current directory"
     echo "Please ensure the desktop file is in the same directory as this script"
     exit 1
 fi
 
 # Check if icons exist. New tarballs ship sized icons under icons/ plus a
 # scalable SVG (#395); the root 256px PNG remains for backward compatibility.
-if [[ ! -f "io.github.hkdb.Aerion.png" ]]; then
-    print_error "io.github.hkdb.Aerion.png icon not found in current directory"
+if [[ ! -f "io.github.clabs_public_forks.Aerion.png" ]]; then
+    print_error "io.github.clabs_public_forks.Aerion.png icon not found in current directory"
     echo "Please ensure the icon file is in the same directory as this script"
     exit 1
 fi
@@ -122,6 +122,18 @@ if [[ -f "$OLD_DESKTOP_FILE" ]]; then
     print_success "Old desktop file renamed to aerion.desktop.backup"
 fi
 
+# Remove files installed under the upstream app ID (io.github.hkdb.Aerion)
+# so the menu doesn't show two Aerion entries
+LEGACY_ID="io.github.hkdb.Aerion"
+if [[ -f "$APPS_DIR/$LEGACY_ID.desktop" ]]; then
+    print_info "Removing files installed under the old app ID $LEGACY_ID..."
+    run_cmd rm -f "$APPS_DIR/$LEGACY_ID.desktop"
+    for sz in $ICON_SIZES; do
+        run_cmd rm -f "$ICONS_BASE/${sz}x${sz}/apps/$LEGACY_ID.png"
+    done
+    run_cmd rm -f "$ICONS_BASE/scalable/apps/$LEGACY_ID.svg"
+fi
+
 # Create directories if they don't exist (icon dirs are created per-size by
 # install -D below)
 print_info "Creating directories..."
@@ -134,25 +146,25 @@ run_cmd install -Dm755 aerion "$BIN_DIR/aerion"
 
 # Install desktop file
 print_info "Installing desktop file to $APPS_DIR..."
-run_cmd install -Dm644 io.github.hkdb.Aerion.desktop "$APPS_DIR/io.github.hkdb.Aerion.desktop"
+run_cmd install -Dm644 io.github.clabs_public_forks.Aerion.desktop "$APPS_DIR/io.github.clabs_public_forks.Aerion.desktop"
 
 # Install icons: all hicolor sizes when the tarball ships them (#395),
 # falling back to the root 256px PNG for older tarballs
 print_info "Installing icons to $ICONS_BASE..."
 if [[ -d "icons" ]]; then
     for sz in $ICON_SIZES; do
-        if [[ -f "icons/${sz}x${sz}/io.github.hkdb.Aerion.png" ]]; then
-            run_cmd install -Dm644 "icons/${sz}x${sz}/io.github.hkdb.Aerion.png" \
-                "$ICONS_BASE/${sz}x${sz}/apps/io.github.hkdb.Aerion.png"
+        if [[ -f "icons/${sz}x${sz}/io.github.clabs_public_forks.Aerion.png" ]]; then
+            run_cmd install -Dm644 "icons/${sz}x${sz}/io.github.clabs_public_forks.Aerion.png" \
+                "$ICONS_BASE/${sz}x${sz}/apps/io.github.clabs_public_forks.Aerion.png"
         fi
     done
-    if [[ -f "icons/scalable/io.github.hkdb.Aerion.svg" ]]; then
-        run_cmd install -Dm644 "icons/scalable/io.github.hkdb.Aerion.svg" \
-            "$ICONS_BASE/scalable/apps/io.github.hkdb.Aerion.svg"
+    if [[ -f "icons/scalable/io.github.clabs_public_forks.Aerion.svg" ]]; then
+        run_cmd install -Dm644 "icons/scalable/io.github.clabs_public_forks.Aerion.svg" \
+            "$ICONS_BASE/scalable/apps/io.github.clabs_public_forks.Aerion.svg"
     fi
 else
     print_info "No sized icons in this package - installing 256px icon only"
-    run_cmd install -Dm644 io.github.hkdb.Aerion.png "$ICONS_BASE/256x256/apps/io.github.hkdb.Aerion.png"
+    run_cmd install -Dm644 io.github.clabs_public_forks.Aerion.png "$ICONS_BASE/256x256/apps/io.github.clabs_public_forks.Aerion.png"
 fi
 
 # Update icon cache
@@ -188,7 +200,7 @@ fi
 echo "You may need to log out and back in for the application to appear in your menu."
 echo ""
 echo "To set Aerion as your default email client, run:"
-echo "  xdg-mime default io.github.hkdb.Aerion.desktop x-scheme-handler/mailto"
+echo "  xdg-mime default io.github.clabs_public_forks.Aerion.desktop x-scheme-handler/mailto"
 echo ""
 echo "To start Aerion, run:"
 echo "  aerion --dbus-notify"

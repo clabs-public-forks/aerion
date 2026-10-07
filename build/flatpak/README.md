@@ -4,8 +4,8 @@ This directory contains files for building and distributing Aerion as a Flatpak.
 
 ## Files
 
-- `io.github.hkdb.Aerion-dev.yml` - Dev manifest (packages pre-built host binary, no compilation)
-- `io.github.hkdb.Aerion.metainfo.xml` - AppStream metadata
+- `io.github.clabs_public_forks.Aerion-dev.yml` - Dev manifest (packages pre-built host binary, no compilation)
+- `io.github.clabs_public_forks.Aerion.metainfo.xml` - AppStream metadata
 - `build-flatpak.sh` - Dev build script (uses `-dev.yml`; `--install` also installs the result)
 - `build-local.sh` - From-source local build script (uses flathub manifest, which builds its pinned release rather than this checkout)
 - `test-build.sh` - CI build test script (Docker container)
@@ -56,7 +56,7 @@ make flatpak-install
 Run the installed app with:
 
 ```bash
-flatpak run io.github.hkdb.Aerion
+flatpak run io.github.clabs_public_forks.Aerion
 ```
 
 `make flatpak-dev` runs the same local-checkout build but only writes the bundle; it does not install it.
@@ -87,7 +87,7 @@ sudo dnf install libappstream-glib  # Fedora
 sudo apt install appstream-util      # Ubuntu/Debian
 
 # Validate (from project root)
-appstream-util validate build/flatpak/io.github.hkdb.Aerion.metainfo.xml
+appstream-util validate build/flatpak/io.github.clabs_public_forks.Aerion.metainfo.xml
 ```
 
 Validate the desktop file:

@@ -75,12 +75,12 @@ docker run --rm --privileged \
         echo 'Packaging into Flatpak...'
         # The dev manifest packages the binary built above; the flathub
         # manifest would rebuild a tagged upstream release from git instead.
-        flatpak-builder --force-clean --disable-rofiles-fuse --repo=repo build-dir build/flatpak/io.github.hkdb.Aerion-dev.yml
+        flatpak-builder --force-clean --disable-rofiles-fuse --repo=repo build-dir build/flatpak/io.github.clabs_public_forks.Aerion-dev.yml
 
         echo ''
         echo 'Creating .flatpak bundle...'
         mkdir -p build/bin
-        flatpak build-bundle repo build/bin/Aerion-${VERSION}.flatpak io.github.hkdb.Aerion
+        flatpak build-bundle repo build/bin/Aerion-${VERSION}.flatpak io.github.clabs_public_forks.Aerion
     "
 
 echo ""
@@ -92,4 +92,4 @@ echo "To install locally:"
 echo "  flatpak install --user build/bin/Aerion-${VERSION}.flatpak"
 echo ""
 echo "To run:"
-echo "  flatpak run io.github.hkdb.Aerion"
+echo "  flatpak run io.github.clabs_public_forks.Aerion"

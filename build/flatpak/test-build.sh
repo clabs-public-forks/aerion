@@ -99,12 +99,12 @@ cd /workspace
 
 flatpak-builder --user --force-clean --repo=repo \
   --install-deps-from=flathub \
-  build-dir build/flatpak/flathub/io.github.hkdb.Aerion.yml
+  build-dir build/flatpak/flathub/io.github.clabs_public_forks.Aerion.yml
 
 echo ""
 echo "Creating bundle..."
 mkdir -p build/bin
-flatpak build-bundle repo build/bin/Aerion-${VERSION}.flatpak io.github.hkdb.Aerion
+flatpak build-bundle repo build/bin/Aerion-${VERSION}.flatpak io.github.clabs_public_forks.Aerion
 
 echo ""
 echo "=========================================="

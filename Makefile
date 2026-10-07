@@ -202,11 +202,11 @@ install-linux: build
 	@echo "Installing Aerion to $(DESTDIR)$(PREFIX)..."
 	install -Dm755 build/bin/aerion "$(DESTDIR)$(PREFIX)/bin/aerion"
 	@for sz in $(ICON_SIZES); do \
-		install -Dm644 "build/linux/icons/$${sz}x$${sz}/io.github.hkdb.Aerion.png" \
-			"$(DESTDIR)$(PREFIX)/share/icons/hicolor/$${sz}x$${sz}/apps/io.github.hkdb.Aerion.png"; \
+		install -Dm644 "build/linux/icons/$${sz}x$${sz}/io.github.clabs_public_forks.Aerion.png" \
+			"$(DESTDIR)$(PREFIX)/share/icons/hicolor/$${sz}x$${sz}/apps/io.github.clabs_public_forks.Aerion.png"; \
 	done
-	install -Dm644 build/linux/icons/scalable/io.github.hkdb.Aerion.svg "$(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/io.github.hkdb.Aerion.svg"
-	install -Dm644 build/linux/aerion.desktop "$(DESTDIR)$(PREFIX)/share/applications/io.github.hkdb.Aerion.desktop"
+	install -Dm644 build/linux/icons/scalable/io.github.clabs_public_forks.Aerion.svg "$(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/io.github.clabs_public_forks.Aerion.svg"
+	install -Dm644 build/linux/aerion.desktop "$(DESTDIR)$(PREFIX)/share/applications/io.github.clabs_public_forks.Aerion.desktop"
 	@echo "Updating icon cache..."
 	-gtk-update-icon-cache -f -t "$(DESTDIR)$(PREFIX)/share/icons/hicolor" 2>/dev/null || true
 	@echo ""
@@ -214,18 +214,18 @@ install-linux: build
 	@echo "You may need to log out and back in for the application to appear in your menu."
 	@echo ""
 	@echo "To set Aerion as your default email client:"
-	@echo "  xdg-mime default io.github.hkdb.Aerion.desktop x-scheme-handler/mailto"
+	@echo "  xdg-mime default io.github.clabs_public_forks.Aerion.desktop x-scheme-handler/mailto"
 
 # Uninstall Aerion from Linux
 uninstall-linux:
 	@echo "Uninstalling Aerion from $(DESTDIR)$(PREFIX)..."
 	rm -f "$(DESTDIR)$(PREFIX)/bin/aerion"
 	@for sz in $(ICON_SIZES); do \
-		rm -f "$(DESTDIR)$(PREFIX)/share/icons/hicolor/$${sz}x$${sz}/apps/io.github.hkdb.Aerion.png"; \
+		rm -f "$(DESTDIR)$(PREFIX)/share/icons/hicolor/$${sz}x$${sz}/apps/io.github.clabs_public_forks.Aerion.png"; \
 	done
-	rm -f "$(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/io.github.hkdb.Aerion.svg"
+	rm -f "$(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/io.github.clabs_public_forks.Aerion.svg"
 	rm -f "$(DESTDIR)$(PREFIX)/share/icons/hicolor/256x256/apps/aerion.png"  # Remove old name if it exists
-	rm -f "$(DESTDIR)$(PREFIX)/share/applications/io.github.hkdb.Aerion.desktop"
+	rm -f "$(DESTDIR)$(PREFIX)/share/applications/io.github.clabs_public_forks.Aerion.desktop"
 	rm -f "$(DESTDIR)$(PREFIX)/share/applications/aerion.desktop"  # Remove old name if it exists
 	-gtk-update-icon-cache -f -t "$(DESTDIR)$(PREFIX)/share/icons/hicolor" 2>/dev/null || true
 	@echo "Uninstallation complete!"

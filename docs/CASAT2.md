@@ -317,7 +317,7 @@ All build steps are deterministic and automated — no manual intervention requi
 
 - **Flathub**: Flatpak distribution uses Flathub's automated build infrastructure, which builds from source in a sandboxed environment with GPG-signed repositories
 - **GitHub Actions**: Used for automated release workflows
-- **Source builds**: Flathub builds from source using the project's manifest (`io.github.hkdb.Aerion.yml`), ensuring the distributed binary matches the published source code
+- **Source builds**: Flathub builds from source using the project's manifest (`io.github.clabs_public_forks.Aerion.yml`), ensuring the distributed binary matches the published source code
 
 ### Secrets Management
 

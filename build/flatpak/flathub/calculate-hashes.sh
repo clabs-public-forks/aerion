@@ -22,7 +22,7 @@ echo ""
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-MANIFEST="${SCRIPT_DIR}/io.github.hkdb.Aerion.yml"
+MANIFEST="${SCRIPT_DIR}/io.github.clabs_public_forks.Aerion.yml"
 
 if [ ! -f "$MANIFEST" ]; then
     echo "ERROR: Manifest file not found: $MANIFEST"

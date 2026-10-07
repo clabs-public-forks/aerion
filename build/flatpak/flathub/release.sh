@@ -1,12 +1,12 @@
 #!/bin/bash
 # Copy Aerion files to Flathub repository for submission/update
-# Usage: ./release.sh /path/to/flathub/io.github.hkdb.Aerion
+# Usage: ./release.sh /path/to/flathub/io.github.clabs_public_forks.Aerion
 
 set -e
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <flathub-repo-path>"
-    echo "Example: $0 ~/flathub/io.github.hkdb.Aerion"
+    echo "Example: $0 ~/flathub/io.github.clabs_public_forks.Aerion"
     exit 1
 fi
 
@@ -36,9 +36,9 @@ echo ""
 
 # Copy manifest
 echo "Copying manifest..."
-cp "${SCRIPT_DIR}/io.github.hkdb.Aerion.yml" \
-   "${FLATHUB_DIR}/io.github.hkdb.Aerion.yml"
-echo "   io.github.hkdb.Aerion.yml"
+cp "${SCRIPT_DIR}/io.github.clabs_public_forks.Aerion.yml" \
+   "${FLATHUB_DIR}/io.github.clabs_public_forks.Aerion.yml"
+echo "   io.github.clabs_public_forks.Aerion.yml"
 
 # Copy Go module vendoring sources
 echo "Copying Go module sources..."

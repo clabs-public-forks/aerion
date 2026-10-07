@@ -12,13 +12,15 @@ import (
 )
 
 const (
-	autostartFilename = "io.github.hkdb.Aerion.desktop"
-	desktopEntryTmpl  = `[Desktop Entry]
+	autostartFilename = "io.github.clabs_public_forks.Aerion.desktop"
+	// legacyAutostartFilename is the entry written under the upstream app ID.
+	legacyAutostartFilename = "io.github.hkdb.Aerion.desktop"
+	desktopEntryTmpl        = `[Desktop Entry]
 Type=Application
 Name=Aerion
 Comment=Aerion Email Client
 Exec=%s
-Icon=io.github.hkdb.Aerion
+Icon=io.github.clabs_public_forks.Aerion
 Terminal=false
 Categories=Network;Email;
 X-GNOME-Autostart-enabled=true
@@ -181,6 +183,10 @@ func (m *linuxAutostartManager) xdgEnable() error {
 		return fmt.Errorf("failed to write autostart file: %w", err)
 	}
 
+	if err := os.Remove(filepath.Join(dir, legacyAutostartFilename)); err != nil && !os.IsNotExist(err) {
+		log.Warn().Err(err).Msg("Failed to remove legacy autostart file")
+	}
+
 	log.Info().Str("path", path).Msg("Autostart enabled")
 	return nil
 }
@@ -195,8 +201,10 @@ func (m *linuxAutostartManager) xdgDisable() error {
 	}
 
 	path := filepath.Join(dir, autostartFilename)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove autostart file: %w", err)
+	for _, name := range []string{autostartFilename, legacyAutostartFilename} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove autostart file: %w", err)
+		}
 	}
 
 	log.Info().Str("path", path).Msg("Autostart disabled")
@@ -210,9 +218,12 @@ func (m *linuxAutostartManager) xdgIsEnabled() bool {
 		return false
 	}
 
-	path := filepath.Join(dir, autostartFilename)
-	_, err = os.Stat(path)
-	return err == nil
+	for _, name := range []string{autostartFilename, legacyAutostartFilename} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // autostartDir returns the XDG autostart directory.

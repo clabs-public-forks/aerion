@@ -11,7 +11,7 @@ pagination_next: getting-started/verify
 Flathub:
 
 ```bash
-flatpak install --user io.github.hkdb.Aerion
+flatpak install --user io.github.clabs_public_forks.Aerion
 ```
 
 **Note:** Flathub releases are usually at least a few hours behind Github releases.
@@ -22,15 +22,26 @@ If you want to install the latest Flatpak directly built on Github, you can down
 flatpak install --user Aerion-<VERSION>-<ARCH>.flatpak
 ```
 
+### Upgrading from `io.github.hkdb.Aerion`
+
+This fork's Flatpak ID is `io.github.clabs_public_forks.Aerion`. If you previously installed the upstream ID, quit Aerion and move your accounts, settings, and mail cache to the new ID before first launch, leaving a symlink so the old install keeps working until you remove it:
+
+```bash
+cd ~/.var/app
+[ ! -e io.github.clabs_public_forks.Aerion ] && mv io.github.hkdb.Aerion io.github.clabs_public_forks.Aerion && ln -s io.github.clabs_public_forks.Aerion io.github.hkdb.Aerion
+```
+
+Per-app Flatpak settings are keyed by ID, so re-apply any `flatpak override` you set and re-enable "Start on login" if you used it. Once the new install works, remove the old one with `flatpak uninstall io.github.hkdb.Aerion` (without `--delete-data`, which would target the migrated data) and delete the `~/.var/app/io.github.hkdb.Aerion` symlink.
+
 If Aerion doesn't launch or it behaves weirdly, try the following to disable DMABUF which is known to be buggy for certain hardware combinations:
 
 ```bash
-flatpak run --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.hkdb.Aerion
+flatpak run --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.clabs_public_forks.Aerion
 ```
 If that solves the issues, you can make this permanent with:
 
 ```bash
-flatpak override --user --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.hkdb.Aerion
+flatpak override --user --env=WEBKIT_DISABLE_DMABUF_RENDERER=1 io.github.clabs_public_forks.Aerion
 ```
 
 ## Binary + Desktop File + Icon
