@@ -1,17 +1,12 @@
-![Logo](frontend/src/assets/images/logo-universal.png)
+![Plasmail logo](frontend/src/assets/images/logo-universal.png)
 
-# Aerion Email Client (Personal Fork)
+# Aerion Email Client (_Personal Fork_)
 
 ## Overview
 
 _Aerion_ is a cross-platform email client created by [hkdb/aerion](https://github.com/hkdb/aerion).
 
 [This repository](https://github.com/clabs-public-forks/aerion) is a personal fork for custom development. 
-
-<details>
-<summary>[App Screenshot]</summary>
-![screenshot](docs/ss.png)
-</details>
 
 ## Features
 
