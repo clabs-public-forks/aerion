@@ -31,6 +31,9 @@ set -e
 
 VERSION="$1"
 
+# Install packages as root, then re-run this script as the host user so files
+# written to the bind mount stay owned by that user.
+if [ "$(id -u)" = 0 ] && [ -n "$HOST_UID" ] && [ "$HOST_UID" != 0 ]; then
 echo "Installing dependencies..."
 apt-get update
 # Normal install first; fall back to exact frozen noble release-pocket
@@ -40,6 +43,11 @@ apt-get update
 # image changes.
 apt-get install -y -o APT::Get::Always-Include-Phased-Updates=true flatpak flatpak-builder wget git \
   || apt-get install -y flatpak=1.14.6-1 libflatpak0=1.14.6-1 bubblewrap=0.9.0-1build1 flatpak-builder=1.4.2-1build2 wget git
+
+mkdir -p /tmp/home
+chown "$HOST_UID:$HOST_GID" /tmp/home
+exec env HOME=/tmp/home setpriv --reuid="$HOST_UID" --regid="$HOST_GID" --clear-groups "$0" "$@"
+fi
 
 echo ""
 echo "Adding Flathub repository..."
@@ -112,6 +120,8 @@ docker run --rm -it --privileged \
   -v "$REPO_DIR:/workspace" \
   -v /tmp/flatpak-build-test-inner.sh:/build-script.sh \
   -w /workspace \
+  -e HOST_UID="$(id -u)" \
+  -e HOST_GID="$(id -g)" \
   ubuntu:noble-20260113 \
   /build-script.sh "$VERSION"
 

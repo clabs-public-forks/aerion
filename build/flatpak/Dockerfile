@@ -33,10 +33,12 @@ RUN set -eux; \
     wget -qO- "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" \
         | tar -xJ -C /usr/local/node --strip-components=1
 
-ENV PATH="/root/go/bin:/usr/local/go/bin:/usr/local/node/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:/usr/local/node/bin:${PATH}"
 
-# Install the Wails CLI version pinned in go.mod
-RUN go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+# Install the Wails CLI version pinned in go.mod. GOBIN keeps it readable when
+# build-flatpak-docker.sh runs the container as the host user.
+RUN GOBIN=/usr/local/bin go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}" \
+    && rm -rf /root/go /root/.cache
 
 # Add Flathub repository
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo

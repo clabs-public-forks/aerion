@@ -45,8 +45,12 @@ echo ""
 # Get version from git tag
 VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "dev")
 
-# Run the build in Docker
+# Run the build in Docker as the host user so files written to the bind
+# mount stay owned by that user. HOME points at a writable path for the Go
+# and npm caches.
 docker run --rm --privileged \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp/home \
     -v "$(pwd):/workspace" \
     -w /workspace \
     -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}" \
@@ -54,18 +58,11 @@ docker run --rm --privileged \
     -e MICROSOFT_CLIENT_ID="${MICROSOFT_CLIENT_ID}" \
     -e GOOGLE_TESTING_CLIENT_ID="${GOOGLE_TESTING_CLIENT_ID}" \
     -e GOOGLE_TESTING_CLIENT_SECRET="${GOOGLE_TESTING_CLIENT_SECRET}" \
-    -e HOST_UID="$(id -u)" \
-    -e HOST_GID="$(id -g)" \
     aerion-flatpak-builder \
     bash -c "
         set -e
-        # The container runs as root; on exit, remove the generated credentials
-        # file and return build outputs in the bind mount to the host user.
-        cleanup() {
-            rm -f internal/oauth2/credentials_gen.go
-            chown -R \"\$HOST_UID:\$HOST_GID\" frontend/node_modules frontend/dist frontend/wailsjs build/bin repo build-dir .flatpak-builder 2>/dev/null || true
-        }
-        trap cleanup EXIT
+        # Do not leave the generated credentials file in the checkout.
+        trap 'rm -f internal/oauth2/credentials_gen.go' EXIT
 
         echo 'Installing frontend dependencies...'
         (cd frontend && npm ci)
