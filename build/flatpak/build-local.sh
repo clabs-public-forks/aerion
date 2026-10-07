@@ -1,6 +1,7 @@
 #!/bin/bash
-# Build Aerion Flatpak locally (no Docker)
-# This uses the hybrid approach - network access during build
+# Build Aerion Flatpak locally (no Docker) from the Flathub manifest, which
+# compiles the release pinned in build/flatpak/flathub/, not this checkout.
+# Use build-flatpak.sh to package this checkout instead.
 
 set -e
 
@@ -45,20 +46,6 @@ if ! flatpak list | grep -q "org.freedesktop.Sdk.Extension.node24"; then
 fi
 
 echo "✅ All runtimes installed"
-echo ""
-
-# Check for OAuth credentials
-if [ -z "$GOOGLE_CLIENT_ID" ] && [ -z "$MICROSOFT_CLIENT_ID" ]; then
-    echo "⚠️  Warning: No OAuth credentials found"
-    echo "Gmail and Outlook OAuth will not work in the built app"
-    echo ""
-fi
-
-# Build the binary on the host first
-echo ""
-echo "Building Aerion binary on host..."
-cd "$(dirname "$0")/../.."
-make build-linux
 
 # Package into Flatpak
 echo ""
@@ -86,7 +73,7 @@ echo ""
 echo "Flatpak bundle created: build/bin/${BUNDLE_NAME}"
 echo ""
 echo "To install locally:"
-echo "  flatpak install --user Aerion.flatpak"
+echo "  flatpak install --user build/bin/${BUNDLE_NAME}"
 echo ""
 echo "To run:"
 echo "  flatpak run io.github.hkdb.Aerion"

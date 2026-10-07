@@ -83,17 +83,17 @@ build-linux: credentials
 	@echo "Building Aerion for Linux..."
 	@wails build -tags $(BUILD_TAGS),linux,production
 
-# Build Flatpak (recommended for Linux distribution)
+# Build Flatpak from the Flathub manifest's pinned release (not this checkout)
 flatpak:
 	@echo "Building Flatpak..."
 	./build/flatpak/build-local.sh
 
-# Build and install the Flatpak for the current user
+# Build a Flatpak bundle from this checkout and install it for the current user
 flatpak-install:
 	@echo "Building and installing Aerion Flatpak for the current user..."
-	./build/flatpak/build-flatpak.sh
+	./build/flatpak/build-flatpak.sh --install
 
-# Build Flatpak from local source (for development/testing)
+# Build a Flatpak bundle from this checkout without installing it
 flatpak-dev:
 	@echo "Building Flatpak from local source..."
 	./build/flatpak/build-flatpak.sh
@@ -270,9 +270,9 @@ help:
 	@echo "Build Targets:"
 	@echo "  make build        - Build production binary"
 	@echo "  make build-linux  - Build for Linux with production tags"
-	@echo "  make flatpak      - Build Flatpak package (recommended for Linux)"
-	@echo "  make flatpak-install - Build and install Flatpak for the current user"
-	@echo "  make flatpak-dev  - Build Flatpak from local source (for testing)"
+	@echo "  make flatpak      - Build Flatpak from the Flathub manifest's pinned release"
+	@echo "  make flatpak-install - Build Flatpak from this checkout and install it"
+	@echo "  make flatpak-dev  - Build Flatpak bundle from this checkout (no install)"
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
 	@echo ""

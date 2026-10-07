@@ -10,11 +10,8 @@ import (
 
 // Build-time OAuth credentials. `make` writes them from .env into the
 // gitignored credentials_gen.go (build tag aerion_creds) so they never appear
-// on a command line; see build/gencreds.go. They can also be injected with
-//
-//	go build -ldflags "-X 'github.com/hkdb/aerion/internal/oauth2.GoogleClientID=xxx'"
-//
-// If neither is set, credentials are loaded from the aerion-creds shim binary.
+// on a command line; see build/gencreds.go. If that file is not compiled in,
+// they are loaded from the aerion-creds shim binary.
 var (
 	// GoogleClientID is the OAuth2 client ID for Google/Gmail (Mail-scoped project).
 	// Same client also backs first-party extensions' Google flows for any scopes
@@ -48,8 +45,12 @@ var (
 	GoogleTestingClientSecret string
 )
 
+// compiled is set by setCredentials. When credentials_gen.go calls it, that
+// happens before init(), which then leaves the compiled-in values alone.
+var compiled bool
+
 func init() {
-	if GoogleClientID != "" {
+	if compiled {
 		return
 	}
 	loadFromShim()
@@ -96,6 +97,7 @@ func setCredentials(creds map[string]string) bool {
 	// until provisioned — picker simply omits the "(Testing)" option.
 	GoogleTestingClientID = creds["google_testing_client_id"]
 	GoogleTestingClientSecret = creds["google_testing_client_secret"]
+	compiled = true
 	return true
 }
 

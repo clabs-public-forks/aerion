@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
@@ -99,33 +101,56 @@ func TestTransport_InvalidGrantOnMailSlotKeepsRefreshError(t *testing.T) {
 	}
 }
 
+// The retry after a refresh resends the body, whether or not the caller's
+// request has GetBody (bodies without one are buffered).
 func TestTransport_RetryAfterRefreshResendsBody(t *testing.T) {
-	client, bodies := newRefreshingClient(t)
+	for name, body := range map[string]io.Reader{
+		"with GetBody":    strings.NewReader("BEGIN:VCALENDAR"),
+		"without GetBody": io.NopCloser(strings.NewReader("BEGIN:VCALENDAR")),
+	} {
+		t.Run(name, func(t *testing.T) {
+			client, bodies := newRefreshingClient(t)
 
-	resp, err := client.Post("https://api.test/", "text/calendar", strings.NewReader("BEGIN:VCALENDAR"))
-	if err != nil {
-		t.Fatalf("POST: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", resp.StatusCode)
-	}
-	if got := *bodies; len(got) != 2 || got[1] != "BEGIN:VCALENDAR" {
-		t.Fatalf("API bodies = %q, want the retry to resend the body", got)
+			req, err := http.NewRequest(http.MethodPut, "https://api.test/", body)
+			if err != nil {
+				t.Fatalf("NewRequest: %v", err)
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Fatalf("PUT: %v", err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("status = %d, want 200", resp.StatusCode)
+			}
+			if got := *bodies; len(got) != 2 || got[1] != "BEGIN:VCALENDAR" {
+				t.Fatalf("API bodies = %q, want the retry to resend the body", got)
+			}
+		})
 	}
 }
 
-// A body without GetBody can't be resent, so the caller gets the 401 (body
-// intact) instead of an empty-body retry — but the token is still refreshed,
-// so the caller's own retry succeeds.
-func TestTransport_UnreplayableBodyReturns401AfterRefresh(t *testing.T) {
+// lowerBodyBuffer makes bodies over n bytes unreplayable for one test.
+func lowerBodyBuffer(t *testing.T, n int64) {
+	old := maxBufferedBody
+	maxBufferedBody = n
+	t.Cleanup(func() { maxBufferedBody = old })
+}
+
+// unreplayablePut returns a PUT whose body has no GetBody.
+func unreplayablePut() *http.Request {
+	req, _ := http.NewRequest(http.MethodPut, "https://api.test/", io.NopCloser(strings.NewReader("BEGIN:VCALENDAR")))
+	return req
+}
+
+// A body too large to buffer can't be resent, so the caller gets the 401
+// (body intact) instead of an empty-body retry — but the token is still
+// refreshed, so the caller's own retry succeeds.
+func TestTransport_OversizedBodyReturns401AfterRefresh(t *testing.T) {
+	lowerBodyBuffer(t, 4)
 	client, bodies := newRefreshingClient(t)
 
-	req, err := http.NewRequest(http.MethodPut, "https://api.test/", io.NopCloser(strings.NewReader("BEGIN:VCALENDAR")))
-	if err != nil {
-		t.Fatalf("NewRequest: %v", err)
-	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(unreplayablePut())
 	if err != nil {
 		t.Fatalf("PUT: %v", err)
 	}
@@ -134,8 +159,8 @@ func TestTransport_UnreplayableBodyReturns401AfterRefresh(t *testing.T) {
 	if resp.StatusCode != http.StatusUnauthorized || string(body) != "Unauthorized" {
 		t.Fatalf("got %d %q, want the 401 with its body", resp.StatusCode, body)
 	}
-	if n := len(*bodies); n != 1 {
-		t.Fatalf("API saw %d requests, want 1 (no empty-body retry)", n)
+	if got := *bodies; len(got) != 1 || got[0] != "BEGIN:VCALENDAR" {
+		t.Fatalf("API bodies = %q, want one request with the whole body", got)
 	}
 
 	resp, err = client.Get("https://api.test/")
@@ -148,6 +173,48 @@ func TestTransport_UnreplayableBodyReturns401AfterRefresh(t *testing.T) {
 	}
 }
 
+// Concurrent requests that all got a 401 for the same stale token refresh
+// once; the rest retry with the token that refresh stored.
+func TestTransport_ConcurrentUnauthorizedRefreshOnce(t *testing.T) {
+	const n = 5
+	var stale sync.WaitGroup
+	stale.Add(n)
+	api := func(r *http.Request) (*http.Response, error) {
+		if r.Header.Get("Authorization") == "Bearer fresh-token" {
+			return respond(r, http.StatusOK), nil
+		}
+		// Hold every 401 until all requests have sent the stale token.
+		stale.Done()
+		stale.Wait()
+		return respond(r, http.StatusUnauthorized), nil
+	}
+	var refreshes atomic.Int32
+	token := func(w http.ResponseWriter, r *http.Request) {
+		refreshes.Add(1)
+		tokenResponse(http.StatusOK, `{"access_token":"fresh-token","expires_in":3600}`)(w, r)
+	}
+	client := newCustomAccountClient(t, api, token)
+
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() {
+			resp, err := client.Get("https://api.test/")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("status %d, want 200", resp.StatusCode)
+			}
+		})
+	}
+	wg.Wait()
+	if got := refreshes.Load(); got != 1 {
+		t.Fatalf("token endpoint hit %d times, want 1", got)
+	}
+}
+
 // A truncated 401 body must report its real length, not the server's.
 func TestTransport_HandedBack401LengthMatchesBody(t *testing.T) {
 	big := strings.Repeat("x", 100_000)
@@ -155,10 +222,10 @@ func TestTransport_HandedBack401LengthMatchesBody(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusUnauthorized, ContentLength: int64(len(big)),
 			Header: http.Header{"Content-Length": {"100000"}}, Body: io.NopCloser(strings.NewReader(big)), Request: r}, nil
 	}
+	lowerBodyBuffer(t, 4)
 	client := newCustomAccountClient(t, api, tokenResponse(http.StatusOK, `{"access_token":"fresh-token","expires_in":3600}`))
 
-	req, _ := http.NewRequest(http.MethodPut, "https://api.test/", io.NopCloser(strings.NewReader("BEGIN:VCALENDAR")))
-	resp, err := client.Do(req)
+	resp, err := client.Do(unreplayablePut())
 	if err != nil {
 		t.Fatalf("PUT: %v", err)
 	}

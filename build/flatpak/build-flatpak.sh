@@ -1,8 +1,17 @@
 #!/bin/bash
 # Build Aerion Flatpak for local development/testing.
 # Builds the binary on the host, then packages it into a Flatpak.
+# Usage: build-flatpak.sh [--install]
+#   --install  also install the result into the user Flatpak scope
 
 set -e
+
+INSTALL_FLAG=
+case "${1:-}" in
+    "") ;;
+    --install) INSTALL_FLAG=--install ;;
+    *) echo "Usage: $0 [--install]" >&2; exit 1 ;;
+esac
 
 # Change to project root
 cd "$(dirname "$0")/../.."
@@ -54,7 +63,7 @@ echo ""
 echo "Packaging into Flatpak..."
 echo ""
 
-flatpak-builder --force-clean --user --install --install-deps-from=flathub \
+flatpak-builder --force-clean --user $INSTALL_FLAG --install-deps-from=flathub \
     --repo=repo build-dir build/flatpak/io.github.hkdb.Aerion-dev.yml
 
 # Create bundle for distribution/testing on other machines
@@ -69,8 +78,8 @@ echo "Build complete!"
 echo ""
 echo "Flatpak bundle: build/bin/Aerion-dev.flatpak"
 echo ""
-echo "To install on a target machine:"
-echo "  flatpak install --user Aerion-dev.flatpak"
+echo "To install:"
+echo "  flatpak install --user build/bin/Aerion-dev.flatpak"
 echo ""
 echo "To run:"
 echo "  flatpak run io.github.hkdb.Aerion"

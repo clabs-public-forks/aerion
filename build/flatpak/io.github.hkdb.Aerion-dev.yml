@@ -41,6 +41,16 @@ modules:
       # Install metainfo (AppStream metadata)
       - install -Dm644 build/flatpak/io.github.hkdb.Aerion.metainfo.xml /app/share/metainfo/io.github.hkdb.Aerion.metainfo.xml
 
+    # Copy only the packaging inputs, never the whole checkout: it holds
+    # .env files and the generated OAuth credentials, and flatpak-builder
+    # keeps a copy of every source under .flatpak-builder/build/.
     sources:
+      - type: file
+        path: ../bin/aerion
+        dest: build/bin
       - type: dir
-        path: ../..
+        path: ../linux
+        dest: build/linux
+      - type: file
+        path: io.github.hkdb.Aerion.metainfo.xml
+        dest: build/flatpak

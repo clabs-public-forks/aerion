@@ -64,8 +64,17 @@ func TestSerializeVEVENT_NonRecurring(t *testing.T) {
 }
 
 func TestSerializeVEVENT_AllDay(t *testing.T) {
-	start := time.Date(2026, 6, 5, 0, 0, 0, 0, time.UTC).Unix()
-	end := time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC).Unix()
+	// All-day dates are anchored to midnight in the configured display tz,
+	// which is what the serializer formats them in. A zone west of UTC makes
+	// UTC formatting land on the previous day.
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Skipf("tz data unavailable: %v", err)
+	}
+	SetConfiguredTimezone("America/Los_Angeles")
+	t.Cleanup(func() { SetConfiguredTimezone("") })
+	start := time.Date(2026, 6, 5, 0, 0, 0, 0, loc).Unix()
+	end := time.Date(2026, 6, 6, 0, 0, 0, 0, loc).Unix()
 	blob, err := serializeVEVENT("alld@aerion", EventInput{
 		CalendarID:  "cal1",
 		Summary:     "Holiday",

@@ -6,8 +6,8 @@ This directory contains files for building and distributing Aerion as a Flatpak.
 
 - `io.github.hkdb.Aerion-dev.yml` - Dev manifest (packages pre-built host binary, no compilation)
 - `io.github.hkdb.Aerion.metainfo.xml` - AppStream metadata
-- `build-flatpak.sh` - Dev build script (uses `-dev.yml`)
-- `build-local.sh` - From-source local build script (uses flathub manifest)
+- `build-flatpak.sh` - Dev build script (uses `-dev.yml`; `--install` also installs the result)
+- `build-local.sh` - From-source local build script (uses flathub manifest, which builds its pinned release rather than this checkout)
 - `test-build.sh` - CI build test script (Docker container)
 - `build-flatpak-docker.sh`, `Dockerfile` - Docker-based build (builds the binary in a container, then packages it with `-dev.yml`; toolchain versions in `Dockerfile` track `go.mod` and CI)
 - `flathub/` - Flathub submission files (from-source manifests + vendored deps)
@@ -59,11 +59,13 @@ Run the installed app with:
 flatpak run io.github.hkdb.Aerion
 ```
 
-`make flatpak-dev` runs the same local-checkout build path.
+`make flatpak-dev` runs the same local-checkout build but only writes the bundle; it does not install it.
+
+The dev manifest copies only the built binary, `build/linux/`, and the metainfo file into the Flatpak build, so `.env` files and the generated OAuth credentials source never reach `.flatpak-builder/`.
 
 ### Build the Flathub source manifest
 
-`make flatpak` uses the Flathub manifest and builds its configured source inside the Flatpak sandbox. The script also installs the result into your user scope and creates a bundle under `build/bin/`.
+`make flatpak` uses the Flathub manifest and builds its pinned release (not this checkout) inside the Flatpak sandbox, with OAuth credentials from that release's `aerion-creds` shim. It writes a bundle under `build/bin/` but does not install it.
 
 ```bash
 make flatpak

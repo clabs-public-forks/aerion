@@ -3,7 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
-	"slices"
+	"sync"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
@@ -21,7 +21,13 @@ type Broker struct {
 	// honors the same trusted-certificate store as IMAP/SMTP. Nil falls back to
 	// http.DefaultTransport.
 	baseTransport http.RoundTripper
+	// refreshLocks holds one *sync.Mutex per slotKey, shared by every client
+	// vended for that slot so they refresh only once.
+	refreshLocks sync.Map
 }
+
+// slotKey identifies one account's tokens under one client config.
+type slotKey struct{ accountID, clientConfigID string }
 
 // NewBroker constructs a Broker bound to the given credential store and
 // OAuth manager. credStore and oauthManager are required; baseTransport is the
@@ -85,7 +91,7 @@ func (b *Broker) HTTPClient(accountID string, scopes []coreapi.AuthScope) (*http
 		}
 	}
 
-	return b.newClient(accountID, string(clientConfigID), scopes), nil
+	return b.newClient(accountID, string(clientConfigID)), nil
 }
 
 // HTTPClientForExtension is the Phase 2b entry point that knows WHICH extension
@@ -134,7 +140,7 @@ func (b *Broker) HTTPClientForExtension(
 			}
 			return nil, fmt.Errorf("auth broker: check tokens: %w", terr)
 		}
-		return b.newClient(accountID, string(clientConfigID), scopes), nil
+		return b.newClient(accountID, string(clientConfigID)), nil
 	}
 
 	// Classify each requested scope: does it use Aerion core's mail OAuth
@@ -198,7 +204,7 @@ func (b *Broker) HTTPClientForExtension(
 		}
 	}
 
-	return b.newClient(accountID, clientConfigID, scopes), nil
+	return b.newClient(accountID, clientConfigID), nil
 }
 
 // IMAPClient returns an authenticated IMAP client for the account. Phase 1
@@ -219,7 +225,8 @@ func (b *Broker) SMTPClient(accountID string) (coreapi.SMTPClient, error) {
 
 // newClient returns an HTTP client that authenticates as accountID using the
 // tokens in the given slot, refreshing them as needed.
-func (b *Broker) newClient(accountID, clientConfigID string, scopes []coreapi.AuthScope) *http.Client {
+func (b *Broker) newClient(accountID, clientConfigID string) *http.Client {
+	mu, _ := b.refreshLocks.LoadOrStore(slotKey{accountID, clientConfigID}, &sync.Mutex{})
 	return &http.Client{
 		Transport: &bearerRefreshTransport{
 			base:           b.baseTransport,
@@ -227,7 +234,7 @@ func (b *Broker) newClient(accountID, clientConfigID string, scopes []coreapi.Au
 			oauthManager:   b.oauthManager,
 			accountID:      accountID,
 			clientConfigID: clientConfigID,
-			scopes:         slices.Clone(scopes),
+			mu:             mu.(*sync.Mutex),
 		},
 	}
 }

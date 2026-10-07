@@ -15,6 +15,11 @@ import (
 	"github.com/hkdb/aerion/internal/oauth2"
 )
 
+// maxBufferedBody caps how much of a request body without GetBody the
+// transport buffers so it can resend it after a refresh. A var so tests can
+// lower it.
+var maxBufferedBody int64 = 10 << 20
+
 // bearerRefreshTransport is an http.RoundTripper that injects the current
 // access token on each request and transparently refreshes it on 401
 // responses. It serializes refreshes per (accountID, clientConfigID) so that
@@ -25,21 +30,29 @@ type bearerRefreshTransport struct {
 	oauthManager   *oauth2.Manager
 	accountID      string
 	clientConfigID string
-	// scopes the client was issued for; reported back if the refresh token
-	// is rejected and the user must re-consent.
-	scopes []coreapi.AuthScope
 
-	mu sync.Mutex // guards token retrieval/refresh
+	// mu guards token refresh. The broker shares one per (accountID,
+	// clientConfigID) across every client it vends for that slot.
+	mu *sync.Mutex
 }
 
 // RoundTrip implements http.RoundTripper.
 func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	tokens, err := t.credStore.GetOAuthTokensForClientConfig(t.accountID, t.clientConfigID)
+	req, err := bufferBody(req)
 	if err != nil {
-		return nil, fmt.Errorf("auth broker: read tokens: %w", err)
+		return nil, err
 	}
 
-	resp, err := t.do(req, tokens.AccessToken)
+	tokens, err := t.credStore.GetOAuthTokensForClientConfig(t.accountID, t.clientConfigID)
+	if err != nil {
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
+		return nil, fmt.Errorf("auth broker: read tokens: %w", err)
+	}
+	sent := tokens.AccessToken
+
+	resp, err := t.do(req, sent)
 	if err != nil {
 		return nil, err
 	}
@@ -55,43 +68,9 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 	resp.ContentLength = int64(len(body401))
 	resp.Header.Del("Content-Length")
 
-	// Refresh under lock to avoid thundering herd.
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	// Re-read tokens in case another goroutine refreshed already.
-	tokens, err = t.credStore.GetOAuthTokensForClientConfig(t.accountID, t.clientConfigID)
-	if err != nil {
-		return nil, fmt.Errorf("auth broker: re-read tokens before refresh: %w", err)
-	}
-
-	provider, err := t.resolveProvider()
+	accessToken, err := t.freshToken(sent)
 	if err != nil {
 		return nil, err
-	}
-
-	refreshed, err := t.oauthManager.RefreshTokenWithProvider(provider, tokens.RefreshToken)
-	if errors.Is(err, oauth2.ErrInvalidGrant) && canRegrant(t.clientConfigID) {
-		// The refresh token is dead (expired/revoked). Surface it as a consent
-		// requirement so extensions offer their grant flow instead of a raw
-		// error the user has no way to act on. Mail slots keep the refresh
-		// error: only mail re-auth can repair them.
-		return nil, &coreapi.ErrAdditionalConsentRequired{
-			AccountID:      t.accountID,
-			ClientConfigID: coreapi.ClientConfigID(t.clientConfigID),
-			MissingScopes:  t.scopes,
-			Reason:         "refresh token expired or revoked",
-		}
-	}
-	if err != nil {
-		return nil, fmt.Errorf("auth broker: refresh: %w", err)
-	}
-
-	expiresAt := time.Now().Add(time.Duration(refreshed.ExpiresIn) * time.Second)
-	// Persist the rotated refresh token too — providers like Microsoft and custom
-	// OIDC return a NEW refresh_token on refresh; dropping it breaks the next one.
-	if err := t.credStore.UpdateOAuthTokensForClientConfig(t.accountID, t.clientConfigID, refreshed.AccessToken, refreshed.RefreshToken, expiresAt); err != nil {
-		return nil, fmt.Errorf("auth broker: persist refreshed tokens: %w", err)
 	}
 
 	// Rewind only now: a fresh body taken earlier would leak on the error paths above.
@@ -100,10 +79,84 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 		return nil, err
 	}
 	if !canRetry {
-		// The token is fresh now, so the caller's own retry will succeed.
+		// Only bodies over maxBufferedBody get here. The token is fresh now,
+		// so the caller's own retry will succeed.
 		return resp, nil
 	}
-	return t.do(retry, refreshed.AccessToken)
+	return t.do(retry, accessToken)
+}
+
+// freshToken returns an access token to retry with after sent got a 401. It
+// refreshes under the slot lock unless another request already replaced sent.
+func (t *bearerRefreshTransport) freshToken(sent string) (string, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	tokens, err := t.credStore.GetOAuthTokensForClientConfig(t.accountID, t.clientConfigID)
+	if err != nil {
+		return "", fmt.Errorf("auth broker: re-read tokens before refresh: %w", err)
+	}
+	if tokens.AccessToken != sent && tokens.AccessToken != "" {
+		return tokens.AccessToken, nil
+	}
+
+	provider, err := t.resolveProvider()
+	if err != nil {
+		return "", err
+	}
+
+	refreshed, err := t.oauthManager.RefreshTokenWithProvider(provider, tokens.RefreshToken)
+	if errors.Is(err, oauth2.ErrInvalidGrant) && canRegrant(t.clientConfigID) {
+		// The refresh token is dead (expired/revoked). Surface it as a consent
+		// requirement so extensions offer their grant flow instead of a raw
+		// error the user has no way to act on. Mail slots keep the refresh
+		// error: only mail re-auth can repair them.
+		return "", &coreapi.ErrAdditionalConsentRequired{
+			AccountID:      t.accountID,
+			ClientConfigID: coreapi.ClientConfigID(t.clientConfigID),
+			Reason:         "refresh token expired or revoked",
+		}
+	}
+	if err != nil {
+		return "", fmt.Errorf("auth broker: refresh: %w", err)
+	}
+
+	expiresAt := time.Now().Add(time.Duration(refreshed.ExpiresIn) * time.Second)
+	// Persist the rotated refresh token too — providers like Microsoft and custom
+	// OIDC return a NEW refresh_token on refresh; dropping it breaks the next one.
+	if err := t.credStore.UpdateOAuthTokensForClientConfig(t.accountID, t.clientConfigID, refreshed.AccessToken, refreshed.RefreshToken, expiresAt); err != nil {
+		return "", fmt.Errorf("auth broker: persist refreshed tokens: %w", err)
+	}
+	return refreshed.AccessToken, nil
+}
+
+// bufferBody reads a body that has no GetBody into memory and sets GetBody,
+// so the request can be resent after a refresh. Bodies over maxBufferedBody
+// are passed through unbuffered and stay unreplayable.
+func bufferBody(req *http.Request) (*http.Request, error) {
+	if req.Body == nil || req.Body == http.NoBody || req.GetBody != nil || req.ContentLength > maxBufferedBody {
+		return req, nil
+	}
+	buf, err := io.ReadAll(io.LimitReader(req.Body, maxBufferedBody+1))
+	if err != nil {
+		_ = req.Body.Close()
+		return nil, fmt.Errorf("auth broker: buffer request body: %w", err)
+	}
+	r := *req // shallow copy is enough: do() clones before mutating
+	if int64(len(buf)) > maxBufferedBody {
+		r.Body = readCloser{io.MultiReader(bytes.NewReader(buf), req.Body), req.Body}
+		return &r, nil
+	}
+	_ = req.Body.Close()
+	r.ContentLength = int64(len(buf)) // known now; avoids a chunked upload
+	r.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(buf)), nil }
+	r.Body, _ = r.GetBody()
+	return &r, nil
+}
+
+type readCloser struct {
+	io.Reader
+	io.Closer
 }
 
 // rewind returns req with a fresh body for resending after a refresh. The
