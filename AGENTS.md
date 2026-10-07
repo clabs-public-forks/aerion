@@ -38,13 +38,13 @@ When a change affects user-visible behavior, commands, configuration, or develop
 
 Use Go's `testing` package, `*_test.go` files, and `TestXxx` functions. Cover critical paths and edge cases with table-driven tests where appropriate. Start with checks relevant to the change. Run `make test` for changes affecting multiple Go packages or shared behavior, or when focused checks leave unresolved risks. No numeric coverage threshold or frontend test script is configured; use frontend lint and type checks plus manual UI verification for frontend changes.
 
-- Before marking a milestone done, run `/code-review` on the diff and have a subagent check it against that milestone's acceptance criteria, followed by a `/simplify`. Fix gaps that affect correctness or stated requirements; treat style-only findings as optional.
-- Commit locally at milestone boundaries; rewind checkpoints do not capture changes made through Bash. Never push.
+- Before marking a milestone done, review the diff for correctness and regressions, have a read-only subagent check its acceptance criteria, then simplify changed code without changing behavior. Use available review and simplify tools or skills; if unavailable, perform the equivalent review directly and report any missing independent check. Fix gaps that affect correctness or stated requirements; treat style-only findings as optional.
+- Commit locally at milestone boundaries, staging only files changed for the task and preserving unrelated user changes. Never push.
 - When compacting, preserve: the current milestone and sub-step, files modified so far, failing checks with their exact commands, and discoveries not yet written to the plan.
 
 ## Project Planning, Task Management, and Issue Tracking
 
-- Use the PLAN.md file to guide your work when building new features.
+- Use `PLAN.md` to guide new features; create it when needed with scope, milestones, acceptance criteria, and validation steps. Keep task-specific progress out of `AGENTS.md`.
 - Use TASKS.md to track the current status of the tasks you are working on.
 - Add to ISSUES.md whenever you find any issues that may need to be fixed in this session or a future session.
 
@@ -54,7 +54,7 @@ Use Go's `testing` package, `*_test.go` files, and `TestXxx` functions. Cover cr
 
 Inherited history uses release titles and short maintenance summaries. Use descriptive prefixes such as `feat:`, `fix:`, and `docs:` for downstream commits. In PRs, describe behavior changes, link relevant issues when available, and report validation.
 
-Follow `CONTRIBUTING.md` for the downstream workflow and `docs/LANGUAGE.md` for translation conventions. Consult upstream’s own guidelines when submitting upstream.
+Use `CONTRIBUTING.md` for setup and contribution workflow details, and `docs/LANGUAGE.md` when changing localized strings or translations. Consult upstream’s own guidelines when submitting upstream.
 
 ## Security & Configuration
 
