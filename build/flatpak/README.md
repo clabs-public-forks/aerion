@@ -9,7 +9,7 @@ This directory contains files for building and distributing Aerion as a Flatpak.
 - `build-flatpak.sh` - Dev build script (uses `-dev.yml`)
 - `build-local.sh` - From-source local build script (uses flathub manifest)
 - `test-build.sh` - CI build test script (Docker container)
-- `build-flatpak-docker.sh`, `Dockerfile` - Docker-based build
+- `build-flatpak-docker.sh`, `Dockerfile` - Docker-based build (builds the binary in a container, then packages it with `-dev.yml`; toolchain versions in `Dockerfile` track `go.mod` and CI)
 - `flathub/` - Flathub submission files (from-source manifests + vendored deps)
 
 ## Prerequisites

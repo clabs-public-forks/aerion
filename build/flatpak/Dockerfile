@@ -2,6 +2,12 @@ FROM ubuntu:noble-20260113
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Toolchain versions. Keep in sync with go.mod and .github/workflows/ci.yml.
+ARG GO_VERSION=1.25.14
+ARG NODE_VERSION=24.21.0
+ARG WAILS_VERSION=v2.16.0
+ARG GNOME_RUNTIME=50
+
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     flatpak \
@@ -10,32 +16,35 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-dev \
     libwebkit2gtk-4.1-dev \
     build-essential \
+    pkg-config \
     wget \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Go 1.23
-RUN wget -q https://go.dev/dl/go1.23.0.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.23.0.linux-amd64.tar.gz && \
-    rm go1.23.0.linux-amd64.tar.gz
+# Install Go and Node.js for the build architecture (amd64 or arm64)
+RUN set -eux; \
+    case "$(dpkg --print-architecture)" in \
+        amd64) go_arch=amd64; node_arch=x64 ;; \
+        arm64) go_arch=arm64; node_arch=arm64 ;; \
+        *) echo "Unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac; \
+    wget -qO- "https://go.dev/dl/go${GO_VERSION}.linux-${go_arch}.tar.gz" | tar -xz -C /usr/local; \
+    mkdir -p /usr/local/node; \
+    wget -qO- "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" \
+        | tar -xJ -C /usr/local/node --strip-components=1
 
-# Install Node.js 20
-RUN wget -qO- https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz | tar -xJ -C /usr/local && \
-    ln -s /usr/local/node-v20.11.0-linux-x64/bin/node /usr/local/bin/node && \
-    ln -s /usr/local/node-v20.11.0-linux-x64/bin/npm /usr/local/bin/npm
+ENV PATH="/root/go/bin:/usr/local/go/bin:/usr/local/node/bin:${PATH}"
 
-# Add Go and Node to PATH
-ENV PATH="/usr/local/go/bin:/usr/local/node-v20.11.0-linux-x64/bin:${PATH}"
-
-# Install Wails CLI
-RUN go install github.com/wailsapp/wails/v2/cmd/wails@latest
-ENV PATH="/root/go/bin:${PATH}"
+# Install the Wails CLI version pinned in go.mod
+RUN go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
 
 # Add Flathub repository
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-# Install Flatpak runtimes (only Platform and SDK, no extensions needed)
-RUN flatpak install -y flathub \
-    org.gnome.Platform//47 \
-    org.gnome.Sdk//47
+# Install the runtime used by build/flatpak/io.github.hkdb.Aerion-dev.yml.
+# That manifest packages the prebuilt binary, so no SDK extensions are needed.
+RUN flatpak install -y --noninteractive flathub \
+    "org.gnome.Platform//${GNOME_RUNTIME}" \
+    "org.gnome.Sdk//${GNOME_RUNTIME}"
 
 WORKDIR /workspace

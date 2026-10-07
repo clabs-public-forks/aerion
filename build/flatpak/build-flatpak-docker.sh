@@ -46,16 +46,29 @@ echo ""
 VERSION=$(git describe --tags --exact-match 2>/dev/null || echo "dev")
 
 # Run the build in Docker
-docker run --rm \
+docker run --rm --privileged \
     -v "$(pwd):/workspace" \
     -w /workspace \
     -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}" \
     -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}" \
     -e MICROSOFT_CLIENT_ID="${MICROSOFT_CLIENT_ID}" \
+    -e GOOGLE_TESTING_CLIENT_ID="${GOOGLE_TESTING_CLIENT_ID}" \
+    -e GOOGLE_TESTING_CLIENT_SECRET="${GOOGLE_TESTING_CLIENT_SECRET}" \
+    -e HOST_UID="$(id -u)" \
+    -e HOST_GID="$(id -g)" \
     aerion-flatpak-builder \
     bash -c "
+        set -e
+        # The container runs as root; on exit, remove the generated credentials
+        # file and return build outputs in the bind mount to the host user.
+        cleanup() {
+            rm -f internal/oauth2/credentials_gen.go
+            chown -R \"\$HOST_UID:\$HOST_GID\" frontend/node_modules frontend/dist frontend/wailsjs build/bin repo build-dir .flatpak-builder 2>/dev/null || true
+        }
+        trap cleanup EXIT
+
         echo 'Installing frontend dependencies...'
-        cd frontend && npm install && cd ..
+        (cd frontend && npm ci)
 
         echo ''
         echo 'Building Aerion binary...'
@@ -63,7 +76,9 @@ docker run --rm \
 
         echo ''
         echo 'Packaging into Flatpak...'
-        flatpak-builder --force-clean --repo=repo build-dir build/flatpak/flathub/io.github.hkdb.Aerion.yml
+        # The dev manifest packages the binary built above; the flathub
+        # manifest would rebuild a tagged upstream release from git instead.
+        flatpak-builder --force-clean --disable-rofiles-fuse --repo=repo build-dir build/flatpak/io.github.hkdb.Aerion-dev.yml
 
         echo ''
         echo 'Creating .flatpak bundle...'
