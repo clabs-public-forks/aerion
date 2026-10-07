@@ -17,17 +17,14 @@ sudo pacman -S flatpak-builder    # Arch
 cp .env.example .env
 # Fill in your own creds
 
-# Or via make
-make flatpak
-
-# Install
-flatpak --user install build/bin/Aerion.flatpak
+# Build from this checkout and install for your user
+make flatpak-install
 
 # Run
 flatpak run io.github.hkdb.Aerion
 ```
 
-See [build/flatpak/README.md](../build/flatpak/README.md) for detailed Flatpak build instructions and Flathub submission guide.
+`make flatpak-install` installs into your user Flatpak scope and also writes a bundle under `build/bin/`. See [build/flatpak/README.md](../build/flatpak/README.md) for other build paths and Flathub submission details.
 
 **Native Binary:**
 
@@ -45,5 +42,4 @@ make build
 # Run
 ./build/bin/aerion
 ```
-
 

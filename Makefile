@@ -10,7 +10,7 @@
 
 .PHONY: all build build-linux dev dev-race generate clean test lint help \
         install uninstall install-linux uninstall-linux \
-        install-darwin uninstall-darwin build-windows-installer flatpak flatpak-dev
+        install-darwin uninstall-darwin build-windows-installer flatpak flatpak-install flatpak-dev
 
 # Load environment variables from .env files.
 # .env.local overrides .env. All OAuth credentials live in the root .env —
@@ -89,6 +89,11 @@ build-linux:
 flatpak:
 	@echo "Building Flatpak..."
 	./build/flatpak/build-local.sh
+
+# Build and install the Flatpak for the current user
+flatpak-install:
+	@echo "Building and installing Aerion Flatpak for the current user..."
+	./build/flatpak/build-flatpak.sh
 
 # Build Flatpak from local source (for development/testing)
 flatpak-dev:
@@ -267,6 +272,7 @@ help:
 	@echo "  make build        - Build production binary"
 	@echo "  make build-linux  - Build for Linux with production tags"
 	@echo "  make flatpak      - Build Flatpak package (recommended for Linux)"
+	@echo "  make flatpak-install - Build and install Flatpak for the current user"
 	@echo "  make flatpak-dev  - Build Flatpak from local source (for testing)"
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make generate     - Generate Wails TypeScript bindings"

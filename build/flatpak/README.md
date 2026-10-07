@@ -30,46 +30,49 @@ sudo pacman -S flatpak-builder
 Add Flathub repository (if not already added):
 
 ```bash
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
 ```
 
 Install required runtimes and SDKs:
 
 ```bash
-flatpak install flathub org.gnome.Platform//50 org.gnome.Sdk//50
-flatpak install flathub org.freedesktop.Sdk.Extension.golang//25.08
-flatpak install flathub org.freedesktop.Sdk.Extension.node24//25.08
+flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
+flatpak install --user flathub org.freedesktop.Sdk.Extension.golang//25.08
+flatpak install --user flathub org.freedesktop.Sdk.Extension.node24//25.08
 ```
+
+The local-checkout build also needs the host build prerequisites listed in [the project build guide](../../docs/BUILD.md), including WebKitGTK 4.1 development files.
 
 ## Building Locally
 
-There are two build paths:
+### Build and install this checkout
 
-### 1. Dev build (`build-flatpak.sh`) - Fast
-
-Builds the binary on the host, then packages it into a Flatpak. Best for development iteration.
+This builds the Linux binary on the host, packages it with the local dev manifest, installs it into your user Flatpak scope, and writes a bundle to `build/bin/Aerion-dev.flatpak`.
 
 ```bash
-./build/flatpak/build-flatpak.sh
-
-# Or via make
-make flatpak
+make flatpak-install
 ```
 
-### 2. From-source build (`build-local.sh`) - Full
-
-Builds everything from source inside the Flatpak sandbox, matching how Flathub builds it. Uses the `node24` SDK extension.
-
-```bash
-./build/flatpak/build-local.sh
-```
-
-## Running
-
-After building, run the Flatpak:
+Run the installed app with:
 
 ```bash
 flatpak run io.github.hkdb.Aerion
+```
+
+`make flatpak-dev` runs the same local-checkout build path.
+
+### Build the Flathub source manifest
+
+`make flatpak` uses the Flathub manifest and builds its configured source inside the Flatpak sandbox. The script also installs the result into your user scope and creates a bundle under `build/bin/`.
+
+```bash
+make flatpak
+```
+
+For a direct script invocation, use:
+
+```bash
+./build/flatpak/build-local.sh
 ```
 
 ## Validation

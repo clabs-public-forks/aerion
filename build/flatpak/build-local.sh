@@ -22,7 +22,7 @@ fi
 
 # Add flathub remote if not present
 echo "Checking Flathub remote..."
-if ! flatpak remote-list | grep -q "flathub"; then
+if ! flatpak remote-list --user --columns=name | grep -qx "flathub"; then
     echo "⚠️  Flathub remote not found. Adding..."
     flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
 fi

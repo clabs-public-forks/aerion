@@ -23,7 +23,7 @@ fi
 
 # Add flathub remote if not present
 echo "Checking Flathub remote..."
-if ! flatpak remote-list | grep -q "flathub"; then
+if ! flatpak remote-list --user --columns=name | grep -qx "flathub"; then
     echo "Flathub remote not found. Adding..."
     flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
 fi
@@ -54,7 +54,7 @@ echo ""
 echo "Packaging into Flatpak..."
 echo ""
 
-flatpak-builder --force-clean --user --install-deps-from=flathub \
+flatpak-builder --force-clean --user --install --install-deps-from=flathub \
     --repo=repo build-dir build/flatpak/io.github.hkdb.Aerion-dev.yml
 
 # Create bundle for distribution/testing on other machines
