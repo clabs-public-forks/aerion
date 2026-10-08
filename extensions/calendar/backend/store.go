@@ -1246,30 +1246,83 @@ type Alarm struct {
 	CreatedAt    int64  `json:"createdAt"`
 }
 
-// UpsertAlarmTx inserts an alarm if no row already covers the same
-// (event_id, instance_unix, trigger_unix). Idempotent — safe to call
-// after every sync. Existing rows are NOT updated (we don't want to
-// clobber a 'fired' status by re-evaluating).
-func (s *Store) UpsertAlarmTx(tx *sql.Tx, a Alarm) error {
-	if a.CreatedAt == 0 {
-		a.CreatedAt = time.Now().Unix()
+// ReplacePendingAlarmsTx makes eventID's pending alarms with trigger_unix >=
+// from match alarms: pending rows not in alarms are deleted, and alarms
+// without a row are inserted. Rows that already exist keep their ID (so
+// armed timers stay valid) and their status, so fired and dismissed
+// alarms are never re-raised.
+func (s *Store) ReplacePendingAlarmsTx(tx *sql.Tx, eventID string, from int64, alarms []Alarm) error {
+	type alarmKey struct{ instance, trigger int64 }
+	want := make(map[alarmKey]struct{}, len(alarms))
+	for _, a := range alarms {
+		want[alarmKey{a.InstanceUnix, a.TriggerUnix}] = struct{}{}
 	}
-	if a.Status == "" {
-		a.Status = "pending"
-	}
-	if a.Action == "" {
-		a.Action = "display"
-	}
-	_, err := tx.Exec(`
-		INSERT OR IGNORE INTO event_alarms
-			(id, event_id, instance_unix, trigger_unix, status, action, description, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.EventID, a.InstanceUnix, a.TriggerUnix,
-		a.Status, a.Action, nullIfEmpty(a.Description), a.CreatedAt)
+
+	rows, err := tx.Query(`
+		SELECT id, instance_unix, trigger_unix FROM event_alarms
+		WHERE event_id = ? AND status = 'pending' AND trigger_unix >= ?`, eventID, from)
 	if err != nil {
-		return fmt.Errorf("upsert alarm: %w", err)
+		return fmt.Errorf("query pending alarms: %w", err)
+	}
+	var stale []string
+	for rows.Next() {
+		var id string
+		var k alarmKey
+		if err := rows.Scan(&id, &k.instance, &k.trigger); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan pending alarm: %w", err)
+		}
+		if _, ok := want[k]; !ok {
+			stale = append(stale, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate pending alarms: %w", err)
+	}
+	for _, id := range stale {
+		if _, err := tx.Exec(`DELETE FROM event_alarms WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("delete stale alarm: %w", err)
+		}
+	}
+
+	now := time.Now().Unix()
+	for _, a := range alarms {
+		if a.Action == "" {
+			a.Action = "display"
+		}
+		_, err := tx.Exec(`
+			INSERT INTO event_alarms
+				(id, event_id, instance_unix, trigger_unix, status, action, description, created_at)
+			VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+			ON CONFLICT(event_id, instance_unix, trigger_unix) DO UPDATE SET
+				action = excluded.action, description = excluded.description
+			WHERE status = 'pending'`,
+			a.ID, eventID, a.InstanceUnix, a.TriggerUnix,
+			a.Action, nullIfEmpty(a.Description), now)
+		if err != nil {
+			return fmt.Errorf("upsert alarm: %w", err)
+		}
 	}
 	return nil
+}
+
+// ListCalendarIDs returns the IDs of every calendar across all sources.
+func (s *Store) ListCalendarIDs() ([]string, error) {
+	rows, err := s.DB().Query(`SELECT id FROM calendars`)
+	if err != nil {
+		return nil, fmt.Errorf("query calendar ids: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan calendar id: %w", err)
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
 
 // PendingAlarmsInRange returns all 'pending' alarms with trigger_unix in

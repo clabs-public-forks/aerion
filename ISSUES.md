@@ -100,8 +100,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K5 high** `provider_caldav.go:170`, `event_crud.go:926`: alarms are only
-  generated for the 7 days after a write or sync. Unverified.
 - **K6 high** `provider_microsoft_translate.go:685-775`: recurrence is
   expanded in UTC against a local-zone pattern, giving the wrong weekday
   and DST shifts. Unverified.
@@ -113,8 +111,6 @@ has not yet been confirmed against the code.
   line, never EXDATE or RDATE. Unverified.
 - **K10 medium** `TimelineView.svelte:632-651`: drag and resize drop
   transparency, visibility, reminder and HTML. Unverified.
-- **K11 medium** `store.go:1246-1266`: stale pending alarms are never
-  removed. Unverified.
 - **K12 medium** `event_crud.go:708,966,1008,1042`: all-day UNTIL, EXDATE and
   RECURRENCE-ID are written as UTC date-times. Unverified.
 - **K13 medium** `rrule_expand.go:77`: FREQ=SECONDLY has no expansion cap.

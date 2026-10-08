@@ -204,6 +204,7 @@ END:VEVENT`)
 			Event:             ev,
 			InstanceStartUnix: start.Unix(),
 			InstanceEndUnix:   start.Add(time.Hour).Unix(),
+			RecurrenceIDUnix:  start.Unix(),
 		}
 	}
 	overrideStart := time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC).Unix()

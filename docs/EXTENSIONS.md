@@ -393,7 +393,7 @@ b.initOnce.Do(func() {
 
 The Syncer subscribes to `system:wake` and `system:network-online` for immediate resync; the AlarmScheduler subscribes to `calendar:sync-complete` (re-evaluates alarms after each sync writes new VALARM rows) and `system:wake` (sweeps past alarms to `fired` status without firing-after-the-fact, re-arms future ones). Both subscriptions go through `coreapi.EventBus`; the extension never imports `internal/platform`.
 
-**VALARM notifications via `coreapi.Notifications`** — at sync time, the upsert transaction extracts VALARM templates from each event's stored ICSBlob, projects them onto the expanded recurrence instances within a 7-day window, and writes one row per `(event_id, instance_unix, trigger_unix)` triple. The scheduler reads pending rows in `[now, now+24h]`, arms `time.AfterFunc` callbacks, and fires desktop notifications via the published `coreapi.Notifications` surface:
+**VALARM notifications via `coreapi.Notifications`** — event writes and CalDAV syncs extract VALARM templates from each touched event's stored ICSBlob, project them onto the expanded recurrence instances within a window of about 9 days (`alarmWindow`), and replace that event's future pending rows, one per `(event_id, instance_unix, trigger_unix)` triple. Fired and dismissed rows are kept. The scheduler re-runs this for every event on start, on `calendar:sync-complete`, on `system:wake`, and hourly, so the window rolls forward and Google and Microsoft events get alarms too. The scheduler reads pending rows in `[now, now+24h]`, arms `time.AfterFunc` callbacks, and fires desktop notifications via the published `coreapi.Notifications` surface:
 
 ```go
 s.notif.Show(coreapi.NotifyRequest{

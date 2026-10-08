@@ -942,27 +942,14 @@ func setRRuleText(props ical.Props, rt string) {
 }
 
 // extractAndUpsertAlarmsTx re-parses the event's blob, extracts VALARMs,
-// and upserts them into event_alarms. Keeps create/update → alarms atomic.
+// and replaces its pending alarms in event_alarms. Keeps create/update →
+// alarms atomic.
 func (a *API) extractAndUpsertAlarmsTx(tx *sql.Tx, ev Event) error {
 	overrides, err := a.store.ListOverrides(ev.ID)
 	if err != nil {
 		return err
 	}
-	now := time.Now()
-	instances, err := ExpandInRange(ev, overrides, now, now.Add(7*24*time.Hour))
-	if err != nil {
-		return fmt.Errorf("expand for alarms: %w", err)
-	}
-	alarms, err := ExtractAlarms(ev, overrides, instances)
-	if err != nil {
-		return fmt.Errorf("extract alarms: %w", err)
-	}
-	for _, alm := range alarms {
-		if err := a.store.UpsertAlarmTx(tx, alm); err != nil {
-			return err
-		}
-	}
-	return nil
+	return refreshEventAlarmsTx(tx, a.store, ev, overrides, time.Now())
 }
 
 // --- ICS manipulation helpers -------------------------------------------------

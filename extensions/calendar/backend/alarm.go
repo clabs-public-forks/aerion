@@ -19,8 +19,11 @@ package backend
 // EMAIL / PROCEDURE through different mechanisms.
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-ical"
 	"github.com/google/uuid"
@@ -31,7 +34,7 @@ import (
 // EventOverrides whose ics_blob may include their own VALARM blocks.
 //
 // The returned alarms have ID auto-generated, Status="pending", and
-// CreatedAt=0 (filled in by Store.UpsertAlarmTx).
+// CreatedAt=0 (filled in by Store.ReplacePendingAlarmsTx).
 func ExtractAlarms(ev Event, overrides []EventOverride, instances []EventInstance) ([]Alarm, error) {
 	if len(instances) == 0 {
 		return nil, nil
@@ -56,7 +59,7 @@ func ExtractAlarms(ev Event, overrides []EventOverride, instances []EventInstanc
 	out := make([]Alarm, 0, len(instances))
 	for _, inst := range instances {
 		templates := masterAlarms
-		if ov, ok := overrideTemplates[inst.InstanceStartUnix]; ok {
+		if ov, ok := overrideTemplates[inst.RecurrenceIDUnix]; ok {
 			// Override takes precedence; if the override has zero alarms,
 			// it means the user intentionally cleared reminders for that
 			// instance — honor that.
@@ -75,6 +78,89 @@ func ExtractAlarms(ev Event, overrides []EventOverride, instances []EventInstanc
 		}
 	}
 	return out, nil
+}
+
+// alarmWindow is how far ahead alarms are materialized into event_alarms.
+// It must exceed the scheduler's arming horizon, and the hourly refresh
+// rolls it forward so recurring events always have upcoming alarms.
+const alarmWindow = alarmHorizon + 8*24*time.Hour
+
+// upcomingAlarms expands ev over the alarm window and returns the alarms
+// that trigger at or after now. Expansion starts one horizon back so an
+// occurrence that already started can still contribute a trigger relative
+// to its end or a positive offset.
+func upcomingAlarms(ev Event, overrides []EventOverride, now time.Time) ([]Alarm, error) {
+	instances, err := ExpandInRange(ev, overrides, now.Add(-alarmHorizon), now.Add(alarmWindow))
+	if err != nil {
+		return nil, fmt.Errorf("expand for alarms: %w", err)
+	}
+	alarms, err := ExtractAlarms(ev, overrides, instances)
+	if err != nil {
+		return nil, fmt.Errorf("extract alarms: %w", err)
+	}
+	upcoming := alarms[:0]
+	for _, a := range alarms {
+		if a.TriggerUnix >= now.Unix() {
+			upcoming = append(upcoming, a)
+		}
+	}
+	return upcoming, nil
+}
+
+// refreshEventAlarmsTx replaces ev's future pending alarms with the ones its
+// current data produces, dropping alarms left behind by an edit.
+func refreshEventAlarmsTx(tx *sql.Tx, store *Store, ev Event, overrides []EventOverride, now time.Time) error {
+	alarms, err := upcomingAlarms(ev, overrides, now)
+	if err != nil {
+		return err
+	}
+	return store.ReplacePendingAlarmsTx(tx, ev.ID, now.Unix(), alarms)
+}
+
+// RefreshAllAlarms recomputes the future pending alarms of every event in
+// one transaction. Events that fail to expand are skipped and reported in
+// the returned error; the others are still refreshed.
+func RefreshAllAlarms(store *Store, now time.Time) error {
+	calendarIDs, err := store.ListCalendarIDs()
+	if err != nil {
+		return err
+	}
+	events, err := store.ListEventsForExpansion(calendarIDs)
+	if err != nil {
+		return err
+	}
+
+	type eventAlarms struct {
+		eventID string
+		alarms  []Alarm
+	}
+	planned := make([]eventAlarms, 0, len(events))
+	var expandErrs []error
+	for _, ev := range events {
+		overrides, err := store.ListOverrides(ev.ID)
+		if err != nil {
+			return err
+		}
+		alarms, err := upcomingAlarms(ev, overrides, now)
+		if err != nil {
+			expandErrs = append(expandErrs, fmt.Errorf("event %s: %w", ev.ID, err))
+			continue
+		}
+		planned = append(planned, eventAlarms{ev.ID, alarms})
+	}
+
+	err = store.WithTx(func(tx *sql.Tx) error {
+		for _, p := range planned {
+			if err := store.ReplacePendingAlarmsTx(tx, p.eventID, now.Unix(), p.alarms); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return errors.Join(expandErrs...)
 }
 
 // alarmTemplate is one VALARM parsed from an ICSBlob — not yet projected

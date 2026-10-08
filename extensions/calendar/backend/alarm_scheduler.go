@@ -11,12 +11,14 @@ package backend
 //     to 'fired' without firing-after-the-fact, and future ones re-armed).
 //   - time.AfterFunc timers cover the 24h horizon. On wrap-around (>24h
 //     out), Reevaluate doesn't arm anything for that alarm yet — the next
-//     scheduled tick or sync re-pass will pick it up.
+//     hourly tick or sync re-pass will pick it up.
 //
-// The scheduler does NOT walk recurrences or parse VALARMs itself. That
-// happens at sync time via ExtractAlarms (alarm.go), which writes rows
-// into event_alarms. The scheduler only reads pending rows and arms
-// time.AfterFunc callbacks.
+// Writes and CalDAV syncs materialize alarms for the events they touch.
+// Refresh (on Start, sync-complete, wake and an hourly tick) recomputes
+// every event's alarms via RefreshAllAlarms (alarm.go) so recurring
+// events keep upcoming alarms, Google and Microsoft events get theirs,
+// and stale pending rows are dropped. Reevaluate then arms
+// time.AfterFunc callbacks for the pending rows inside the horizon.
 
 import (
 	"context"
@@ -28,6 +30,9 @@ import (
 )
 
 const alarmHorizon = 24 * time.Hour
+
+// alarmRefreshInterval is how often the alarm window is rolled forward.
+const alarmRefreshInterval = time.Hour
 
 type AlarmScheduler struct {
 	store  *Store
@@ -72,6 +77,7 @@ func (s *AlarmScheduler) Start(ctx context.Context) context.CancelFunc {
 	if s.ctx == nil {
 		s.ctx, s.cancel = context.WithCancel(ctx)
 	}
+	runCtx := s.ctx
 	s.mu.Unlock()
 
 	// Sweep alarms that should have fired in the past so they don't
@@ -85,29 +91,50 @@ func (s *AlarmScheduler) Start(ctx context.Context) context.CancelFunc {
 	// from sync.go's calendar:sync-complete event still keeps timers fresh.
 	if s.events != nil {
 		syncUnsub, _ := s.events.Subscribe("calendar:sync-complete", func(_ any) {
-			if err := s.Reevaluate(); err != nil {
-				s.warn("reevaluate after sync: %v", err)
-			}
+			s.Refresh()
 		})
 		wakeUnsub, _ := s.events.Subscribe("system:wake", func(_ any) {
 			// Sweep past alarms first; user was asleep, don't fire-after.
 			if err := s.store.MarkPastAlarmsFired(time.Now().Unix()); err != nil {
 				s.warn("mark past on wake: %v", err)
 			}
-			if err := s.Reevaluate(); err != nil {
-				s.warn("reevaluate on wake: %v", err)
-			}
+			s.Refresh()
 		})
 		s.mu.Lock()
 		s.unsubs = append(s.unsubs, syncUnsub, wakeUnsub)
 		s.mu.Unlock()
 	}
 
-	if err := s.Reevaluate(); err != nil {
-		s.warn("initial reevaluate: %v", err)
-	}
+	s.Refresh()
+	go s.refreshLoop(runCtx)
 
 	return s.cancel
+}
+
+// refreshLoop rolls the alarm window forward every alarmRefreshInterval
+// until ctx is cancelled by Stop.
+func (s *AlarmScheduler) refreshLoop(ctx context.Context) {
+	ticker := time.NewTicker(alarmRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.Refresh()
+		}
+	}
+}
+
+// Refresh recomputes every event's upcoming alarms, then re-arms timers.
+// Errors are logged; a partial refresh still arms what it produced.
+func (s *AlarmScheduler) Refresh() {
+	if err := RefreshAllAlarms(s.store, time.Now()); err != nil {
+		s.warn("refresh alarms: %v", err)
+	}
+	if err := s.Reevaluate(); err != nil {
+		s.warn("reevaluate alarms: %v", err)
+	}
 }
 
 // Stop cancels all timers and event subscriptions.

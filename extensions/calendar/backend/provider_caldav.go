@@ -170,22 +170,8 @@ func (p caldavProvider) SyncCalendar(ctx context.Context, src Source, cal Calend
 				}
 			}
 
-			// Compute VALARM instances for the next 7 days. INSERT OR IGNORE
-			// in UpsertAlarmTx makes this idempotent across resyncs.
-			now := time.Now()
-			alarmWindow := now.Add(7 * 24 * time.Hour)
-			instances, expErr := ExpandInRange(ev, srv.parsed.Overrides, now, alarmWindow)
-			if expErr != nil {
-				return fmt.Errorf("expand for alarms: %w", expErr)
-			}
-			alarms, aerr := ExtractAlarms(ev, srv.parsed.Overrides, instances)
-			if aerr != nil {
-				return fmt.Errorf("extract alarms: %w", aerr)
-			}
-			for _, a := range alarms {
-				if err := p.store.UpsertAlarmTx(tx, a); err != nil {
-					return err
-				}
+			if err := refreshEventAlarmsTx(tx, p.store, ev, srv.parsed.Overrides, time.Now()); err != nil {
+				return err
 			}
 		}
 
