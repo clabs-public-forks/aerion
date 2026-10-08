@@ -53,8 +53,6 @@ has not yet been confirmed against the code.
 
 ### Contacts
 
-- **C5 medium** `internal/carddav/store.go:854-900,1010-1035`: an empty etag
-  makes PUT and DELETE unconditional. Unverified.
 - **C9 medium** `extensions/contacts/backend/imaging/imaging.go:55-75`:
   photos have no DecodeConfig dimension check before decoding, so a
   decompression bomb can exhaust memory. Unverified.

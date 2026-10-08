@@ -910,6 +910,13 @@ func (s *Store) UpdateRecord(rec *contact.Record, client *Client) error {
 		return fmt.Errorf("UpdateRecord: lookup state: %w", err)
 	}
 
+	// Without an etag the PUT would be unconditional and could overwrite a
+	// change made elsewhere. Report a conflict so the caller refreshes the
+	// record, which stores the server's current etag.
+	if etag == "" {
+		return &ErrPreconditionFailed{Href: href}
+	}
+
 	card, err := BuildVCard(rec, rec.VCardRaw)
 	if err != nil {
 		return fmt.Errorf("UpdateRecord: build vcard: %w", err)
@@ -920,6 +927,7 @@ func (s *Store) UpdateRecord(rec *contact.Record, client *Client) error {
 		// Includes *ErrPreconditionFailed unchanged for the caller to type-check.
 		return err
 	}
+	newETag = s.etagAfterPut(client, addressbookPath, href, newETag)
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -1005,6 +1013,7 @@ func (s *Store) CreateRecord(addressbookID string, rec *contact.Record, client *
 		// the caller can surface it cleanly.
 		return "", err
 	}
+	newETag = s.etagAfterPut(client, addressbookPath, href, newETag)
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -1029,6 +1038,22 @@ func (s *Store) CreateRecord(addressbookID string, rec *contact.Record, client *
 	}
 	s.log.Info().Str("id", rec.ID).Str("href", href).Str("addressbook", addressbookID).Msg("CardDAV record created")
 	return rec.ID, nil
+}
+
+// etagAfterPut returns etag, or when the PUT response carried none, the
+// resource's etag fetched right after the write. Servers may omit ETag on
+// PUT (for example when they rewrite the card); storing an empty etag would
+// leave the next write with no If-Match.
+func (s *Store) etagAfterPut(client *Client, addressbookPath, href, etag string) string {
+	if etag != "" {
+		return etag
+	}
+	rec, err := client.FetchContactByPath(addressbookPath, href)
+	if err != nil || rec == nil {
+		s.log.Warn().Err(err).Str("href", href).Msg("Could not fetch etag after PUT; next write will refresh first")
+		return ""
+	}
+	return rec.ETag
 }
 
 // DeleteRecord DELETEs the given record from its CardDAV server via the
@@ -1061,6 +1086,11 @@ func (s *Store) DeleteRecord(recordID string, client *Client) error {
 	}
 	if err != nil {
 		return fmt.Errorf("DeleteRecord: lookup state: %w", err)
+	}
+
+	// Same as UpdateRecord: never DELETE unconditionally.
+	if etag == "" {
+		return &ErrPreconditionFailed{Href: href}
 	}
 
 	if err := client.DeleteContact(addressbookPath, href, etag); err != nil {
