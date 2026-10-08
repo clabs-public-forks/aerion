@@ -107,7 +107,7 @@ func (m *Manager) startAuthFlowInternal(ctx context.Context, providerName string
 	}
 
 	// Start callback server
-	m.callbackServer = NewCallbackServer()
+	m.callbackServer = NewCallbackServer(state)
 	port, err := m.callbackServer.Start(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to start callback server: %w", err)

@@ -3,6 +3,7 @@ package oauth2
 import (
 	"context"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"sync"
@@ -25,16 +26,19 @@ type CallbackServer struct {
 	log      zerolog.Logger
 	server   *http.Server
 	listener net.Listener
+	state    string // expected OAuth state; other callbacks are rejected
 	resultCh chan CallbackResult
 	done     chan struct{}
 	mu       sync.Mutex
 	started  bool
 }
 
-// NewCallbackServer creates a new OAuth callback server
-func NewCallbackServer() *CallbackServer {
+// NewCallbackServer creates a new OAuth callback server that only accepts
+// callbacks carrying the given state.
+func NewCallbackServer(state string) *CallbackServer {
 	return &CallbackServer{
 		log:      logging.WithComponent("oauth2-callback"),
+		state:    state,
 		resultCh: make(chan CallbackResult, 1),
 		done:     make(chan struct{}),
 	}
@@ -154,14 +158,22 @@ func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 		ErrorDescription: query.Get("error_description"),
 	}
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	// Ignore requests that don't belong to this flow (stray tabs, local
+	// probes) so they can't take the single result slot.
+	if result.State != s.state {
+		s.log.Warn().Msg("OAuth callback with unexpected state ignored")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, errorPageHTML, "invalid_state", "This sign-in link is not for the current request.")
+		return
+	}
+
 	// Send result (non-blocking, only first result counts)
 	select {
 	case s.resultCh <- result:
 	default:
 	}
-
-	// Respond to browser
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if result.Error != "" {
 		s.log.Warn().
@@ -170,7 +182,7 @@ func (s *CallbackServer) handleCallback(w http.ResponseWriter, r *http.Request) 
 			Msg("OAuth callback received error")
 
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, errorPageHTML, result.Error, result.ErrorDescription)
+		fmt.Fprintf(w, errorPageHTML, html.EscapeString(result.Error), html.EscapeString(result.ErrorDescription))
 		return
 	}
 
