@@ -698,15 +698,18 @@ ${processedHtml}
 
   function linkifyText(text: string): string {
     if (!text) return ''
-    const urlPattern = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g
-    const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g
-    let escaped = text
+    // One pass with alternation so an address inside a URL stays part of
+    // that link instead of getting a nested mailto anchor.
+    const linkPattern = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g
+    const escaped = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-    escaped = escaped.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>')
-    escaped = escaped.replace(emailPattern, '<a href="mailto:$1" class="text-primary hover:underline">$1</a>')
-    return escaped
+    return escaped.replace(linkPattern, (_match, url: string | undefined, email: string | undefined) =>
+      url
+        ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">${url}</a>`
+        : `<a href="mailto:${email}" class="text-primary hover:underline">${email}</a>`,
+    )
   }
 
   // Copy selected text to clipboard

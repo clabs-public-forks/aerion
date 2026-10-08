@@ -30,8 +30,6 @@ has not yet been confirmed against the code.
 
 ### Frontend
 
-- **F4 low** `EmailBody.svelte:699-710`: linkify wraps emails inside
-  generated links. Unverified.
 - **F5 low** kit components: hardcoded English strings (R29). Unverified.
 - **F6 low** `AccountSection.svelte:108-114`: the more button has no
   aria-label and no Escape handling. Unverified.
