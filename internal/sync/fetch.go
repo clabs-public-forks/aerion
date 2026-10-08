@@ -38,6 +38,12 @@ type ProcessedBody struct {
 	// failure — the next sync may succeed.
 	ReportedSize  int64
 	ReceivedBytes int64
+
+	// Incomplete means the server returned the message but no complete
+	// body (no body section, an empty one, or a read that failed partway).
+	// Only MessageID and the size signals are set; nothing is stored, and
+	// the message is neither treated as fetched nor deleted.
+	Incomplete bool
 }
 
 // FetchMessageBody fetches the body for a single message on-demand.
@@ -82,6 +88,9 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	}
 
 	result, ok := results[uid]
+	if ok && result.Incomplete {
+		return nil, fmt.Errorf("server returned an incomplete message body")
+	}
 	if !ok || result == nil {
 		// Message no longer exists on server — clean up the ghost
 		e.log.Warn().Str("messageID", messageID).Uint32("uid", uid).Msg("Message not found on server, deleting ghost")
@@ -171,6 +180,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		var fetchedUID imap.UID
 		var rawBytes []byte
 		var gotBodySection bool
+		var readErr error
 		var reportedSize int64 // RFC822.SIZE; 0 if server didn't return it
 
 		for {
@@ -192,14 +202,17 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				// Read body from literal reader with size limit to prevent memory exhaustion
 				if data.Literal != nil {
 					lr := io.LimitReader(data.Literal, maxMessageSize)
-					var err error
-					rawBytes, err = io.ReadAll(lr)
-					if err != nil {
+					rawBytes, readErr = io.ReadAll(lr)
+					// A dropped connection can end the literal early
+					// without an error; compare with its declared size.
+					if want := min(data.Literal.Size(), maxMessageSize); readErr == nil && int64(len(rawBytes)) < want {
+						readErr = fmt.Errorf("read %d of %d literal bytes: %w", len(rawBytes), want, io.ErrUnexpectedEOF)
+					}
+					if readErr != nil {
 						e.log.Warn().
-							Err(err).
+							Err(readErr).
 							Uint32("uid", uint32(fetchedUID)).
-							Msg("Failed to read body literal, continuing with partial data")
-						// Keep whatever we got (may be partial)
+							Msg("Failed to read body literal")
 					}
 					// Log if we hit the size limit
 					if int64(len(rawBytes)) == maxMessageSize {
@@ -235,10 +248,21 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			continue
 		}
 
-		if len(rawBytes) == 0 {
-			e.log.Warn().Uint32("uid", uid).Str("messageID", messageID).Msg("Empty message body — deleting ghost message")
-			if delErr := e.messageStore.Delete(messageID); delErr != nil {
-				e.log.Warn().Err(delErr).Str("messageID", messageID).Msg("Failed to delete ghost message")
+		// The server listed this UID, so the message exists: a missing,
+		// empty or partly read body is a fetch failure, not a deletion.
+		// Keep the size signals so markUnresolvedAsFailed can decide
+		// whether to retry it next sync.
+		if !gotBodySection || readErr != nil || len(rawBytes) == 0 {
+			e.log.Warn().
+				Uint32("uid", uid).
+				Str("messageID", messageID).
+				Int("bodySize", len(rawBytes)).
+				Msg("Incomplete message body, not storing")
+			results[uid] = &ProcessedBody{
+				MessageID:     messageID,
+				ReportedSize:  reportedSize,
+				ReceivedBytes: int64(len(rawBytes)),
+				Incomplete:    true,
 			}
 			continue
 		}
@@ -765,7 +789,14 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 			var allAttachments []*message.Attachment
 			sizes := make(map[string]fetchedSize, len(currentBodies))
 
+			fetchedCount := 0
 			for _, pb := range currentBodies {
+				sizes[pb.MessageID] = fetchedSize{received: pb.ReceivedBytes, reported: pb.ReportedSize}
+				if pb.Incomplete {
+					continue
+				}
+				fetchedCount++
+
 				// Build body update
 				bu := message.BodyUpdate{
 					MessageID:      pb.MessageID,
@@ -780,8 +811,6 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				}
 				// Don't cache S/MIME or PGP verification status — computed fresh on each view
 				bodyUpdates = append(bodyUpdates, bu)
-
-				sizes[pb.MessageID] = fetchedSize{received: pb.ReceivedBytes, reported: pb.ReportedSize}
 
 				// Use pre-extracted attachments (no re-parsing!)
 				if len(pb.Attachments) > 0 {
@@ -800,7 +829,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				bodyUpdates:  bodyUpdates,
 				attachments:  allAttachments,
 				sizes:        sizes,
-				fetchedCount: len(currentBodies),
+				fetchedCount: fetchedCount,
 			}
 		}()
 
