@@ -6,12 +6,6 @@ Found by the full audit on 2026-10-08. Each entry gives a severity, the
 location, and the failure. "Unverified" means a reviewer reported it and it
 has not yet been confirmed against the code.
 
-### Mail sync and storage
-
-- **M12 low** `internal/platform/singleinstance_linux.go`: the
-  single-instance socket lives in /tmp instead of `$XDG_RUNTIME_DIR`.
-  Unverified.
-
 ### Security
 
 - **S6 medium** `internal/smime/verifier.go` `verifyChain`: there is no

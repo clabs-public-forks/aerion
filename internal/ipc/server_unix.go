@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"github.com/hkdb/aerion/internal/platform"
 )
 
 // UnixServer implements the Server interface using Unix domain sockets.
@@ -68,27 +70,10 @@ func (s *UnixServer) Stop() error {
 
 // createSocketPath creates the socket directory and returns the socket path.
 func (s *UnixServer) createSocketPath() (string, error) {
-	// Use /tmp/aerion-{uid}/ directory
-	uid := os.Getuid()
-	socketDir := filepath.Join(os.TempDir(), fmt.Sprintf("aerion-%d", uid))
-
-	// Create directory with restrictive permissions (0700)
-	if err := os.MkdirAll(socketDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create socket directory: %w", err)
-	}
-
-	// Verify directory permissions
-	info, err := os.Stat(socketDir)
+	socketDir, err := platform.SocketDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to stat socket directory: %w", err)
+		return "", err
 	}
-
-	if info.Mode().Perm() != 0700 {
-		if err := os.Chmod(socketDir, 0700); err != nil {
-			return "", fmt.Errorf("failed to set directory permissions: %w", err)
-		}
-	}
-
 	return filepath.Join(socketDir, "ipc.sock"), nil
 }
 
