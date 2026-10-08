@@ -30,8 +30,6 @@ has not yet been confirmed against the code.
 
 ### Frontend
 
-- **F3 low** `Composer.svelte:1363-1367`: Keep Editing doesn't reschedule
-  autosave. Unverified.
 - **F4 low** `EmailBody.svelte:699-710`: linkify wraps emails inside
   generated links. Unverified.
 - **F5 low** kit components: hardcoded English strings (R29). Unverified.

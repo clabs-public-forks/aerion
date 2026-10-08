@@ -1315,8 +1315,12 @@
     doSend()
   }
 
+  // A debounced draft save that handleClose cancelled; Keep Editing restarts it.
+  let closeCancelledSave = false
+
   function handleClose() {
     // Cancel any pending draft save
+    closeCancelledSave = saveTimeoutId !== null
     if (saveTimeoutId) {
       clearTimeout(saveTimeoutId)
       saveTimeoutId = null
@@ -1367,9 +1371,13 @@
     onClose?.()
   }
 
-  // Keep Editing: Just close the dialog
+  // Keep Editing: close the dialog and restart any autosave handleClose cancelled
   function handleKeepEditing() {
     showCloseConfirm = false
+    if (closeCancelledSave) {
+      closeCancelledSave = false
+      scheduleDraftSave()
+    }
     onCloseHandled?.()
   }
 
