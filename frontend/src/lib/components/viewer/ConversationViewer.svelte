@@ -1002,6 +1002,9 @@
       <body><h1>${escapeHtmlText(subject)}</h1>${blocks.join('')}</body></html>`
 
     const frame = document.createElement('iframe')
+    // The bodies are message content: no scripts. allow-same-origin lets us
+    // reach contentWindow to print, and allow-modals lets print() run.
+    frame.setAttribute('sandbox', 'allow-same-origin allow-modals')
     frame.setAttribute('aria-hidden', 'true')
     frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
     frame.srcdoc = doc
