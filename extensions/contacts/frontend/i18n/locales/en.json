@@ -47,6 +47,7 @@
       "edit": "Edit",
       "copyTooltip": "Click to copy",
       "readonlyHint": "Read-only",
+      "localSource": "Local",
       "cardDAVReadOnlyNote": "This source is read-only. To enable editing, open Settings → Contact Sources, edit this source, and turn on \"Enable write access\".",
       "oauthReadOnlyNote": "Read-only — write capability for Google/Microsoft contacts is coming in a future release.",
       "labels": {

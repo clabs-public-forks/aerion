@@ -44,6 +44,14 @@
     return 'carddav'
   })
 
+  // Human-readable source: the source's configured name, "Local" for local
+  // records, or the raw id if the source is no longer configured.
+  let sourceLabel = $derived.by(() => {
+    const sid = contact?.sourceId ?? ''
+    if (sid === 'aerion' || sid.startsWith('local')) return $_('contacts.detail.localSource')
+    return contactSourcesStore.sources.find(s => s.id === sid)?.name || sid
+  })
+
   let showDeleteConfirm = $state(false)
   let deleting = $state(false)
 
@@ -129,43 +137,45 @@
   {#snippet body()}
     {#if contact}
       <dl class="grid grid-cols-[120px_1fr] gap-y-2 gap-x-4">
-        <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.email')}</dt>
-        <dd class="m-0 break-words">
-          {#if contact.emailItems && contact.emailItems.length > 0}
-            {#each contact.emailItems as item (item.email)}
-              <div class="flex items-baseline gap-2">
-                <span
-                  role="button"
-                  tabindex="0"
-                  class="text-primary hover:underline cursor-pointer"
-                  title={$_('contacts.detail.copyTooltip')}
-                  onclick={(e) => { e.stopPropagation(); copyEmail(item.email) }}
-                  onkeydown={(e) => handleKeydown(e, item.email)}
-                >{item.email}</span>
-                {#if item.type}
-                  <span class="text-xs text-muted-foreground uppercase">{item.type}</span>
-                {/if}
-                {#if item.isPrimary}
-                  <span class="text-xs text-primary">{$_('contacts.common.primary')}</span>
-                {/if}
-              </div>
-            {/each}
-          {/if}
-          {#if (!contact.emailItems || contact.emailItems.length === 0) && contact.emails && contact.emails.length > 0}
-            {#each contact.emails as email (email)}
-              <div>
-                <span
-                  role="button"
-                  tabindex="0"
-                  class="text-primary hover:underline cursor-pointer"
-                  title={$_('contacts.detail.copyTooltip')}
-                  onclick={(e) => { e.stopPropagation(); copyEmail(email) }}
-                  onkeydown={(e) => handleKeydown(e, email)}
-                >{email}</span>
-              </div>
-            {/each}
-          {/if}
-        </dd>
+        {#if contact.emailItems?.length || contact.emails?.length}
+          <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.email')}</dt>
+          <dd class="m-0 break-words">
+            {#if contact.emailItems && contact.emailItems.length > 0}
+              {#each contact.emailItems as item (item.email)}
+                <div class="flex items-baseline gap-2">
+                  <span
+                    role="button"
+                    tabindex="0"
+                    class="text-primary hover:underline cursor-pointer"
+                    title={$_('contacts.detail.copyTooltip')}
+                    onclick={(e) => { e.stopPropagation(); copyEmail(item.email) }}
+                    onkeydown={(e) => handleKeydown(e, item.email)}
+                  >{item.email}</span>
+                  {#if item.type}
+                    <span class="text-xs text-muted-foreground uppercase">{item.type}</span>
+                  {/if}
+                  {#if item.isPrimary}
+                    <span class="text-xs text-primary">{$_('contacts.common.primary')}</span>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
+            {#if (!contact.emailItems || contact.emailItems.length === 0) && contact.emails && contact.emails.length > 0}
+              {#each contact.emails as email (email)}
+                <div>
+                  <span
+                    role="button"
+                    tabindex="0"
+                    class="text-primary hover:underline cursor-pointer"
+                    title={$_('contacts.detail.copyTooltip')}
+                    onclick={(e) => { e.stopPropagation(); copyEmail(email) }}
+                    onkeydown={(e) => handleKeydown(e, email)}
+                  >{email}</span>
+                </div>
+              {/each}
+            {/if}
+          </dd>
+        {/if}
 
         {#if contact.phones && contact.phones.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.phone')}</dt>
@@ -266,7 +276,7 @@
 
         {#if contact.sourceId}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.source')}</dt>
-          <dd class="m-0 break-words text-foreground">{contact.sourceId}</dd>
+          <dd class="m-0 break-words text-foreground">{sourceLabel}</dd>
         {/if}
 
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.lastUpdated')}</dt>
