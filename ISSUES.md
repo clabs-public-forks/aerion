@@ -19,8 +19,6 @@ has not yet been confirmed against the code.
   imports: EXT_RULES R1, R2 and R5. The bridge gets a token closure and the
   core DB, and the extension imports `internal/*`. This is architectural
   (see C12).
-- **A9 low** `app/compose.go:577`: an invalid mailto URL, including its
-  recipients and body, is logged in full. Unverified.
 
 ### Contacts
 

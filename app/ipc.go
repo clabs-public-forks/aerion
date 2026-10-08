@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"slices"
 
 	"github.com/hkdb/aerion/internal/folder"
 	"github.com/hkdb/aerion/internal/ipc"
@@ -228,7 +229,7 @@ func (a *App) OpenComposerWindow(accountID, mode, messageID, draftID, mailtoURL 
 
 	log.Info().
 		Str("execPath", execPath).
-		Strs("args", args).
+		Strs("args", redactMailtoArg(args)).
 		Msg("Spawning composer window")
 
 	cmd := exec.Command(execPath, args...)
@@ -287,4 +288,16 @@ func (a *App) GetConnectedComposers() int {
 		return 0
 	}
 	return len(a.ipcServer.Clients())
+}
+
+// redactMailtoArg returns a copy of args with the --mailto value, which holds
+// recipients and body text, replaced for logging.
+func redactMailtoArg(args []string) []string {
+	out := slices.Clone(args)
+	for i := 0; i+1 < len(out); i++ {
+		if out[i] == "--mailto" {
+			out[i+1] = "[redacted]"
+		}
+	}
+	return out
 }

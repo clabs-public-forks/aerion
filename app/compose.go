@@ -573,7 +573,8 @@ func (a *App) handleExternalMailto(rawURL string) {
 
 	mailtoData := ParseMailtoURL(rawURL)
 	if mailtoData == nil {
-		log.Warn().Str("url", rawURL).Msg("Invalid mailto URL from second instance")
+		// The URL holds recipients and body text, so don't log it.
+		log.Warn().Int("length", len(rawURL)).Msg("Invalid mailto URL from second instance")
 		return
 	}
 
