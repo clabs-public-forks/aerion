@@ -263,13 +263,14 @@ func (v *Verifier) verifyOpaqueSigned(raw []byte) (*SignatureResult, []byte) {
 
 // verifyPKCS7 verifies a parsed PKCS#7 object and caches the signer cert
 func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
-	signer := signerCertificate(p7)
-	if signer == nil {
+	signers := signerCertificates(p7)
+	if signers == nil {
 		return &SignatureResult{
 			Status:       StatusInvalid,
 			ErrorMessage: "no certificate for signer",
 		}
 	}
+	signer := signers[0]
 	signerEmail, signerName := signerIdentity(signer)
 
 	// Check the signature itself. pkcs7.Verify() does not check the
@@ -285,7 +286,12 @@ func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
 
 	v.cacheSenderCert(signer, signerEmail)
 
-	if err := v.verifyChain(p7, signer); err != nil {
+	// Every signer must chain to a trusted root, not just the displayed one.
+	for _, cert := range signers {
+		err := v.verifyChain(p7, cert)
+		if err == nil {
+			continue
+		}
 		result := &SignatureResult{
 			Status:       StatusUnknownSigner,
 			SignerEmail:  signerEmail,
@@ -293,10 +299,10 @@ func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
 			ErrorMessage: fmt.Sprintf("unverified signer: %v", err),
 		}
 		switch {
-		case time.Now().After(signer.NotAfter):
+		case time.Now().After(cert.NotAfter):
 			result.Status = StatusExpiredCert
 			result.ErrorMessage = "signer certificate has expired"
-		case bytes.Equal(signer.RawIssuer, signer.RawSubject):
+		case bytes.Equal(cert.RawIssuer, cert.RawSubject):
 			result.Status = StatusSelfSigned
 			result.ErrorMessage = "self-signed certificate"
 		}
@@ -344,19 +350,29 @@ func (v *Verifier) verifyChain(p7 *pkcs7.PKCS7, signer *x509.Certificate) error 
 	return err
 }
 
-// signerCertificate returns the certificate referenced by the first
-// SignerInfo's issuer and serial number, or nil if it is not embedded.
-func signerCertificate(p7 *pkcs7.PKCS7) *x509.Certificate {
+// signerCertificates returns the certificate referenced by each
+// SignerInfo's issuer and serial number, in SignerInfo order. It returns nil
+// if there are no signers or any signer's certificate is not embedded.
+func signerCertificates(p7 *pkcs7.PKCS7) []*x509.Certificate {
 	if len(p7.Signers) == 0 {
 		return nil
 	}
-	ias := p7.Signers[0].IssuerAndSerialNumber
-	for _, cert := range p7.Certificates {
-		if cert.SerialNumber.Cmp(ias.SerialNumber) == 0 && bytes.Equal(cert.RawIssuer, ias.IssuerName.FullBytes) {
-			return cert
+	certs := make([]*x509.Certificate, 0, len(p7.Signers))
+	for _, si := range p7.Signers {
+		ias := si.IssuerAndSerialNumber
+		var match *x509.Certificate
+		for _, cert := range p7.Certificates {
+			if cert.SerialNumber.Cmp(ias.SerialNumber) == 0 && bytes.Equal(cert.RawIssuer, ias.IssuerName.FullBytes) {
+				match = cert
+				break
+			}
 		}
+		if match == nil {
+			return nil
+		}
+		certs = append(certs, match)
 	}
-	return nil
+	return certs
 }
 
 // signerIdentity returns the email address and common name of the signer certificate

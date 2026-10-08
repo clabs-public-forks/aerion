@@ -161,3 +161,34 @@ func TestVerifyPKCS7UsesActualSignerCert(t *testing.T) {
 		t.Errorf("cached serial %s, want signer serial %s", certs[0].SerialNumber, signer.cert.SerialNumber)
 	}
 }
+
+func TestVerifyPKCS7ChecksEverySigner(t *testing.T) {
+	trustedCA := newTestCert(t, "Trusted CA", "", true, nil)
+	untrustedCA := newTestCert(t, "Attacker CA", "", true, nil)
+	alice := newTestCert(t, "Alice", "alice@example.com", false, trustedCA)
+	mallory := newTestCert(t, "Mallory", "mallory@example.com", false, untrustedCA)
+
+	sd, err := pkcs7.NewSignedData([]byte("hello"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sd.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+	for _, s := range []*testCert{alice, mallory} {
+		if err := sd.AddSigner(s.cert, s.key, pkcs7.SignerInfoConfig{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	der, err := sd.Finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p7, err := pkcs7.Parse(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v, _ := newTestVerifier(t, trustedCA.cert)
+	if result := v.verifyPKCS7(p7); result.Status != StatusUnknownSigner {
+		t.Fatalf("status = %q (%s), want %q", result.Status, result.ErrorMessage, StatusUnknownSigner)
+	}
+}
