@@ -343,16 +343,18 @@ var subscribeOnceGuard sync.Once
 
 func (s *Syncer) subscribeOnce() {
 	subscribeOnceGuard.Do(func() {
-		wakeUnsub, _ := s.events.Subscribe("system:wake", func(_ any) {
+		// Connectivity is back: give queued writes that exhausted their
+		// retry budget another round before syncing drains the queue.
+		resync := func(_ any) {
+			if s.queue != nil {
+				_ = s.queue.ResetExhausted()
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
 			_ = s.SyncAllSources(ctx)
-		})
-		netUnsub, _ := s.events.Subscribe("system:network-online", func(_ any) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			_ = s.SyncAllSources(ctx)
-		})
+		}
+		wakeUnsub, _ := s.events.Subscribe("system:wake", resync)
+		netUnsub, _ := s.events.Subscribe("system:network-online", resync)
 		s.unsubs = append(s.unsubs, wakeUnsub, netUnsub)
 	})
 }

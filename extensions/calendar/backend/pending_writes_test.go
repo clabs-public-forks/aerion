@@ -137,7 +137,7 @@ func TestPendingQueue_Enqueue(t *testing.T) {
 	}
 
 	// Verify row is in the table.
-	row, err := queue.nextPending(srcID)
+	row, err := queue.nextPending(srcID, nil)
 	if err != nil {
 		t.Fatalf("nextPending: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestPendingQueue_Drain_SuccessUpdatesEventAndDeletesRow(t *testing.T) {
 	}
 
 	// Row should be gone.
-	row, _ := queue.nextPending(srcID)
+	row, _ := queue.nextPending(srcID, nil)
 	if row != nil {
 		t.Errorf("expected queue empty after success, got row %+v", row)
 	}
@@ -238,7 +238,9 @@ func TestPendingQueue_Drain_TransportFailureKeepsRowAndBumpsAttempt(t *testing.T
 
 	// httptest server that immediately closes the connection, triggering
 	// a transport error on the client side.
+	var hits int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
 		hj, ok := w.(http.Hijacker)
 		if !ok {
 			t.Fatalf("not a hijacker")
@@ -264,10 +266,11 @@ func TestPendingQueue_Drain_TransportFailureKeepsRowAndBumpsAttempt(t *testing.T
 		t.Fatalf("Drain: %v", err)
 	}
 
-	// Drain loops until nextPending returns nil. Transport-failure rows
-	// keep their place but the attempt counter climbs each pass; after
-	// pendingMaxAttempts the row is skipped (not deleted). Query the
-	// table directly so we see the row regardless of attempt level.
+	// A transport failure ends the pass after one try and does not spend
+	// the retry budget, so an offline sync can't strand the row.
+	if hits != 1 {
+		t.Errorf("server hits = %d, want 1 attempt per drain", hits)
+	}
 	var attempt int
 	var lastError string
 	if err := store.DB().QueryRow(
@@ -276,8 +279,8 @@ func TestPendingQueue_Drain_TransportFailureKeepsRowAndBumpsAttempt(t *testing.T
 	).Scan(&attempt, &lastError); err != nil {
 		t.Fatalf("expected row to stay after transport failure, query err: %v", err)
 	}
-	if attempt < 1 {
-		t.Errorf("attempt = %d, want >= 1", attempt)
+	if attempt != 0 {
+		t.Errorf("attempt = %d, want 0 after transport failure", attempt)
 	}
 	if lastError == "" {
 		t.Errorf("last_error should be populated after failure")
@@ -316,7 +319,7 @@ func TestPendingQueue_Drain_ConflictDropsRowAndPublishesEvent(t *testing.T) {
 		t.Fatalf("Drain: %v", err)
 	}
 
-	row, _ := queue.nextPending(srcID)
+	row, _ := queue.nextPending(srcID, nil)
 	if row != nil {
 		t.Errorf("expected row dropped on conflict, still present")
 	}
@@ -356,7 +359,7 @@ func TestPendingQueue_Drain_SkipsExhaustedRows(t *testing.T) {
 	)
 
 	// nextPending should return nil (row exhausted).
-	row, err := queue.nextPending(srcID)
+	row, err := queue.nextPending(srcID, nil)
 	if err != nil {
 		t.Fatalf("nextPending: %v", err)
 	}
@@ -502,7 +505,7 @@ func TestPendingQueue_Drain_SequentialWritesAdvanceTransportState(t *testing.T) 
 			if got := conflictCount(bus); got != tt.wantConflicts {
 				t.Errorf("conflicts = %d, want %d", got, tt.wantConflicts)
 			}
-			if row, _ := queue.nextPending(srcID); row != nil {
+			if row, _ := queue.nextPending(srcID, nil); row != nil {
 				t.Errorf("expected queue empty, got row %+v", row)
 			}
 		})
@@ -605,5 +608,62 @@ func TestPendingQueue_Drain_PreservesSendUpdates(t *testing.T) {
 	}
 	if gotSendUpdates != "externalOnly" {
 		t.Errorf("sendUpdates query = %q, want externalOnly", gotSendUpdates)
+	}
+}
+
+// --- Drain: hard failures spend one attempt per pass; reset recovers ------
+
+func TestPendingQueue_Drain_HardFailureOneAttemptPerPassAndReset(t *testing.T) {
+	store := newTestStore(t)
+
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	queue := NewPendingQueue(store, fakeSecrets{password: "x"}, fakeAuth{target: srv.URL}, &recordingEventBus{})
+	srcID, calID := seedGoogleSource(t, store, "primary")
+	id, err := queue.Enqueue(PendingOp{
+		SourceID: srcID, CalendarID: calID,
+		Op: PendingOpCreate, CalendarURL: "primary",
+		UID: "evt@aerion-google", ICSBlob: minimalGoogleICS(t, "evt@aerion-google"),
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	attempt := func() int {
+		t.Helper()
+		var n int
+		if err := store.DB().QueryRow(`SELECT attempt FROM pending_writes WHERE id = ?`, id).Scan(&n); err != nil {
+			t.Fatalf("query attempt: %v", err)
+		}
+		return n
+	}
+
+	if err := queue.Drain(context.Background(), srcID); err != nil {
+		t.Fatalf("Drain: %v", err)
+	}
+	if hits != 1 || attempt() != 1 {
+		t.Fatalf("after one drain: hits = %d, attempt = %d, want 1 and 1", hits, attempt())
+	}
+
+	for i := 1; i < pendingMaxAttempts; i++ {
+		_ = queue.Drain(context.Background(), srcID)
+	}
+	if got := attempt(); got != pendingMaxAttempts {
+		t.Fatalf("attempt = %d, want %d", got, pendingMaxAttempts)
+	}
+	if row, _ := queue.nextPending(srcID, nil); row != nil {
+		t.Fatalf("exhausted row should be skipped")
+	}
+
+	if err := queue.ResetExhausted(); err != nil {
+		t.Fatalf("ResetExhausted: %v", err)
+	}
+	if row, _ := queue.nextPending(srcID, nil); row == nil || row.ID != id {
+		t.Fatalf("reset row should be eligible again, got %+v", row)
 	}
 }

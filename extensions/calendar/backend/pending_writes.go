@@ -18,7 +18,13 @@ package backend
 //     since those call SyncAllSources → SyncSource → syncSourceInner →
 //     Drain.
 //
-// Order: rows for a given source replay in insertion order.
+// Order: rows for a given source replay in insertion order. Each Drain
+// makes at most one attempt per row. A transport failure ends the pass for
+// that source (connectivity is down, and later rows must not overtake it)
+// without spending the row's retry budget; the next drain retries it.
+// Only non-transport failures count toward pendingMaxAttempts, and
+// ResetExhausted (run on system:network-online / system:wake) gives
+// exhausted rows a fresh budget so they are never stranded permanently.
 //
 // Sequential offline writes to the same event (create then edit, or
 // several edits) are stored separately and replayed in order. Each was
@@ -50,10 +56,8 @@ const (
 	PendingOpDelete PendingOpKind = "delete"
 )
 
-// pendingMaxAttempts is the per-row retry budget. After this many failed
-// drain attempts, Drain skips the row (logs but doesn't fail). A future
-// chunk can expose retry / clear UI; for Chunk 5 the row just sits there
-// awaiting that future surface.
+// pendingMaxAttempts is the per-row budget for non-transport failures.
+// After this many, Drain skips the row until ResetExhausted restores it.
 const pendingMaxAttempts = 3
 
 // PendingOp is the input shape to Enqueue. The caller supplies the
@@ -210,34 +214,47 @@ func (q *PendingQueue) Enqueue(op PendingOp) (string, error) {
 // created_unix ASC order. Stops on ctx cancellation. Per-row outcomes:
 //   - success → row deleted, events row updated with new ETag +
 //     ProviderEventID where applicable.
-//   - ErrTransport → row stays, attempt counter bumped.
+//   - ErrTransport → row stays with last_error populated, attempt
+//     counter unchanged, and the pass ends for this source.
 //   - ErrConflict (412) → row deleted, calendar:write-conflict event
 //     published, user surfaces a "please re-edit" toast via frontend.
 //   - other errors → row stays with last_error populated + attempt
-//     bumped. Rows past pendingMaxAttempts are skipped on subsequent
-//     drains.
+//     bumped. Rows past pendingMaxAttempts are skipped until
+//     ResetExhausted.
 //
-// Returns the first hard error encountered (ctx canceled, store failure).
-// Per-row transport / conflict / hard failures don't bubble up — the
-// drain loop continues to the next row so one stuck write doesn't
-// block others.
+// Each row is attempted at most once per call. Returns the first hard
+// error encountered (ctx canceled, store failure). Per-row conflict /
+// hard failures don't bubble up — the pass continues to the next row so
+// one stuck write doesn't block others.
 func (q *PendingQueue) Drain(ctx context.Context, sourceID string) error {
 	if sourceID == "" {
 		return errors.New("pending queue: sourceID required")
 	}
+	var after *pendingRow
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		row, err := q.nextPending(sourceID)
+		row, err := q.nextPending(sourceID, after)
 		if err != nil {
 			return err
 		}
 		if row == nil {
-			return nil // queue empty for this source
+			return nil // nothing left for this pass
 		}
-		q.processRow(ctx, *row)
+		if errors.Is(q.processRow(ctx, *row), ErrTransport) {
+			return nil // offline; retry on the next drain
+		}
+		after = row
 	}
+}
+
+// ResetExhausted restores the retry budget of rows that used it up, so
+// the next drain retries them. Called when connectivity returns.
+func (q *PendingQueue) ResetExhausted() error {
+	_, err := q.store.DB().Exec(
+		`UPDATE pending_writes SET attempt = 0 WHERE attempt >= ?`, pendingMaxAttempts)
+	return err
 }
 
 // DrainAll iterates all sources known to the store and drains each in
@@ -262,9 +279,14 @@ func (q *PendingQueue) DrainAll(ctx context.Context) error {
 }
 
 // nextPending returns the oldest pending row for sourceID with attempt <
-// pendingMaxAttempts, or nil when none. Skips exhausted rows so they
-// don't permanently block the queue.
-func (q *PendingQueue) nextPending(sourceID string) (*pendingRow, error) {
+// pendingMaxAttempts that is ordered after `after` (nil = from the start),
+// or nil when none. Skips exhausted rows so they don't permanently block
+// the queue.
+func (q *PendingQueue) nextPending(sourceID string, after *pendingRow) (*pendingRow, error) {
+	var afterCreated, afterSeq int64 = -1, -1
+	if after != nil {
+		afterCreated, afterSeq = after.CreatedUnix, after.Seq
+	}
 	rowRes := q.store.DB().QueryRow(`
 		SELECT rowid, id, source_id, calendar_id, COALESCE(event_id, ''), op,
 		       COALESCE(scope, ''), payload_json, attempt,
@@ -272,8 +294,9 @@ func (q *PendingQueue) nextPending(sourceID string) (*pendingRow, error) {
 		       created_unix
 		FROM pending_writes
 		WHERE source_id = ? AND attempt < ?
+		  AND (created_unix > ? OR (created_unix = ? AND rowid > ?))
 		ORDER BY created_unix ASC, rowid ASC
-		LIMIT 1`, sourceID, pendingMaxAttempts)
+		LIMIT 1`, sourceID, pendingMaxAttempts, afterCreated, afterCreated, afterSeq)
 
 	var row pendingRow
 	var payloadJSON string
@@ -296,15 +319,15 @@ func (q *PendingQueue) nextPending(sourceID string) (*pendingRow, error) {
 }
 
 // processRow dispatches one pending row to the provider, handles the
-// result (delete row / bump attempt / publish conflict), and returns.
-// All per-row errors are absorbed — the row's state in the table reflects
-// what happened.
-func (q *PendingQueue) processRow(ctx context.Context, row pendingRow) {
+// result (delete row / bump attempt / publish conflict), and returns the
+// provider error so Drain can stop on transport failures. The row's state
+// in the table reflects what happened.
+func (q *PendingQueue) processRow(ctx context.Context, row pendingRow) error {
 	src, err := q.store.GetSource(row.SourceID)
 	if err != nil || src == nil {
 		// Source deleted (or load failed); drop the orphaned row.
 		_ = q.deleteRow(row.ID)
-		return
+		return nil
 	}
 
 	provider := ProviderForSource(*src, ProviderDeps{
@@ -361,10 +384,11 @@ func (q *PendingQueue) processRow(ctx context.Context, row pendingRow) {
 	default:
 		// Unknown op — drop the row.
 		_ = q.deleteRow(row.ID)
-		return
+		return nil
 	}
 
 	q.recordOutcome(row, perr)
+	return perr
 }
 
 // recordOutcome translates the per-row push result into table state +
@@ -387,9 +411,14 @@ func (q *PendingQueue) recordOutcome(row pendingRow, perr error) {
 		}
 		return
 	}
-	// Transport or other error: bump attempt + record last_error. Drain
-	// will skip rows past pendingMaxAttempts on subsequent passes.
-	_ = q.bumpAttempt(row.ID, perr.Error())
+	// Transport errors are expected while offline and retried on the next
+	// drain without spending the budget. Other errors bump attempt; Drain
+	// skips rows past pendingMaxAttempts until ResetExhausted.
+	bump := 1
+	if errors.Is(perr, ErrTransport) {
+		bump = 0
+	}
+	_ = q.recordFailure(row.ID, bump, perr.Error())
 }
 
 func (q *PendingQueue) deleteRow(id string) error {
@@ -397,13 +426,13 @@ func (q *PendingQueue) deleteRow(id string) error {
 	return err
 }
 
-func (q *PendingQueue) bumpAttempt(id, lastError string) error {
+func (q *PendingQueue) recordFailure(id string, bump int, lastError string) error {
 	_, err := q.store.DB().Exec(`
 		UPDATE pending_writes
-		SET attempt = attempt + 1,
+		SET attempt = attempt + ?,
 		    last_attempt_unix = ?,
 		    last_error = ?
-		WHERE id = ?`, time.Now().Unix(), lastError, id)
+		WHERE id = ?`, bump, time.Now().Unix(), lastError, id)
 	return err
 }
 
