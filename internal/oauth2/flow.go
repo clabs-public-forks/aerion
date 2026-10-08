@@ -59,7 +59,8 @@ func NewManager() *Manager {
 	return &Manager{
 		log: logging.WithComponent("oauth2"),
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:       30 * time.Second,
+			CheckRedirect: secureRedirectsOnly,
 		},
 	}
 }
@@ -253,6 +254,9 @@ func (m *Manager) RefreshTokenWithProvider(provider ProviderConfig, refreshToken
 		data.Set("client_secret", provider.ClientSecret)
 	}
 
+	if err := RequireSecureURL(provider.TokenURL, "token URL"); err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("POST", provider.TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -322,6 +326,9 @@ func (m *Manager) exchangeCode(provider ProviderConfig, code, codeVerifier strin
 		data.Set("client_secret", provider.ClientSecret)
 	}
 
+	if err := RequireSecureURL(provider.TokenURL, "token URL"); err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequest("POST", provider.TokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -380,6 +387,9 @@ func (m *Manager) getUserEmail(provider ProviderConfig, tokens *TokenResponse) (
 		return "", fmt.Errorf("userinfo not supported for provider: %s", provider.Name)
 	}
 
+	if err := RequireSecureURL(userinfoURL, "userinfo URL"); err != nil {
+		return "", err
+	}
 	req, err := http.NewRequest("GET", userinfoURL, nil)
 	if err != nil {
 		return "", err

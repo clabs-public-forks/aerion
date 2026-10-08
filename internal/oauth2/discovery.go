@@ -38,17 +38,11 @@ func DiscoverOIDC(ctx context.Context, issuer string) (OIDCDiscovery, error) {
 		return OIDCDiscovery{}, fmt.Errorf("issuer URL is required")
 	}
 
-	u, err := url.Parse(base)
-	if err != nil || u.Host == "" {
-		return OIDCDiscovery{}, fmt.Errorf("invalid issuer URL")
-	}
-	host := u.Hostname()
-	isLoopback := host == "localhost" || host == "127.0.0.1" || host == "::1"
-	if u.Scheme != "https" && !(u.Scheme == "http" && isLoopback) {
-		return OIDCDiscovery{}, fmt.Errorf("issuer URL must use https")
+	if err := RequireSecureURL(base, "issuer URL"); err != nil {
+		return OIDCDiscovery{}, err
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: secureRedirectsOnly}
 	var lastErr error
 	for _, p := range discoveryPaths {
 		doc, derr := fetchDiscovery(ctx, client, base+p)
@@ -60,9 +54,51 @@ func DiscoverOIDC(ctx context.Context, issuer string) (OIDCDiscovery, error) {
 			lastErr = fmt.Errorf("discovery document is missing an authorization or token endpoint")
 			continue
 		}
+		if derr := doc.requireSecureEndpoints(); derr != nil {
+			lastErr = derr
+			continue
+		}
 		return doc, nil
 	}
 	return OIDCDiscovery{}, fmt.Errorf("OIDC discovery failed: %w", lastErr)
+}
+
+// RequireSecureURL returns an error unless raw is an absolute https URL, or
+// an http URL to a loopback host (for self-hosted testing). OAuth endpoints
+// carry codes, client secrets and tokens, so they must not be plain http.
+func RequireSecureURL(raw, label string) error {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("invalid %s", label)
+	}
+	host := u.Hostname()
+	isLoopback := host == "localhost" || host == "127.0.0.1" || host == "::1"
+	if u.Scheme != "https" && !(u.Scheme == "http" && isLoopback) {
+		return fmt.Errorf("%s must use https", label)
+	}
+	return nil
+}
+
+// secureRedirectsOnly is an http.Client CheckRedirect that refuses to follow
+// a redirect to an insecure URL.
+func secureRedirectsOnly(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	return RequireSecureURL(req.URL.String(), "redirect URL")
+}
+
+func (d OIDCDiscovery) requireSecureEndpoints() error {
+	if err := RequireSecureURL(d.AuthorizationEndpoint, "authorization endpoint"); err != nil {
+		return err
+	}
+	if err := RequireSecureURL(d.TokenEndpoint, "token endpoint"); err != nil {
+		return err
+	}
+	if d.UserinfoEndpoint != "" {
+		return RequireSecureURL(d.UserinfoEndpoint, "userinfo endpoint")
+	}
+	return nil
 }
 
 func fetchDiscovery(ctx context.Context, client *http.Client, endpoint string) (OIDCDiscovery, error) {

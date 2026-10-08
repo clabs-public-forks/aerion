@@ -12,8 +12,6 @@ has not yet been confirmed against the code.
   revocation check, so a revoked signer still shows as trusted. Needs an
   owner decision: OCSP or CRL fetches on every view tell the CA what is
   being read. (The signing-time half of S6 is fixed.)
-- **S14 low** `app/oauth.go:265-280`, `internal/oauth2/discovery.go`: custom
-  and discovered OAuth endpoints are not required to be https. Unverified.
 
 ### App layer
 
