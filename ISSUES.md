@@ -30,10 +30,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `app/draft.go` `saveDraftToDB` never populates `IdentityID`, and `toComposeMessage` omits `From`. Reopening a draft saved with a nondefault alias selects the default identity; background pending-draft retries serialize an empty sender. Persist the selected identity on create/update and restore the sender for both editing and retries.
 
-### [P2] Unlimited-history sync never reconciles an empty mailbox
-
-`internal/sync/messages.go` `SyncMessages` skips deletion reconciliation when a successful remote search returns zero messages, local rows remain, and `syncPeriodDays == 0`. Emptying a folder in another client leaves stale messages indefinitely. Distinguish search errors from valid empty results and reconcile confirmed empty mailboxes.
-
 ### [P2] Untrusted signer certificates become encryption keys
 
 `internal/smime/verifier.go` caches the signer certificate for unknown-CA and self-signed signatures, and `Store.GetSenderCertPEMs` encrypts to the most recently seen cert per email. Anyone can send a validly signed message claiming another address and replace the key used for future encrypted mail to it. Prefer chain-trusted certs for encryption, or require explicit user acceptance of untrusted ones.

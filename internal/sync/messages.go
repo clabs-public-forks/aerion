@@ -167,14 +167,14 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 		Int("remoteCount", len(remoteUIDs)).
 		Msg("UID comparison")
 
-	// SAFEGUARD: If remote returns empty but we have local messages, something is wrong
-	// This could be a network issue, server error, or connection problem
-	// Do NOT delete local messages in this case (unless we're using date filtering)
-	if len(remoteUIDs) == 0 && len(localUIDs) > 0 && syncPeriodDays == 0 {
+	// SAFEGUARD: An empty search result while local messages exist is only
+	// trusted when SELECT also reported an empty mailbox.
+	if skipEmptyRemoteReconcile(len(remoteUIDs), len(localUIDs), syncPeriodDays, mailbox.Messages) {
 		e.log.Warn().
 			Str("folder", f.Path).
 			Int("localCount", len(localUIDs)).
-			Msg("Server returned 0 messages but we have local messages - skipping deletion to prevent data loss")
+			Uint32("selectedCount", mailbox.Messages).
+			Msg("Server search returned 0 messages but mailbox is not empty - skipping deletion to prevent data loss")
 		// Still try to update folder metadata but don't delete anything
 		now := time.Now()
 		f.LastSync = &now
@@ -663,6 +663,16 @@ func (e *Engine) fetchUIDsSince(ctx context.Context, client *imapclient.Client, 
 		e.log.Debug().Int("count", len(uids)).Msg("Fetched UIDs since date")
 		return uids, nil
 	}
+}
+
+// skipEmptyRemoteReconcile reports whether deletion reconciliation must be
+// skipped because a full-history UID search returned nothing while local
+// messages remain. The empty result is accepted as genuine (and stale local
+// messages are reconciled away) only when SELECT confirmed the mailbox holds
+// no messages; otherwise an empty search more likely signals a server or
+// connection problem. Date-filtered syncs legitimately see empty windows.
+func skipEmptyRemoteReconcile(remoteCount, localCount, syncPeriodDays int, selectedMessages uint32) bool {
+	return remoteCount == 0 && localCount > 0 && syncPeriodDays == 0 && selectedMessages > 0
 }
 
 // fetchAllUIDs fetches all UIDs from the currently selected mailbox.
