@@ -68,16 +68,17 @@ func (s *CallbackServer) Start(ctx context.Context) (int, error) {
 	mux.HandleFunc("/callback", s.handleCallback)
 	mux.HandleFunc("/", s.handleRoot)
 
-	s.server = &http.Server{
+	srv := &http.Server{
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
+	s.server = srv
 
-	// Start server in background
+	// Start server in background. Use the local: Stop clears s.server.
 	go func() {
 		s.log.Debug().Int("port", port).Msg("Starting OAuth callback server")
-		if err := s.server.Serve(listener); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			s.log.Error().Err(err).Msg("Callback server error")
 		}
 	}()

@@ -87,8 +87,7 @@ func (a *App) StartOAuthFlow(provider string) error {
 		}
 
 		// Store tokens temporarily for account creation
-		a.pendingOAuthTokens = tokens
-		a.pendingOAuthEmail = email
+		a.setPendingOAuth(tokens, email)
 
 		log.Info().
 			Str("provider", provider).
@@ -138,14 +137,15 @@ func (a *App) CompleteOAuthAccountSetup(provider, email, accountName, displayNam
 		Msg("Completing OAuth account setup")
 
 	// Check that we have pending tokens from the OAuth flow
-	if a.pendingOAuthTokens == nil {
+	pendingTokens, pendingEmail, _ := a.pendingOAuth()
+	if pendingTokens == nil {
 		return nil, fmt.Errorf("no pending OAuth tokens - please complete the sign-in process first")
 	}
 
 	// Verify the email matches
-	if a.pendingOAuthEmail != "" && a.pendingOAuthEmail != email {
+	if pendingEmail != "" && pendingEmail != email {
 		log.Warn().
-			Str("expected", a.pendingOAuthEmail).
+			Str("expected", pendingEmail).
 			Str("provided", email).
 			Msg("OAuth email mismatch, using provided email")
 	}
@@ -205,13 +205,13 @@ func (a *App) CompleteOAuthAccountSetup(provider, email, accountName, displayNam
 	}
 
 	// Calculate token expiry
-	expiresAt := time.Now().Add(time.Duration(a.pendingOAuthTokens.ExpiresIn) * time.Second)
+	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
 
 	// Save OAuth tokens
 	tokens := &credentials.OAuthTokens{
 		Provider:     provider,
-		AccessToken:  a.pendingOAuthTokens.AccessToken,
-		RefreshToken: a.pendingOAuthTokens.RefreshToken,
+		AccessToken:  pendingTokens.AccessToken,
+		RefreshToken: pendingTokens.RefreshToken,
 		ExpiresAt:    expiresAt,
 		Scopes:       providerConfig.Scopes,
 	}
@@ -237,11 +237,10 @@ func (a *App) CompleteOAuthAccountSetup(provider, email, accountName, displayNam
 	log.Debug().Str("accountID", acc.ID).Msg("OAuth tokens saved successfully")
 
 	// Capture the stable account identity (oid+tid) for incremental-consent validation.
-	a.persistOAuthStableID(acc.ID, a.pendingOAuthTokens)
+	a.persistOAuthStableID(acc.ID, pendingTokens)
 
 	// Clear pending tokens
-	a.pendingOAuthTokens = nil
-	a.pendingOAuthEmail = ""
+	a.clearPendingOAuth(pendingTokens)
 
 	log.Info().
 		Str("accountID", acc.ID).
@@ -280,13 +279,13 @@ func (a *App) StartCustomOAuthFlow(authURL, tokenURL, userinfoURL string, scopes
 		ClientID:         clientID,
 		ClientSecret:     clientSecret,
 	}
-	a.pendingCustomProvider = provider
+	a.setPendingCustomProvider(provider)
 
 	log.Info().Str("provider", customOAuthProviderName).Msg("Starting custom OAuth flow")
 
 	authRedirectURL, err := a.oauth2Manager.StartAuthFlowWithProvider(a.ctx, provider)
 	if err != nil {
-		a.pendingCustomProvider = nil
+		a.setPendingCustomProvider(nil)
 		wailsRuntime.EventsEmit(a.ctx, "oauth:error", map[string]interface{}{
 			"provider": customOAuthProviderName,
 			"error":    err.Error(),
@@ -321,8 +320,7 @@ func (a *App) StartCustomOAuthFlow(authURL, tokenURL, userinfoURL string, scopes
 			return
 		}
 
-		a.pendingOAuthTokens = tokens
-		a.pendingOAuthEmail = email
+		a.setPendingOAuth(tokens, email)
 
 		log.Info().
 			Str("provider", customOAuthProviderName).
@@ -372,13 +370,13 @@ func (a *App) DiscoverOAuthProvider(issuerURL string) (*OIDCDiscoveryResult, err
 func (a *App) CompleteCustomOAuthAccountSetup(config account.AccountConfig) (*account.Account, error) {
 	log := logging.WithComponent("app.oauth")
 
-	if a.pendingOAuthTokens == nil {
+	pendingTokens, _, provider := a.pendingOAuth()
+	if pendingTokens == nil {
 		return nil, fmt.Errorf("no pending OAuth tokens - please complete the sign-in process first")
 	}
-	if a.pendingCustomProvider == nil {
+	if provider == nil {
 		return nil, fmt.Errorf("no pending custom OAuth provider - please restart the sign-in process")
 	}
-	provider := a.pendingCustomProvider
 
 	config.AuthType = account.AuthOAuth2
 
@@ -388,11 +386,11 @@ func (a *App) CompleteCustomOAuthAccountSetup(config account.AccountConfig) (*ac
 		return nil, fmt.Errorf("failed to create account: %w", err)
 	}
 
-	expiresAt := time.Now().Add(time.Duration(a.pendingOAuthTokens.ExpiresIn) * time.Second)
+	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
 	tokens := &credentials.OAuthTokens{
 		Provider:     customOAuthProviderName,
-		AccessToken:  a.pendingOAuthTokens.AccessToken,
-		RefreshToken: a.pendingOAuthTokens.RefreshToken,
+		AccessToken:  pendingTokens.AccessToken,
+		RefreshToken: pendingTokens.RefreshToken,
 		ExpiresAt:    expiresAt,
 		Scopes:       provider.Scopes,
 	}
@@ -424,11 +422,10 @@ func (a *App) CompleteCustomOAuthAccountSetup(config account.AccountConfig) (*ac
 	}
 
 	// Capture the stable account identity (oid+tid) for incremental-consent validation.
-	a.persistOAuthStableID(acc.ID, a.pendingOAuthTokens)
+	a.persistOAuthStableID(acc.ID, pendingTokens)
 
-	a.pendingOAuthTokens = nil
-	a.pendingOAuthEmail = ""
-	a.pendingCustomProvider = nil
+	a.clearPendingOAuth(pendingTokens)
+	a.setPendingCustomProvider(nil)
 
 	a.updateDBConnectionPool()
 
@@ -445,7 +442,8 @@ func (a *App) CompleteCustomOAuthAccountSetup(config account.AccountConfig) (*ac
 func (a *App) SavePendingOAuthTokens(accountID string) error {
 	log := logging.WithComponent("app.oauth")
 
-	if a.pendingOAuthTokens == nil {
+	pendingTokens, _, _ := a.pendingOAuth()
+	if pendingTokens == nil {
 		return fmt.Errorf("no pending OAuth tokens to save")
 	}
 
@@ -475,12 +473,12 @@ func (a *App) SavePendingOAuthTokens(accountID string) error {
 	}
 
 	// Calculate expiry time
-	expiresAt := time.Now().Add(time.Duration(a.pendingOAuthTokens.ExpiresIn) * time.Second)
+	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
 
 	tokens := &credentials.OAuthTokens{
 		Provider:     provider,
-		AccessToken:  a.pendingOAuthTokens.AccessToken,
-		RefreshToken: a.pendingOAuthTokens.RefreshToken,
+		AccessToken:  pendingTokens.AccessToken,
+		RefreshToken: pendingTokens.RefreshToken,
 		ExpiresAt:    expiresAt,
 		Scopes:       scopes,
 	}
@@ -491,7 +489,7 @@ func (a *App) SavePendingOAuthTokens(accountID string) error {
 
 	// Re-capture the stable account identity (oid+tid) so accounts added before
 	// this existed self-heal on re-authorize (#337/#328).
-	a.persistOAuthStableID(accountID, a.pendingOAuthTokens)
+	a.persistOAuthStableID(accountID, pendingTokens)
 
 	// Propagate new tokens to any shared mailboxes linked to this account
 	sharedMailboxes, _ := a.accountStore.ListBySharedMailboxParent(accountID)
@@ -508,8 +506,7 @@ func (a *App) SavePendingOAuthTokens(accountID string) error {
 		Msg("Pending OAuth tokens saved to account")
 
 	// Clear pending tokens
-	a.pendingOAuthTokens = nil
-	a.pendingOAuthEmail = ""
+	a.clearPendingOAuth(pendingTokens)
 
 	return nil
 }
@@ -522,8 +519,7 @@ func (a *App) CancelOAuthFlow() {
 	a.oauth2Manager.CancelAuthFlow()
 
 	// Clear any pending tokens
-	a.pendingOAuthTokens = nil
-	a.pendingOAuthEmail = ""
+	a.setPendingOAuth(nil, "")
 
 	wailsRuntime.EventsEmit(a.ctx, "oauth:cancelled", nil)
 }

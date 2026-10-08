@@ -513,9 +513,7 @@ func (a *App) StartContactsOnlyOAuthFlow(provider string) error {
 		}
 
 		// Store tokens temporarily for source creation
-		a.pendingContactSourceOAuthTokens = tokens
-		a.pendingContactSourceOAuthEmail = email
-		a.pendingContactSourceOAuthProvider = provider
+		a.setPendingContactSourceOAuth(tokens, email, provider)
 
 		log.Info().
 			Str("provider", provider).
@@ -538,12 +536,10 @@ func (a *App) CompleteContactSourceOAuthSetup(name string, syncInterval int) (*c
 	log := logging.WithComponent("app.contacts-oauth")
 
 	// Check that we have pending tokens
-	if a.pendingContactSourceOAuthTokens == nil {
+	pendingTokens, email, provider := a.pendingContactSourceOAuth()
+	if pendingTokens == nil {
 		return nil, fmt.Errorf("no pending OAuth tokens - please complete the sign-in process first")
 	}
-
-	provider := a.pendingContactSourceOAuthProvider
-	email := a.pendingContactSourceOAuthEmail
 
 	log.Info().
 		Str("provider", provider).
@@ -586,13 +582,13 @@ func (a *App) CompleteContactSourceOAuthSetup(name string, syncInterval int) (*c
 	}
 
 	// Calculate token expiry
-	expiresAt := time.Now().Add(time.Duration(a.pendingContactSourceOAuthTokens.ExpiresIn) * time.Second)
+	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
 
 	// Save OAuth tokens for the source
 	tokens := &credentials.OAuthTokens{
 		Provider:     provider,
-		AccessToken:  a.pendingContactSourceOAuthTokens.AccessToken,
-		RefreshToken: a.pendingContactSourceOAuthTokens.RefreshToken,
+		AccessToken:  pendingTokens.AccessToken,
+		RefreshToken: pendingTokens.RefreshToken,
 		ExpiresAt:    expiresAt,
 		Scopes:       providerConfig.Scopes,
 	}
@@ -604,9 +600,7 @@ func (a *App) CompleteContactSourceOAuthSetup(name string, syncInterval int) (*c
 	}
 
 	// Clear pending tokens
-	a.pendingContactSourceOAuthTokens = nil
-	a.pendingContactSourceOAuthEmail = ""
-	a.pendingContactSourceOAuthProvider = ""
+	a.clearPendingContactSourceOAuth(pendingTokens)
 
 	// Trigger initial sync
 	go a.carddavSyncer.SyncSource(source.ID)
@@ -628,9 +622,7 @@ func (a *App) CancelContactSourceOAuthFlow() {
 	a.oauth2Manager.CancelAuthFlow()
 
 	// Clear any pending tokens
-	a.pendingContactSourceOAuthTokens = nil
-	a.pendingContactSourceOAuthEmail = ""
-	a.pendingContactSourceOAuthProvider = ""
+	a.setPendingContactSourceOAuth(nil, "", "")
 
 	wailsRuntime.EventsEmit(a.ctx, "contact-source-oauth:cancelled", nil)
 }

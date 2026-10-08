@@ -285,6 +285,9 @@ type App struct {
 	// OAuth2 manager
 	oauth2Manager *oauth2.Manager
 
+	// Guards the pending OAuth fields below (see oauth_pending.go)
+	pendingOAuthMu goSync.Mutex
+
 	// Temporary OAuth token storage (for pending account creation)
 	pendingOAuthTokens *oauth2.TokenResponse
 	pendingOAuthEmail  string

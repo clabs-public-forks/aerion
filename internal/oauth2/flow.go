@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hkdb/aerion/internal/logging"
@@ -47,6 +48,7 @@ type UserInfo struct {
 // Manager handles OAuth2 authorization flows
 type Manager struct {
 	log            zerolog.Logger
+	mu             sync.Mutex // guards activeSession and callbackServer
 	activeSession  *AuthSession
 	callbackServer *CallbackServer
 	httpClient     *http.Client
@@ -90,8 +92,11 @@ func (m *Manager) StartAuthFlowWithProvider(ctx context.Context, provider *Provi
 
 // startAuthFlowInternal is the common implementation for starting OAuth flows
 func (m *Manager) startAuthFlowInternal(ctx context.Context, providerName string, provider ProviderConfig, customConfig *ProviderConfig) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	// Cancel any existing session
-	m.CancelAuthFlow()
+	m.cancelLocked()
 
 	// Generate PKCE code verifier and challenge
 	verifier, err := generateCodeVerifier()
@@ -137,11 +142,12 @@ func (m *Manager) startAuthFlowInternal(ctx context.Context, providerName string
 // WaitForCallback waits for the OAuth callback and exchanges the code for tokens
 // Returns the tokens and user email on success
 func (m *Manager) WaitForCallback(ctx context.Context) (*TokenResponse, string, error) {
-	if m.activeSession == nil || m.callbackServer == nil {
+	m.mu.Lock()
+	session, server := m.activeSession, m.callbackServer
+	m.mu.Unlock()
+	if session == nil || server == nil {
 		return nil, "", fmt.Errorf("no active OAuth session")
 	}
-
-	session := m.activeSession
 
 	// Use custom provider config if available, otherwise look up by name
 	var provider ProviderConfig
@@ -156,7 +162,7 @@ func (m *Manager) WaitForCallback(ctx context.Context) (*TokenResponse, string, 
 	}
 
 	// Wait for callback
-	result, err := m.callbackServer.WaitForCallback(ctx)
+	result, err := server.WaitForCallback(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("callback failed: %w", err)
 	}
@@ -184,8 +190,12 @@ func (m *Manager) WaitForCallback(ctx context.Context) (*TokenResponse, string, 
 		email = "" // Non-fatal, will need to be provided by user
 	}
 
-	// Clear session
-	m.activeSession = nil
+	// Clear session, unless a newer flow has replaced it
+	m.mu.Lock()
+	if m.activeSession == session {
+		m.activeSession = nil
+	}
+	m.mu.Unlock()
 
 	m.log.Info().
 		Str("provider", session.Provider).
@@ -197,6 +207,12 @@ func (m *Manager) WaitForCallback(ctx context.Context) (*TokenResponse, string, 
 
 // CancelAuthFlow cancels any active OAuth flow
 func (m *Manager) CancelAuthFlow() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cancelLocked()
+}
+
+func (m *Manager) cancelLocked() {
 	if m.callbackServer != nil {
 		m.callbackServer.Stop()
 		m.callbackServer = nil
