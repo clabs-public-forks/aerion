@@ -200,6 +200,10 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN reply_to`); err != nil {
 		t.Fatalf("drop drafts.reply_to for re-migrate: %v", err)
 	}
+	// And v44's trusted on smime_sender_certs.
+	if _, err := db.Exec(`ALTER TABLE smime_sender_certs DROP COLUMN trusted`); err != nil {
+		t.Fatalf("drop smime_sender_certs.trusted for re-migrate: %v", err)
+	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
 	if err := db.Migrate(); err != nil {
@@ -355,6 +359,10 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	// And v43's reply_to on drafts.
 	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN reply_to`); err != nil {
 		t.Fatalf("drop drafts.reply_to for re-migrate: %v", err)
+	}
+	// And v44's trusted on smime_sender_certs.
+	if _, err := db.Exec(`ALTER TABLE smime_sender_certs DROP COLUMN trusted`); err != nil {
+		t.Fatalf("drop smime_sender_certs.trusted for re-migrate: %v", err)
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,

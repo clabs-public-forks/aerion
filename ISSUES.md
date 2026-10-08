@@ -18,6 +18,4 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `app/compose.go` (`getValidOAuthToken` → `refreshOAuthToken`) refreshes mail-slot tokens outside the extension broker's per-slot lock in `internal/extensions/auth`. With providers that rotate refresh tokens (Microsoft, custom OIDC), an extension refresh and an IMAP/SMTP refresh can race and one can send an already-used refresh token. Fix by moving a single-flight "refresh unless the token already changed" into `credentials.Store` or `oauth2.Manager` and calling it from both.
 
-### [P2] Untrusted signer certificates become encryption keys
 
-`internal/smime/verifier.go` caches the signer certificate for unknown-CA and self-signed signatures, and `Store.GetSenderCertPEMs` encrypts to the most recently seen cert per email. Anyone can send a validly signed message claiming another address and replace the key used for future encrypted mail to it. Prefer chain-trusted certs for encryption, or require explicit user acceptance of untrusted ones.

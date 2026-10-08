@@ -192,3 +192,52 @@ func TestVerifyPKCS7ChecksEverySigner(t *testing.T) {
 		t.Fatalf("status = %q (%s), want %q", result.Status, result.ErrorMessage, StatusUnknownSigner)
 	}
 }
+
+func TestUntrustedSignerCertNotUsedForEncryption(t *testing.T) {
+	ca := newTestCert(t, "Trusted CA", "", true, nil)
+	attackerCA := newTestCert(t, "Attacker CA", "", true, nil)
+	alice := newTestCert(t, "Alice", "alice@example.com", false, ca)
+
+	v, store := newTestVerifier(t, ca.cert)
+	if r := v.verifyPKCS7(signTestMessage(t, alice)); r.Status != StatusSigned {
+		t.Fatalf("status = %q, want signed", r.Status)
+	}
+
+	alicePEM := func() string {
+		t.Helper()
+		pems, err := store.GetSenderCertPEMs([]string{"alice@example.com"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return pems["alice@example.com"]
+	}
+	trustedPEM := alicePEM()
+	if trustedPEM == "" {
+		t.Fatal("chain-trusted cert should be usable for encryption")
+	}
+
+	// Later forged signatures claiming alice must not replace her key.
+	for _, forger := range []*testCert{
+		newTestCert(t, "Mallory", "alice@example.com", false, attackerCA),
+		newTestCert(t, "Mallory", "alice@example.com", false, nil),
+	} {
+		time.Sleep(time.Millisecond) // newer last_seen_at
+		v.verifyPKCS7(signTestMessage(t, forger))
+		if got := alicePEM(); got != trustedPEM {
+			t.Fatalf("untrusted signer cert became alice's encryption key")
+		}
+	}
+
+	// An untrusted cert alone is not used, but explicit import accepts it.
+	bob := newTestCert(t, "Bob", "bob@example.com", false, nil)
+	v.verifyPKCS7(signTestMessage(t, bob))
+	if pems, _ := store.GetSenderCertPEMs([]string{"bob@example.com"}); pems["bob@example.com"] != "" {
+		t.Fatal("self-signed cert should not be used without explicit import")
+	}
+	if err := store.ImportSenderCertFromFile("bob@example.com", bob.cert.Raw); err != nil {
+		t.Fatal(err)
+	}
+	if pems, _ := store.GetSenderCertPEMs([]string{"bob@example.com"}); pems["bob@example.com"] == "" {
+		t.Fatal("imported cert should be usable for encryption")
+	}
+}

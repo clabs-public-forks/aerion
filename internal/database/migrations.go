@@ -1347,4 +1347,15 @@ var migrations = []Migration{
 			ALTER TABLE drafts ADD COLUMN reply_to TEXT;
 		`,
 	},
+	{
+		Version: 44,
+		SQL: `
+			-- S/MIME sender certs are only used as encryption keys when trusted:
+			-- chain-verified when collected, or explicitly imported. Existing
+			-- rows predate trust tracking and start untrusted; a later trusted
+			-- signature from the sender (or a re-import) marks them trusted.
+
+			ALTER TABLE smime_sender_certs ADD COLUMN trusted INTEGER NOT NULL DEFAULT 0;
+		`,
+	},
 }

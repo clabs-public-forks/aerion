@@ -305,7 +305,7 @@ For non-OAuth accounts:
         - **List** - There's a list below the above 2 buttons that shows the current stored public keys
 - **S/MIME** - S/MIME cert based signing and encryption settings for your account
     - **Import .p12** - Import your .p12 certificate. Imported certificate will appear below
-    - **Import** - Import recipient certificates here. Imported or auto-collected public certs will appear below
+    - **Import** - Import recipient certificates here. Imported or auto-collected public certs will appear below. Auto-collected certs are used for encryption only when they chain to a trusted certificate authority; import a self-signed or otherwise untrusted cert to accept it for encryption
 
 ### Remove Account
 

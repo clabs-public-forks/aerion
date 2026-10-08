@@ -188,8 +188,10 @@ func (s *Store) GetDefaultCertificate(accountID string) (*Certificate, string, e
 	return cert, certChainPEM, nil
 }
 
-// CacheSenderCert stores or updates a sender's public certificate from a signed message
-func (s *Store) CacheSenderCert(email, certPEM string) error {
+// CacheSenderCert stores or updates a sender's public certificate. trusted
+// marks certificates that chain to a trusted root or that the user imported;
+// only those are used for encryption. Once trusted, a cert stays trusted.
+func (s *Store) CacheSenderCert(email, certPEM string, trusted bool) error {
 	// Parse the PEM to extract metadata
 	block, _ := pem.Decode([]byte(certPEM))
 	if block == nil {
@@ -209,13 +211,14 @@ func (s *Store) CacheSenderCert(email, certPEM string) error {
 
 	_, err = s.db.Exec(`
 		INSERT INTO smime_sender_certs (id, email, subject, issuer, serial_number,
-			fingerprint, not_before, not_after, cert_pem, collected_at, last_seen_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			fingerprint, not_before, not_after, cert_pem, collected_at, last_seen_at, trusted)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(fingerprint) DO UPDATE SET
-			last_seen_at = excluded.last_seen_at`,
+			last_seen_at = excluded.last_seen_at,
+			trusted = MAX(trusted, excluded.trusted)`,
 		id, email, cert.Subject.String(), cert.Issuer.String(),
 		cert.SerialNumber.String(), fingerprint,
-		cert.NotBefore, cert.NotAfter, certPEM, now, now,
+		cert.NotBefore, cert.NotAfter, certPEM, now, now, trusted,
 	)
 	return err
 }
@@ -336,7 +339,8 @@ func (s *Store) SetEncryptPolicy(accountID, policy string) error {
 }
 
 // GetSenderCertPEMs returns PEM-encoded certificates for multiple email addresses (batch lookup for encryption).
-// Returns a map of email -> certPEM for emails that have a valid (non-expired) certificate.
+// Returns a map of email -> certPEM for emails that have a valid (non-expired)
+// trusted certificate; untrusted collected certs are never used for encryption.
 func (s *Store) GetSenderCertPEMs(emails []string) (map[string]string, error) {
 	result := make(map[string]string)
 	if len(emails) == 0 {
@@ -349,7 +353,7 @@ func (s *Store) GetSenderCertPEMs(emails []string) (map[string]string, error) {
 		var notAfter time.Time
 		err := s.db.QueryRow(`
 			SELECT cert_pem, not_after FROM smime_sender_certs
-			WHERE email = ? ORDER BY last_seen_at DESC LIMIT 1`, email,
+			WHERE email = ? AND trusted = 1 ORDER BY last_seen_at DESC LIMIT 1`, email,
 		).Scan(&certPEM, &notAfter)
 		if err != nil {
 			continue
@@ -386,5 +390,6 @@ func (s *Store) ImportSenderCertFromFile(email string, certData []byte) error {
 		Bytes: cert.Raw,
 	}))
 
-	return s.CacheSenderCert(email, certPEM)
+	// An explicit import is the user's acceptance of the certificate.
+	return s.CacheSenderCert(email, certPEM, true)
 }

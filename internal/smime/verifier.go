@@ -284,9 +284,18 @@ func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
 		}
 	}
 
-	v.cacheSenderCert(signer, signerEmail)
+	result := v.verifySigners(p7, signers, signerEmail, signerName)
 
-	// Every signer must chain to a trusted root, not just the displayed one.
+	// Cache the signer cert for future encryption. Only a chain-trusted
+	// cert may become the recipient's encryption key; untrusted ones are
+	// kept for reference but need explicit import to be used.
+	v.cacheSenderCert(signer, signerEmail, result.Status == StatusSigned)
+	return result
+}
+
+// verifySigners requires every signer, not just the displayed one, to chain
+// to a trusted root.
+func (v *Verifier) verifySigners(p7 *pkcs7.PKCS7, signers []*x509.Certificate, signerEmail, signerName string) *SignatureResult {
 	for _, cert := range signers {
 		err := v.verifyChain(p7, cert)
 		if err == nil {
@@ -383,8 +392,9 @@ func signerIdentity(cert *x509.Certificate) (email, name string) {
 	return email, cert.Subject.CommonName
 }
 
-// cacheSenderCert stores the signer's certificate for future reference
-func (v *Verifier) cacheSenderCert(cert *x509.Certificate, email string) {
+// cacheSenderCert stores the signer's certificate for future reference.
+// trusted marks it as usable for encrypting to email.
+func (v *Verifier) cacheSenderCert(cert *x509.Certificate, email string, trusted bool) {
 	if email == "" {
 		return
 	}
@@ -394,7 +404,7 @@ func (v *Verifier) cacheSenderCert(cert *x509.Certificate, email string) {
 		Bytes: cert.Raw,
 	})
 
-	if err := v.store.CacheSenderCert(email, string(certPEM)); err != nil {
+	if err := v.store.CacheSenderCert(email, string(certPEM), trusted); err != nil {
 		v.log.Warn().Err(err).Str("email", email).Msg("Failed to cache sender certificate")
 	}
 }
