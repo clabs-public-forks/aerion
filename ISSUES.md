@@ -19,9 +19,6 @@ has not yet been confirmed against the code.
 
 ### Security
 
-- **S2 medium** `internal/pgp/{store,hkp,wkd}.go`, `app/pgp.go:239-292`: a
-  key from WKD or HKP is cached for the requested email without checking
-  that one of its user IDs matches. Unverified.
 - **S4 medium** `internal/credentials/store.go:62-88`, `oauth.go:241-262`:
   when the keyring write fails and the DB fallback is used, the stale
   keyring entry stays and is read first. Unverified.

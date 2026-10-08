@@ -99,6 +99,30 @@ func ExtractEmailFromKey(entity *openpgp.Entity) string {
 	return ""
 }
 
+// HasUserIDForEmail reports whether one of entity's user IDs names email.
+func HasUserIDForEmail(entity *openpgp.Entity, email string) bool {
+	for _, ident := range entity.Identities {
+		if ident.UserId != nil && strings.EqualFold(ident.UserId.Email, email) {
+			return true
+		}
+	}
+	return false
+}
+
+// keyForEmail returns the armored public key of the first entity with a
+// user ID for email, or "" if none has one. Keys found by WKD or HKP must
+// pass this check before being used for email: a server can return keys
+// for other addresses, and caching one under email would encrypt mail to
+// the wrong person.
+func keyForEmail(entities openpgp.EntityList, email string) (string, error) {
+	for _, entity := range entities {
+		if HasUserIDForEmail(entity, email) {
+			return ArmorPublicKey(entity)
+		}
+	}
+	return "", nil
+}
+
 // IsKeyExpired checks if a PGP entity's primary key is expired
 func IsKeyExpired(entity *openpgp.Entity) bool {
 	now := time.Now()
