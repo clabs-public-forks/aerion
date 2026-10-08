@@ -18,14 +18,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `extensions/calendar/backend/provider_caldav_compose.go` `setRecurrenceID` formats all-day dates in UTC, while parsing and `setDateValue` use `configuredTZ()`. Midnight October 7 in Tokyo becomes October 6 UTC, targeting the wrong occurrence. Use the configured timezone for DATE serialization and fix `recurrenceIDMatches`, which compares UTC midnight against locally anchored timestamps.
 
-### [P1] S/MIME trusted status lacks certificate-chain verification
-
-`internal/smime/verifier.go` `verifyPKCS7` calls `p7.Verify()`, which disables certificate-chain verification in the installed library. A valid signature from a leaf issued by an attacker's untrusted CA receives normal signed status because the leaf is not self-signed. Verify against trusted roots before reporting a trusted signature.
-
-### [P1] S/MIME identity and certificate caching can select a nonsigner
-
-`internal/smime/verifier.go` `extractSignerInfo` selects the first embedded certificate with an email address; `cacheSenderCert` selects the first leaf. Neither resolves the certificate referenced by SignerInfo. An unrelated embedded certificate can supply the displayed identity or cached key. Use the actual signer certificate consistently.
-
 ### [P1] Sequential offline calendar writes retain stale transport state
 
 `extensions/calendar/backend/pending_writes.go` replays each saved ETag and provider ID unchanged. Two offline edits retain the same ETag: the first succeeds, the second conflicts and is discarded, losing the latest edit. An offline create followed by an edit can create a duplicate because the provider ID remains empty. Advance dependent queued operations after success or coalesce them while preserving conflict detection.
@@ -53,3 +45,7 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 ### [P2] Unlimited-history sync never reconciles an empty mailbox
 
 `internal/sync/messages.go` `SyncMessages` skips deletion reconciliation when a successful remote search returns zero messages, local rows remain, and `syncPeriodDays == 0`. Emptying a folder in another client leaves stale messages indefinitely. Distinguish search errors from valid empty results and reconcile confirmed empty mailboxes.
+
+### [P2] Untrusted signer certificates become encryption keys
+
+`internal/smime/verifier.go` caches the signer certificate for unknown-CA and self-signed signatures, and `Store.GetSenderCertPEMs` encrypts to the most recently seen cert per email. Anyone can send a validly signed message claiming another address and replace the key used for future encrypted mail to it. Prefer chain-trusted certs for encryption, or require explicit user acceptance of untrusted ones.

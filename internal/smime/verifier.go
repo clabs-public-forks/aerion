@@ -20,6 +20,7 @@ import (
 type Verifier struct {
 	store *Store
 	log   zerolog.Logger
+	roots *x509.CertPool // trusted roots; nil uses the system pool
 }
 
 // NewVerifier creates a new S/MIME verifier
@@ -262,49 +263,18 @@ func (v *Verifier) verifyOpaqueSigned(raw []byte) (*SignatureResult, []byte) {
 
 // verifyPKCS7 verifies a parsed PKCS#7 object and caches the signer cert
 func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
-	// Try verification against system trust roots
-	err := p7.Verify()
-
-	// Extract signer information regardless of verification result
-	signerEmail, signerName := v.extractSignerInfo(p7)
-
-	if err != nil {
-		// Distinguish between "untrusted CA" and "truly invalid signature"
-		// If we can verify without trust check, the signature is valid but signer is unknown
-		errStr := err.Error()
-
-		// Common certificate verification errors indicate untrusted/expired certs
-		if strings.Contains(errStr, "certificate signed by unknown authority") ||
-			strings.Contains(errStr, "x509: certificate") {
-			// Try to determine if cert is expired
-			if v.isSignerCertExpired(p7) {
-				v.cacheSenderCert(p7, signerEmail)
-				return &SignatureResult{
-					Status:       StatusExpiredCert,
-					SignerEmail:  signerEmail,
-					SignerName:   signerName,
-					ErrorMessage: "signer certificate has expired",
-				}
-			}
-			// Check if the leaf cert is self-signed (Issuer == Subject)
-			v.cacheSenderCert(p7, signerEmail)
-			if v.isSignerCertSelfSigned(p7) {
-				return &SignatureResult{
-					Status:       StatusSelfSigned,
-					SignerEmail:  signerEmail,
-					SignerName:   signerName,
-					ErrorMessage: "self-signed certificate",
-				}
-			}
-			return &SignatureResult{
-				Status:       StatusUnknownSigner,
-				SignerEmail:  signerEmail,
-				SignerName:   signerName,
-				ErrorMessage: fmt.Sprintf("unverified signer: %v", err),
-			}
+	signer := signerCertificate(p7)
+	if signer == nil {
+		return &SignatureResult{
+			Status:       StatusInvalid,
+			ErrorMessage: "no certificate for signer",
 		}
+	}
+	signerEmail, signerName := signerIdentity(signer)
 
-		// Truly invalid signature
+	// Check the signature itself. pkcs7.Verify() does not check the
+	// certificate chain; trust is evaluated separately below.
+	if err := p7.Verify(); err != nil {
 		return &SignatureResult{
 			Status:       StatusInvalid,
 			SignerEmail:  signerEmail,
@@ -313,18 +283,26 @@ func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
 		}
 	}
 
-	// Signature verified successfully — but pkcs7.Verify() trusts certs
-	// embedded in the PKCS7 structure, so a self-signed cert will pass.
-	// Check for self-signed before reporting as fully trusted.
-	v.cacheSenderCert(p7, signerEmail)
-	if v.isSignerCertSelfSigned(p7) {
-		return &SignatureResult{
-			Status:       StatusSelfSigned,
+	v.cacheSenderCert(signer, signerEmail)
+
+	if err := v.verifyChain(p7, signer); err != nil {
+		result := &SignatureResult{
+			Status:       StatusUnknownSigner,
 			SignerEmail:  signerEmail,
 			SignerName:   signerName,
-			ErrorMessage: "self-signed certificate",
+			ErrorMessage: fmt.Sprintf("unverified signer: %v", err),
 		}
+		switch {
+		case time.Now().After(signer.NotAfter):
+			result.Status = StatusExpiredCert
+			result.ErrorMessage = "signer certificate has expired"
+		case bytes.Equal(signer.RawIssuer, signer.RawSubject):
+			result.Status = StatusSelfSigned
+			result.ErrorMessage = "self-signed certificate"
+		}
+		return result
 	}
+
 	return &SignatureResult{
 		Status:      StatusSigned,
 		SignerEmail: signerEmail,
@@ -332,70 +310,72 @@ func (v *Verifier) verifyPKCS7(p7 *pkcs7.PKCS7) *SignatureResult {
 	}
 }
 
-// extractSignerInfo gets the email and common name from the first signer certificate
-func (v *Verifier) extractSignerInfo(p7 *pkcs7.PKCS7) (email, name string) {
-	if len(p7.Certificates) == 0 {
-		return "", ""
-	}
-
-	// Find the actual signer cert (first cert with EmailAddresses typically)
-	for _, cert := range p7.Certificates {
-		if len(cert.EmailAddresses) > 0 {
-			return cert.EmailAddresses[0], cert.Subject.CommonName
+// verifyChain verifies the signer certificate chains to a trusted root for
+// email protection, using embedded certificates as intermediates. The chain
+// is evaluated at the signed signing time when present, otherwise now.
+func (v *Verifier) verifyChain(p7 *pkcs7.PKCS7, signer *x509.Certificate) error {
+	roots := v.roots
+	if roots == nil {
+		var err error
+		if roots, err = x509.SystemCertPool(); err != nil {
+			return fmt.Errorf("loading system roots: %w", err)
 		}
 	}
 
-	// Fall back to first certificate's CN
-	return "", p7.Certificates[0].Subject.CommonName
-}
-
-// isSignerCertExpired checks if any signer certificate in the PKCS#7 is expired
-func (v *Verifier) isSignerCertExpired(p7 *pkcs7.PKCS7) bool {
-	now := time.Now()
+	intermediates := x509.NewCertPool()
 	for _, cert := range p7.Certificates {
-		if !cert.IsCA && now.After(cert.NotAfter) {
-			return true
+		if cert != signer {
+			intermediates.AddCert(cert)
 		}
 	}
-	return false
+
+	at := time.Now()
+	var signingTime time.Time
+	if len(p7.Signers) == 1 && p7.UnmarshalSignedAttribute(pkcs7.OIDAttributeSigningTime, &signingTime) == nil {
+		at = signingTime
+	}
+
+	_, err := signer.Verify(x509.VerifyOptions{
+		Roots:         roots,
+		Intermediates: intermediates,
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection},
+		CurrentTime:   at,
+	})
+	return err
 }
 
-// isSignerCertSelfSigned checks if the leaf signer certificate is self-signed
-func (v *Verifier) isSignerCertSelfSigned(p7 *pkcs7.PKCS7) bool {
+// signerCertificate returns the certificate referenced by the first
+// SignerInfo's issuer and serial number, or nil if it is not embedded.
+func signerCertificate(p7 *pkcs7.PKCS7) *x509.Certificate {
+	if len(p7.Signers) == 0 {
+		return nil
+	}
+	ias := p7.Signers[0].IssuerAndSerialNumber
 	for _, cert := range p7.Certificates {
-		if !cert.IsCA {
-			return bytes.Equal(cert.RawIssuer, cert.RawSubject)
+		if cert.SerialNumber.Cmp(ias.SerialNumber) == 0 && bytes.Equal(cert.RawIssuer, ias.IssuerName.FullBytes) {
+			return cert
 		}
 	}
-	if len(p7.Certificates) > 0 {
-		c := p7.Certificates[0]
-		return bytes.Equal(c.RawIssuer, c.RawSubject)
-	}
-	return false
+	return nil
 }
 
-// cacheSenderCert stores the signer's leaf certificate for future reference
-func (v *Verifier) cacheSenderCert(p7 *pkcs7.PKCS7, email string) {
-	if email == "" || len(p7.Certificates) == 0 {
+// signerIdentity returns the email address and common name of the signer certificate
+func signerIdentity(cert *x509.Certificate) (email, name string) {
+	if len(cert.EmailAddresses) > 0 {
+		email = cert.EmailAddresses[0]
+	}
+	return email, cert.Subject.CommonName
+}
+
+// cacheSenderCert stores the signer's certificate for future reference
+func (v *Verifier) cacheSenderCert(cert *x509.Certificate, email string) {
+	if email == "" {
 		return
 	}
 
-	// Find the leaf (non-CA) certificate
-	var leafCert *x509.Certificate
-	for _, cert := range p7.Certificates {
-		if !cert.IsCA {
-			leafCert = cert
-			break
-		}
-	}
-	if leafCert == nil {
-		leafCert = p7.Certificates[0]
-	}
-
-	// Encode to PEM
 	certPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: leafCert.Raw,
+		Bytes: cert.Raw,
 	})
 
 	if err := v.store.CacheSenderCert(email, string(certPEM)); err != nil {
