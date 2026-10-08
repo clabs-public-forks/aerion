@@ -30,8 +30,6 @@ has not yet been confirmed against the code.
 
 ### Frontend
 
-- **F6 low** `AccountSection.svelte:108-114`: the more button has no
-  aria-label and no Escape handling. Unverified.
 - **F7 low** `ConversationViewer.svelte:470-520`: a stale load's finally
   still clears loading. Unverified.
 

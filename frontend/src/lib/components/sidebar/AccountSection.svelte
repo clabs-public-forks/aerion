@@ -48,6 +48,7 @@
   }: Props = $props()
 
   let showMenu = $state(false)
+  let menuButton = $state<HTMLButtonElement>()
 
   // Toggle expand/collapse via callback
   function toggleExpanded() {
@@ -76,6 +77,16 @@
   function handleSync() {
     showMenu = false
     onSync?.()
+  }
+
+  // Escape closes the menu and returns focus to its button. Stop the event
+  // here so the window-level shortcut handler doesn't also act on it.
+  function handleMenuKeydown(e: KeyboardEvent) {
+    if (!showMenu || e.key !== 'Escape') return
+    e.preventDefault()
+    e.stopPropagation()
+    showMenu = false
+    menuButton?.focus()
   }
 
   // Close menu when clicking outside
@@ -114,21 +125,28 @@
     <!-- Account Menu Button -->
     <button
       class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+      bind:this={menuButton}
       onclick={toggleMenu}
+      onkeydown={handleMenuKeydown}
+      aria-label={$_('sidebar.accountOptions')}
+      title={$_('sidebar.accountOptions')}
+      aria-haspopup="menu"
+      aria-expanded={showMenu}
     >
       <Icon icon="mdi:dots-vertical" class="w-4 h-4 text-muted-foreground" />
     </button>
 
     <!-- Dropdown Menu -->
     {#if showMenu}
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="absolute right-2 top-full mt-1 z-50 min-w-[160px] bg-popover border border-border rounded-md shadow-md py-1"
         role="menu"
         tabindex="-1"
         onclick={(e) => e.stopPropagation()}
+        onkeydown={handleMenuKeydown}
       >
         <button
+          role="menuitem"
           class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
           onclick={handleSync}
         >
@@ -136,6 +154,7 @@
           <span>{$_('sidebar.syncNow')}</span>
         </button>
         <button
+          role="menuitem"
           class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
           onclick={handleEdit}
         >
@@ -144,6 +163,7 @@
         </button>
         <div class="my-1 border-t border-border"></div>
         <button
+          role="menuitem"
           class="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
           onclick={handleDelete}
         >

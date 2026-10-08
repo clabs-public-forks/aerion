@@ -39,6 +39,7 @@
   "sidebar": {
     "compose": "Compose",
     "allInboxes": "All Inboxes",
+    "accountOptions": "Account options",
     "addAccount": "Add Account",
     "noAccountsYet": "No accounts yet",
     "addFirstAccount": "Add your first email account to get started",
