@@ -72,9 +72,6 @@ has not yet been confirmed against the code.
 
 ### Frontend
 
-- **F2 medium** `Composer.svelte:623-632,1344-1360`: a save that starts while
-  another is running is dropped, and Save & Close closes even when the save
-  failed. Unverified.
 - **F3 low** `Composer.svelte:1363-1367`: Keep Editing doesn't reschedule
   autosave. Unverified.
 - **F4 low** `EmailBody.svelte:699-710`: linkify wraps emails inside

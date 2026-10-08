@@ -619,18 +619,20 @@
   let discarding = false
   let savingComplete: Promise<void> = Promise.resolve()
 
-  // Actually save the draft
-  async function saveDraft() {
-    if (discarding || sending) return
-    if (!hasContent()) return
+  // Actually save the draft. Returns false only when the save failed.
+  async function saveDraft(): Promise<boolean> {
+    // Wait out an in-flight save rather than dropping this one, so the
+    // newest edits still get saved. No await sits between this loop and
+    // isSaving = true, so concurrent callers can't both start a save.
+    while (isSaving) await savingComplete
 
-    // If a save is already in flight, skip — next edit will trigger a fresh save
-    if (isSaving) return
+    if (discarding || sending) return true
+    if (!hasContent()) return true
 
     // Check again for content changes before saving
     const currentHash = getContentHash()
     if (currentHash === lastContent && currentDraftId) {
-      return  // No changes since last save
+      return true  // No changes since last save
     }
 
     let resolveSaving: () => void
@@ -646,9 +648,11 @@
       saveStatus = 'saved'
       syncStatus = result.syncStatus as 'pending' | 'synced' | 'failed'
       lastSavedAt = new Date()
+      return true
     } catch (err) {
       console.error('Failed to save draft:', err)
       saveStatus = 'error'
+      return false
     } finally {
       isSaving = false
       resolveSaving!()
@@ -1349,13 +1353,13 @@
   // Save & Close: Save current content as draft, then close
   async function handleSaveAndClose() {
     closeLoading = 'save'
-    try {
-      if (hasContent()) {
-        await saveDraft()
-      }
-    } catch (err) {
-      console.error('Failed to save draft:', err)
-      // Still close even if save fails
+    const saved = await saveDraft()
+    if (!saved) {
+      // Keep the composer open so the message isn't lost.
+      closeLoading = null
+      handleKeepEditing()
+      addToast({ type: 'error', message: $_('composer.failedToSaveDraft') })
+      return
     }
     showCloseConfirm = false
     closeLoading = null

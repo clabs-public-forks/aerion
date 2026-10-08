@@ -206,6 +206,7 @@
     "failedToSend": "Failed to send.",
     "noRecipients": "Please add at least one recipient",
     "failedToLoadDraft": "Failed to load draft",
+    "failedToSaveDraft": "Couldn't save the draft. Your message is still open.",
     "certImported": "Certificate imported for {email}",
     "pgpKeyImported": "PGP key imported for {email}",
     "close": "Close",
