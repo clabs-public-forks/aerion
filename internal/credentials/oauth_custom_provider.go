@@ -65,7 +65,7 @@ func (s *Store) SetCustomOAuthProvider(accountID string, cfg CustomOAuthProvider
 	}
 
 	if s.keyringEnabled {
-		kerr := gokeyring.Set(serviceName, customOAuthProviderKeyringPrefix+accountID, string(payload))
+		kerr := s.setInKeyring(customOAuthProviderKeyringPrefix+accountID, string(payload))
 		if kerr == nil {
 			s.log.Debug().Str("account_id", accountID).Msg("custom OAuth provider stored in OS keyring")
 			// Keyring is primary — clear any encrypted-DB copy.

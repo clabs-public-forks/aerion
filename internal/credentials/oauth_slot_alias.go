@@ -50,7 +50,7 @@ func (s *Store) SetOAuthSlotAlias(configID, targetSlot string) error {
 	}
 
 	if s.keyringEnabled {
-		kerr := gokeyring.Set(serviceName, oauthSlotAliasKeyringPrefix+configID, targetSlot)
+		kerr := s.setInKeyring(oauthSlotAliasKeyringPrefix+configID, targetSlot)
 		if kerr == nil {
 			s.log.Debug().Str("config_id", configID).Str("target", targetSlot).Msg("OAuth slot alias stored in OS keyring")
 			s.clearSlotAliasDB(configID)

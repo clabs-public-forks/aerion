@@ -61,7 +61,7 @@ func (s *Store) SetUserClientCreds(configID, clientID, clientSecret string) erro
 	}
 
 	if s.keyringEnabled {
-		kerr := gokeyring.Set(serviceName, userOAuthKeyringPrefix+configID, string(payload))
+		kerr := s.setInKeyring(userOAuthKeyringPrefix+configID, string(payload))
 		if kerr == nil {
 			s.log.Debug().Str("config_id", configID).Msg("user OAuth client creds stored in OS keyring")
 			// Keyring is primary — clear any encrypted-DB copy.

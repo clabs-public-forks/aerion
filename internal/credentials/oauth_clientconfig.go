@@ -228,7 +228,7 @@ func (s *Store) setOAuthAccessTokenForClientConfig(accountID, clientConfigID, to
 		return nil
 	}
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, accountID+":"+clientConfigID+":access_token", token)
+		err := s.setInKeyring(accountID+":"+clientConfigID+":access_token", token)
 		if err == nil {
 			return nil
 		}
@@ -268,7 +268,7 @@ func (s *Store) setOAuthRefreshTokenForClientConfig(accountID, clientConfigID, t
 		return nil
 	}
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, accountID+":"+clientConfigID+":refresh_token", token)
+		err := s.setInKeyring(accountID+":"+clientConfigID+":refresh_token", token)
 		if err == nil {
 			return nil
 		}

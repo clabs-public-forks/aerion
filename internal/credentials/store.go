@@ -3,6 +3,7 @@ package credentials
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -52,6 +53,24 @@ func NewStore(db *sql.DB, dataDir string) (*Store, error) {
 	}, nil
 }
 
+// keyringSet writes to the OS keyring; tests replace it to simulate failures.
+var keyringSet = gokeyring.Set
+
+// setInKeyring stores value under key in the OS keyring. When the write
+// fails the caller falls back to the encrypted database, so any older
+// keyring entry is removed first: reads try the keyring before the
+// database and would otherwise return the stale value.
+func (s *Store) setInKeyring(key, value string) error {
+	err := keyringSet(serviceName, key, value)
+	if err == nil {
+		return nil
+	}
+	if delErr := gokeyring.Delete(serviceName, key); delErr != nil && !errors.Is(delErr, gokeyring.ErrNotFound) {
+		s.log.Warn().Err(delErr).Msg("Failed to remove stale keyring entry after a failed write")
+	}
+	return err
+}
+
 // testKeyring checks if the OS keyring is available and functional
 func testKeyring() bool {
 	testKey := "aerion-test-keyring-check"
@@ -77,7 +96,7 @@ func (s *Store) SetPassword(accountID, password string) error {
 
 	// Try OS keyring first if available
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, accountID, password)
+		err := s.setInKeyring(accountID, password)
 		if err == nil {
 			s.log.Debug().Str("account_id", accountID).Msg("Password stored in OS keyring")
 			// Clear any fallback storage
@@ -190,7 +209,7 @@ func (s *Store) SetSMTPPassword(accountID, password string) error {
 	}
 
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, smtpPasswordKeyringKey(accountID), password)
+		err := s.setInKeyring(smtpPasswordKeyringKey(accountID), password)
 		if err == nil {
 			s.log.Debug().Str("account_id", accountID).Msg("SMTP password stored in OS keyring")
 			s.clearDBSMTPPassword(accountID)
@@ -279,7 +298,7 @@ func (s *Store) SetSMIMEPrivateKey(certID string, privateKeyPEM []byte) error {
 
 	// Try OS keyring first if available
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, keyringKey, string(privateKeyPEM))
+		err := s.setInKeyring(keyringKey, string(privateKeyPEM))
 		if err == nil {
 			s.log.Debug().Str("cert_id", certID).Msg("S/MIME private key stored in OS keyring")
 			s.clearSMIMEDBPrivateKey(certID)
@@ -374,7 +393,7 @@ func (s *Store) SetPGPPrivateKey(keyID string, armoredKey []byte) error {
 
 	// Try OS keyring first if available
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, keyringKey, string(armoredKey))
+		err := s.setInKeyring(keyringKey, string(armoredKey))
 		if err == nil {
 			s.log.Debug().Str("key_id", keyID).Msg("PGP private key stored in OS keyring")
 			s.clearPGPDBPrivateKey(keyID)
@@ -486,7 +505,7 @@ func (s *Store) trySetExtensionSecretInKeyring(extension, key, value string) boo
 		return false
 	}
 	keyringKey := "ext:" + extension + ":" + key
-	if err := gokeyring.Set(serviceName, keyringKey, value); err != nil {
+	if err := s.setInKeyring(keyringKey, value); err != nil {
 		s.log.Warn().Err(err).Str("extension", extension).Str("key", key).
 			Msg("Failed to store extension secret in OS keyring, falling back to encrypted DB")
 		return false
@@ -657,7 +676,7 @@ func (s *Store) SetCardDAVPassword(sourceID, password string) error {
 
 	// Try OS keyring first if available
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, "carddav:"+sourceID, password)
+		err := s.setInKeyring("carddav:"+sourceID, password)
 		if err == nil {
 			s.log.Debug().Str("source_id", sourceID).Msg("CardDAV password stored in OS keyring")
 			// Clear any fallback storage

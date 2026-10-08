@@ -19,9 +19,6 @@ has not yet been confirmed against the code.
 
 ### Security
 
-- **S4 medium** `internal/credentials/store.go:62-88`, `oauth.go:241-262`:
-  when the keyring write fails and the DB fallback is used, the stale
-  keyring entry stays and is read first. Unverified.
 - **S6 medium** `internal/smime/verifier.go:344-352`: the chain is validated
   at the signer's own signingTime, with no revocation check. Unverified.
 - **S7 medium** `internal/smime/verifier.go:300-311`,

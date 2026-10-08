@@ -245,7 +245,7 @@ func (s *Store) setOAuthAccessToken(accountID, token string) error {
 
 	// Try OS keyring first
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, accountID+":access_token", token)
+		err := s.setInKeyring(accountID+":access_token", token)
 		if err == nil {
 			// Clear fallback storage
 			_, _ = s.db.Exec("UPDATE accounts SET encrypted_access_token = NULL WHERE id = ?", accountID)
@@ -305,7 +305,7 @@ func (s *Store) setOAuthRefreshToken(accountID, token string) error {
 
 	// Try OS keyring first
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, accountID+":refresh_token", token)
+		err := s.setInKeyring(accountID+":refresh_token", token)
 		if err == nil {
 			// Clear fallback storage
 			_, _ = s.db.Exec("UPDATE accounts SET encrypted_refresh_token = NULL WHERE id = ?", accountID)
@@ -540,7 +540,7 @@ func (s *Store) setContactSourceAccessToken(sourceID, token string) error {
 
 	// Try OS keyring first
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, "contact_source:"+sourceID+":access_token", token)
+		err := s.setInKeyring("contact_source:"+sourceID+":access_token", token)
 		if err == nil {
 			// Clear fallback storage
 			_, _ = s.db.Exec("UPDATE contact_sources SET encrypted_access_token = NULL WHERE id = ?", sourceID)
@@ -600,7 +600,7 @@ func (s *Store) setContactSourceRefreshToken(sourceID, token string) error {
 
 	// Try OS keyring first
 	if s.keyringEnabled {
-		err := gokeyring.Set(serviceName, "contact_source:"+sourceID+":refresh_token", token)
+		err := s.setInKeyring("contact_source:"+sourceID+":refresh_token", token)
 		if err == nil {
 			// Clear fallback storage
 			_, _ = s.db.Exec("UPDATE contact_sources SET encrypted_refresh_token = NULL WHERE id = ?", sourceID)
