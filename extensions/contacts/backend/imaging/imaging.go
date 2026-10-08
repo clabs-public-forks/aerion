@@ -25,6 +25,12 @@ import (
 // Callers can enforce their own smaller limits on top.
 const MaxAcceptedBytes = 32 * 1024 * 1024 // 32 MB
 
+// MaxPixels caps the decoded image area. A compressed image can declare far
+// larger dimensions than its byte size suggests (a decompression bomb), so
+// the header is checked before decoding allocates the pixel buffer. 50 MP
+// covers phone camera photos and bounds decode memory to about 200 MB.
+const MaxPixels = 50_000_000
+
 // ResizeOptions parameterizes ResizeToJPEG. Zero values are sensible defaults.
 type ResizeOptions struct {
 	// MaxEdge caps both width and height. Aspect ratio is preserved. 0 = 256.
@@ -56,6 +62,17 @@ func ResizeToJPEG(raw []byte, opts ResizeOptions) ([]byte, string, error) {
 	quality := opts.Quality
 	if quality <= 0 {
 		quality = 85
+	}
+
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return nil, "", fmt.Errorf("imaging: decode: %w", err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return nil, "", fmt.Errorf("imaging: zero-size image")
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > MaxPixels {
+		return nil, "", fmt.Errorf("imaging: %dx%d image exceeds %d pixels", cfg.Width, cfg.Height, MaxPixels)
 	}
 
 	src, _, err := image.Decode(bytes.NewReader(raw))

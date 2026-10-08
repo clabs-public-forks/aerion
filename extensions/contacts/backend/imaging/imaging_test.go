@@ -2,9 +2,12 @@ package imaging
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/png"
+	"strings"
 	"testing"
 )
 
@@ -91,5 +94,37 @@ func TestResizeToJPEG_DefaultsApplied(t *testing.T) {
 	b := img.Bounds()
 	if b.Dx() > 256 || b.Dy() > 256 {
 		t.Errorf("default MaxEdge=256 not applied: %dx%d", b.Dx(), b.Dy())
+	}
+}
+
+// withDimensions rewrites a PNG's IHDR to declare w x h without changing
+// its pixel data, the shape of a decompression bomb.
+func withDimensions(t *testing.T, pngBytes []byte, w, h uint32) []byte {
+	t.Helper()
+	out := append([]byte(nil), pngBytes...)
+	// Signature (8) + length (4) + "IHDR" (4), then width and height.
+	const ihdr = 16
+	binary.BigEndian.PutUint32(out[ihdr:], w)
+	binary.BigEndian.PutUint32(out[ihdr+4:], h)
+	binary.BigEndian.PutUint32(out[ihdr+13:], crc32.ChecksumIEEE(out[ihdr-4:ihdr+13]))
+	return out
+}
+
+func TestResizeToJPEG_RejectsOversizedDimensions(t *testing.T) {
+	small := makePNG(t, 4, 4, color.White)
+	tests := []struct {
+		name string
+		w, h uint32
+	}{
+		{"bomb", 100_000, 100_000},
+		{"just over cap", MaxPixels/1000 + 1, 1000},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := ResizeToJPEG(withDimensions(t, small, tt.w, tt.h), ResizeOptions{})
+			if err == nil || !strings.Contains(err.Error(), "exceeds") {
+				t.Fatalf("err = %v, want pixel cap error", err)
+			}
+		})
 	}
 }

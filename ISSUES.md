@@ -53,9 +53,6 @@ has not yet been confirmed against the code.
 
 ### Contacts
 
-- **C9 medium** `extensions/contacts/backend/imaging/imaging.go:55-75`:
-  photos have no DecodeConfig dimension check before decoding, so a
-  decompression bomb can exhaust memory. Unverified.
 - **C10 medium** `internal/carddav/client.go:511-560`: CardDAV PHOTO data is
   stored uncapped and unvalidated. Unverified.
 - **C11 medium** `ContactEditDialog.svelte:197-215`: a 412 conflict reports
