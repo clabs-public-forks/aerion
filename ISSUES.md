@@ -12,8 +12,6 @@ has not yet been confirmed against the code.
   revocation check, so a revoked signer still shows as trusted. Needs an
   owner decision: OCSP or CRL fetches on every view tell the CA what is
   being read. (The signing-time half of S6 is fixed.)
-- **S12 low** `internal/pgp/key.go:102-117`: IsKeyExpired checks a random
-  identity. Unverified.
 - **S13 low** `internal/oauth2/flow.go:152-210`: the active session and
   callback server have no mutex. The pending OAuth fields in
   `app/oauth.go` and `app/carddav.go` have the same problem (A6).

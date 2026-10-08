@@ -61,18 +61,17 @@ func ExtractKeyMetadata(entity *openpgp.Entity) *Key {
 	createdAt := pk.CreationTime
 	key.CreatedAtKey = &createdAt
 
-	// Extract user ID and email
-	for _, ident := range entity.Identities {
+	// Extract user ID and email from the primary identity, and expiry from
+	// the self-signature that carries the key's lifetime
+	if ident := entity.PrimaryIdentity(); ident != nil {
 		key.UserID = ident.Name
-		if ident.UserId != nil && ident.UserId.Email != "" {
+		if ident.UserId != nil {
 			key.Email = ident.UserId.Email
 		}
-		// Check expiration from self-signature
-		if ident.SelfSignature != nil && ident.SelfSignature.KeyLifetimeSecs != nil {
-			expiry := pk.CreationTime.Add(time.Duration(*ident.SelfSignature.KeyLifetimeSecs) * time.Second)
-			key.ExpiresAtKey = &expiry
-		}
-		break // Use first identity
+	}
+	if sig, _ := entity.PrimarySelfSignature(); sig != nil && sig.KeyLifetimeSecs != nil && *sig.KeyLifetimeSecs != 0 {
+		expiry := pk.CreationTime.Add(time.Duration(*sig.KeyLifetimeSecs) * time.Second)
+		key.ExpiresAtKey = &expiry
 	}
 
 	// Check if key is expired
@@ -89,8 +88,12 @@ func KeyFingerprint(entity *openpgp.Entity) string {
 	return fmt.Sprintf("%X", entity.PrimaryKey.Fingerprint)
 }
 
-// ExtractEmailFromKey extracts the email address from the first identity of a PGP entity
+// ExtractEmailFromKey returns the email address of a PGP entity's primary
+// identity, or of any identity if the primary one has none
 func ExtractEmailFromKey(entity *openpgp.Entity) string {
+	if ident := entity.PrimaryIdentity(); ident != nil && ident.UserId != nil && ident.UserId.Email != "" {
+		return ident.UserId.Email
+	}
 	for _, ident := range entity.Identities {
 		if ident.UserId != nil && ident.UserId.Email != "" {
 			return ident.UserId.Email
@@ -123,21 +126,15 @@ func keyForEmail(entities openpgp.EntityList, email string) (string, error) {
 	return "", nil
 }
 
-// IsKeyExpired checks if a PGP entity's primary key is expired
+// IsKeyExpired checks if a PGP entity's primary key is expired, using the
+// self-signature that carries its lifetime (the primary identity's, or the
+// direct-key signature for v6 keys)
 func IsKeyExpired(entity *openpgp.Entity) bool {
-	now := time.Now()
-	for _, ident := range entity.Identities {
-		if ident.SelfSignature != nil && ident.SelfSignature.KeyLifetimeSecs != nil {
-			expiry := entity.PrimaryKey.CreationTime.Add(
-				time.Duration(*ident.SelfSignature.KeyLifetimeSecs) * time.Second,
-			)
-			if now.After(expiry) {
-				return true
-			}
-		}
-		break
+	sig, _ := entity.PrimarySelfSignature()
+	if sig == nil {
+		return false
 	}
-	return false
+	return entity.PrimaryKey.KeyExpired(sig, time.Now())
 }
 
 // algorithmName returns a human-readable name for a public key algorithm
