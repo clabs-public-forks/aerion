@@ -64,10 +64,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K8/K9 medium** `provider_google.go:91,190-205`: instance exceptions and
-  cancelled tombstones are ignored, and a full resync after 410 never
-  deletes events. Also, `translateICSToGoogleJSON` sends only the RRULE
-  line, never EXDATE or RDATE. Unverified.
 - **K10 medium** `TimelineView.svelte:632-651`: drag and resize drop
   transparency, visibility, reminder and HTML. Unverified.
 - **K12 medium** `event_crud.go:708,966,1008,1042`: all-day UNTIL, EXDATE and

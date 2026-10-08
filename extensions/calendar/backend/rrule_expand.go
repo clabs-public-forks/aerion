@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -95,6 +96,9 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 			// build an EventInstance using overrides where present and
 			// master values where absent.
 			inst, err := applyOverride(ev, ov)
+			if errors.Is(err, errOverrideCancelled) {
+				continue // occurrence cancelled on the server
+			}
 			if err != nil {
 				// Skip malformed override; fall back to default expansion.
 				out = append(out, EventInstance{
@@ -190,6 +194,10 @@ func resolveLocation(tzName string) *time.Location {
 	return loc
 }
 
+// errOverrideCancelled marks an override whose STATUS is CANCELLED: the
+// occurrence it replaces is not shown.
+var errOverrideCancelled = errors.New("override cancelled")
+
 // applyOverride parses an override's ICS blob and merges its non-empty
 // fields onto the master to produce one EventInstance. Override semantics
 // per RFC 5545 §3.8.4.4: an override is a full VEVENT — the fields it
@@ -204,6 +212,9 @@ func applyOverride(master Event, ov EventOverride) (EventInstance, error) {
 		return EventInstance{}, fmt.Errorf("override ICS has no VEVENT")
 	}
 	ev := events[0]
+	if strings.EqualFold(propText(&ev, ical.PropStatus), "CANCELLED") {
+		return EventInstance{}, errOverrideCancelled
+	}
 
 	loc := resolveLocation(master.TZName)
 	dtstartProp := ev.Props.Get(ical.PropDateTimeStart)

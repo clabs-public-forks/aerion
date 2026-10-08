@@ -107,9 +107,15 @@ var errGoogleSyncTokenInvalid = fmt.Errorf("google sync token invalid (410 Gone)
 // syncOnce drives the paginated list-events loop. Returns the final
 // nextSyncToken (suitable for storage), or empty when the server didn't
 // return one (multi-page sweep is still in progress per pageToken).
+//
+// Instance exceptions are applied after every page has landed, since a
+// page can carry an exception before the master it belongs to. A full sync
+// (empty syncToken) lists every live event, so it also rebuilds the
+// calendar's overrides and drops events the server no longer has.
 func (p googleProvider) syncOnce(ctx context.Context, client *http.Client, cal Calendar, syncToken string) (string, error) {
 	pageToken := ""
-	var nextSyncToken string
+	var instances []googleEvent
+	seen := make(map[string]struct{})
 
 	for {
 		if ctx.Err() != nil {
@@ -120,17 +126,103 @@ func (p googleProvider) syncOnce(ctx context.Context, client *http.Client, cal C
 			return "", err
 		}
 
-		if err := p.persistEventsPage(cal, resp.Items); err != nil {
+		pageInstances, err := p.persistEventsPage(cal, resp.Items, seen)
+		if err != nil {
 			return "", err
 		}
+		instances = append(instances, pageInstances...)
 
 		if resp.NextPageToken != "" {
 			pageToken = resp.NextPageToken
 			continue
 		}
-		nextSyncToken = resp.NextSyncToken
-		return nextSyncToken, nil
+		if err := p.finishSync(cal, instances, seen, syncToken == ""); err != nil {
+			return "", err
+		}
+		return resp.NextSyncToken, nil
 	}
+}
+
+// finishSync applies the collected instance exceptions and, after a full
+// sync, removes local events absent from the server. A full sync that saw
+// no events deletes nothing (treat an empty pull as suspect, as the
+// Microsoft provider does). Events with a queued local write are kept.
+func (p googleProvider) finishSync(cal Calendar, instances []googleEvent, seen map[string]struct{}, full bool) error {
+	return p.store.WithTx(func(tx *sql.Tx) error {
+		if full && len(seen) > 0 {
+			if err := p.deleteUnseenTx(tx, cal, seen); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(
+				`DELETE FROM event_recurrence_overrides WHERE event_id IN (SELECT id FROM events WHERE calendar_id = ?)`,
+				cal.ID,
+			); err != nil {
+				return fmt.Errorf("clear overrides: %w", err)
+			}
+		}
+		for _, item := range instances {
+			if err := p.applyInstanceTx(tx, cal, item); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// deleteUnseenTx deletes synced events of cal whose Google id was not in
+// the full listing.
+func (p googleProvider) deleteUnseenTx(tx *sql.Tx, cal Calendar, seen map[string]struct{}) error {
+	rows, err := tx.Query(`
+		SELECT id, provider_event_id FROM events
+		WHERE calendar_id = ? AND provider_event_id != ''
+		  AND id NOT IN (SELECT event_id FROM pending_writes WHERE event_id IS NOT NULL)`,
+		cal.ID)
+	if err != nil {
+		return fmt.Errorf("list synced events: %w", err)
+	}
+	var stale []string
+	for rows.Next() {
+		var id, providerID string
+		if err := rows.Scan(&id, &providerID); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan synced event: %w", err)
+		}
+		if _, ok := seen[providerID]; !ok {
+			stale = append(stale, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate synced events: %w", err)
+	}
+	for _, id := range stale {
+		if _, err := tx.Exec(`DELETE FROM events WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("delete stale event: %w", err)
+		}
+	}
+	return nil
+}
+
+// applyInstanceTx stores one instance exception as an override on its
+// master: a modified instance replaces the occurrence, a cancelled one
+// removes it. Instances whose master isn't stored locally are skipped.
+func (p googleProvider) applyInstanceTx(tx *sql.Tx, cal Calendar, item googleEvent) error {
+	var masterID, masterUID string
+	err := tx.QueryRow(
+		`SELECT id, uid FROM events WHERE calendar_id = ? AND provider_event_id = ?`,
+		cal.ID, item.RecurringEventID,
+	).Scan(&masterID, &masterUID)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("lookup master event: %w", err)
+	}
+	ov, err := googleInstanceOverride(item, masterUID)
+	if err != nil {
+		return nil // skip a malformed exception, keep the rest
+	}
+	return p.store.UpsertOverrideTx(tx, masterID, ov.RecurrenceIDUnix, ov.ICSBlob)
 }
 
 type googleEventsListResponse struct {
@@ -180,28 +272,33 @@ func (p googleProvider) fetchEventsPage(ctx context.Context, client *http.Client
 	return &out, nil
 }
 
-// persistEventsPage upserts the master events in items into the events
-// table. Cancelled masters are deleted. Per-instance override events
-// (those with recurringEventId) are skipped in Chunk 3 — a follow-up
-// adds override handling.
-func (p googleProvider) persistEventsPage(cal Calendar, items []googleEvent) error {
-	return p.store.WithTx(func(tx *sql.Tx) error {
+// persistEventsPage upserts the master and single events in items and
+// deletes cancelled ones. Instance exceptions (items with recurringEventId)
+// are returned for finishSync. Google ids of live events go into seen.
+func (p googleProvider) persistEventsPage(cal Calendar, items []googleEvent, seen map[string]struct{}) ([]googleEvent, error) {
+	var instances []googleEvent
+	err := p.store.WithTx(func(tx *sql.Tx) error {
 		for _, item := range items {
 			if item.RecurringEventID != "" {
-				// Override event. Chunk 3 punts; rrule_expand will still
-				// produce the unmodified occurrence for the master's
-				// RRULE expansion, which is "close enough" for most cases.
+				instances = append(instances, item)
 				continue
 			}
 			if item.Status == "cancelled" {
-				if item.ICalUID == "" {
-					continue
+				// Deleted-event tombstones often carry only the id.
+				if _, err := tx.Exec(
+					`DELETE FROM events WHERE calendar_id = ? AND provider_event_id = ?`,
+					cal.ID, item.ID,
+				); err != nil {
+					return fmt.Errorf("delete cancelled event: %w", err)
 				}
-				if err := p.store.DeleteEventByUIDTx(tx, cal.ID, item.ICalUID); err != nil {
-					return err
+				if item.ICalUID != "" {
+					if err := p.store.DeleteEventByUIDTx(tx, cal.ID, item.ICalUID); err != nil {
+						return err
+					}
 				}
 				continue
 			}
+			seen[item.ID] = struct{}{}
 			blob, err := translateGoogleEventToICS(item)
 			if err != nil {
 				// Skip malformed events rather than abort the whole sync.
@@ -262,6 +359,7 @@ func (p googleProvider) persistEventsPage(cal Calendar, items []googleEvent) err
 		}
 		return nil
 	})
+	return instances, err
 }
 
 // lookupEventIDByUID returns the existing local row ID for a (calendarID,

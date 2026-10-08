@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -325,28 +326,89 @@ func translateGoogleEventToICS(ev googleEvent) (string, error) {
 }
 
 // applyRecurrenceLine sets one RRULE/EXDATE/RDATE property on the event
-// from Google's recurrence-array line.
+// from Google's recurrence-array line, keeping parameters such as TZID and
+// VALUE=DATE.
 func applyRecurrenceLine(ev *ical.Event, line string) {
-	switch {
-	case strings.HasPrefix(line, "RRULE:"):
-		setRRuleText(ev.Props, strings.TrimPrefix(line, "RRULE:"))
-	case strings.HasPrefix(line, "EXDATE"):
-		colon := strings.Index(line, ":")
-		if colon < 0 {
-			return
+	head, value, ok := strings.Cut(line, ":")
+	if !ok {
+		return
+	}
+	parts := strings.Split(head, ";")
+	name := strings.ToUpper(parts[0])
+	switch name {
+	case ical.PropRecurrenceRule:
+		setRRuleText(ev.Props, value)
+	case ical.PropExceptionDates, ical.PropRecurrenceDates:
+		p := ical.NewProp(name)
+		for _, param := range parts[1:] {
+			if k, v, ok := strings.Cut(param, "="); ok {
+				p.Params.Set(strings.ToUpper(k), v)
+			}
 		}
-		p := ical.NewProp(ical.PropExceptionDates)
-		p.Value = line[colon+1:]
-		ev.Props.Add(p)
-	case strings.HasPrefix(line, "RDATE"):
-		colon := strings.Index(line, ":")
-		if colon < 0 {
-			return
-		}
-		p := ical.NewProp(ical.PropRecurrenceDates)
-		p.Value = line[colon+1:]
+		p.Value = value
 		ev.Props.Add(p)
 	}
+}
+
+// recurrenceLines renders a VEVENT's RRULE, EXDATE and RDATE properties as
+// Google recurrence-array lines, parameters included.
+func recurrenceLines(ev *ical.Event) []string {
+	var out []string
+	for _, name := range []string{ical.PropRecurrenceRule, ical.PropExceptionDates, ical.PropRecurrenceDates} {
+		for _, prop := range ev.Props.Values(name) {
+			if strings.TrimSpace(prop.Value) == "" {
+				continue
+			}
+			keys := make([]string, 0, len(prop.Params))
+			for k := range prop.Params {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			var b strings.Builder
+			b.WriteString(name)
+			for _, k := range keys {
+				b.WriteString(";" + k + "=" + strings.Join(prop.Params[k], ","))
+			}
+			b.WriteString(":" + strings.TrimSpace(prop.Value))
+			out = append(out, b.String())
+		}
+	}
+	return out
+}
+
+// googleInstanceOverride converts a Google instance exception into a
+// RECURRENCE-ID override for the master with masterUID. A cancelled
+// instance becomes a STATUS:CANCELLED override, which expansion drops.
+func googleInstanceOverride(item googleEvent, masterUID string) (EventOverride, error) {
+	if item.OriginalStartTime == nil {
+		return EventOverride{}, fmt.Errorf("instance missing originalStartTime")
+	}
+	if item.Status != "cancelled" {
+		item.ICalUID = masterUID
+		blob, err := translateGoogleEventToICS(item)
+		if err != nil {
+			return EventOverride{}, err
+		}
+		cal, err := decodeICS(blob)
+		if err != nil {
+			return EventOverride{}, err
+		}
+		events := cal.Events()
+		if len(events) == 0 {
+			return EventOverride{}, fmt.Errorf("no VEVENT in instance ICS")
+		}
+		return buildOverride(&events[0])
+	}
+	ev := ical.NewEvent()
+	ev.Props.SetText(ical.PropUID, masterUID)
+	ev.Props.SetDateTime(ical.PropDateTimeStamp, time.Now().UTC())
+	ev.Props.SetText(ical.PropStatus, "CANCELLED")
+	for _, prop := range []string{ical.PropRecurrenceID, ical.PropDateTimeStart} {
+		if err := setICSTimeFromGoogle(ev, prop, item.OriginalStartTime); err != nil {
+			return EventOverride{}, err
+		}
+	}
+	return buildOverride(ev)
 }
 
 // translateICSToGoogleJSON extracts the master VEVENT from a single-VEVENT
@@ -386,9 +448,7 @@ func translateICSToGoogleJSON(icsBlob string) (googleEvent, error) {
 	out.Start = start
 	out.End = end
 
-	if rrule := propText(&ev, ical.PropRecurrenceRule); rrule != "" {
-		out.Recurrence = []string{"RRULE:" + rrule}
-	}
+	out.Recurrence = recurrenceLines(&ev)
 
 	// Attendees + Organizer. Roundtrip via the shared parser so the wire
 	// shape matches whatever Phase A's parser would produce — single source
