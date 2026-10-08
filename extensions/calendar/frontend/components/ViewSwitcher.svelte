@@ -70,11 +70,13 @@
 
 </script>
 
-<div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-border bg-background">
+<!-- Wraps onto a second row when the pane is too narrow, rather than
+     clipping the view buttons or the title. -->
+<div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-background">
   <!-- Left: view selector + date nav. -->
-  <div class="flex items-center gap-2 min-w-0">
+  <div class="contents">
     <ResponsiveSidebarToggle />
-    <div class="inline-flex rounded-md border border-border overflow-hidden">
+    <div class="inline-flex shrink-0 rounded-md border border-border overflow-hidden">
       {#each viewOptions as opt (opt.kind)}
         <button
           type="button"
@@ -87,7 +89,7 @@
       {/each}
     </div>
 
-    <div class="inline-flex items-center gap-1 ml-2">
+    <div class="inline-flex shrink-0 items-center gap-1 ml-2">
       <button
         type="button"
         class="p-2 rounded-md hover:bg-muted transition-colors"
@@ -119,7 +121,7 @@
   </div>
 
   <!-- Right: tz picker + new event + sync. -->
-  <div class="flex items-center gap-2 shrink-0">
+  <div class="flex items-center gap-2 shrink-0 ml-auto">
     <div class="hidden sm:inline">
       <TimezonePicker />
     </div>

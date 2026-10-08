@@ -309,6 +309,19 @@
     scrollRef.scrollTop = targetPx
   })
 
+  // Width of the hour body's vertical scrollbar. The header and all-day band
+  // pad their right edge by it so their columns line up with the body's.
+  let scrollbarPx = $state(0)
+
+  $effect(() => {
+    const el = scrollRef
+    if (!el) return
+    const measure = () => { scrollbarPx = el.offsetWidth - el.clientWidth }
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  })
+
   // --- Click handlers ---------------------------------------------------------
 
   function onEventClick(inst: backend.EventInstance) {
@@ -753,6 +766,7 @@
   <div
     class="grid border-b border-border bg-muted/20 shrink-0"
     style:grid-template-columns="60px repeat({dates.length}, 1fr)"
+    style:padding-right={`${scrollbarPx}px`}
   >
     <div></div>
     {#each dates as date, i (i)}
@@ -775,6 +789,7 @@
     <div
       class="grid border-b border-border bg-background shrink-0 py-1 gap-y-0.5"
       style:grid-template-columns="60px repeat({dates.length}, 1fr)"
+      style:padding-right={`${scrollbarPx}px`}
       style:grid-template-rows={`repeat(${bandLaneCount}, minmax(20px, auto))`}
     >
       <!-- Left gutter label -->
