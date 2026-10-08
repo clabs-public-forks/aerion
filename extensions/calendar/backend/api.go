@@ -82,12 +82,24 @@ func NewAPI(store *Store, secrets coreapi.Secrets, auth coreapi.Auth, queue *Pen
 // (IANA name, e.g. "America/Los_Angeles") and applies it process-wide, so the
 // sync/parse path interprets tz-less all-day/floating event times in that zone
 // — matching how the frontend buckets days. Empty clears the override (system tz).
-func (a *API) SetDisplayTimezone(tz string) error {
+// When the zone changes, stored tz-less times are re-anchored to it and pending
+// alarms recomputed; changed reports whether that happened.
+func (a *API) SetDisplayTimezone(tz string) (changed bool, err error) {
+	prev, err := a.store.GetMeta("display_timezone")
+	if err != nil {
+		return false, err
+	}
 	if err := a.store.SetMeta("display_timezone", tz); err != nil {
-		return err
+		return false, err
 	}
 	SetConfiguredTimezone(tz)
-	return nil
+	if prev == tz {
+		return false, nil
+	}
+	if err := a.store.ReanchorFloatingTimes(); err != nil {
+		return false, err
+	}
+	return true, RefreshAllAlarms(a.store, time.Now())
 }
 
 // AddCalDAVSource probes the user-entered server, persists the source +

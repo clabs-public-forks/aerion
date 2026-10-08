@@ -33,8 +33,12 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 		return nil, nil
 	}
 
-	// Non-recurring: include if the event overlaps the window.
+	// Non-recurring: include if the event overlaps the window, unless the
+	// server cancelled it.
 	if ev.RRuleText == "" {
+		if masterCancelled(ev.ICSBlob) {
+			return nil, nil
+		}
 		evStart := time.Unix(ev.DTStartUnix, 0)
 		evEnd := time.Unix(ev.DTEndUnix, 0)
 		if evEnd.Before(from) || evStart.After(to) {
@@ -72,6 +76,9 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 		// Edge case — treat the first as master.
 		first := events[0]
 		masterEv = &first
+	}
+	if isCancelled(masterEv) {
+		return nil, nil // whole series cancelled on the server
 	}
 
 	// RFC 5545 allows EXDATE/RDATE to carry a comma-separated list in one
@@ -217,6 +224,30 @@ func resolveLocation(tzName string) *time.Location {
 	return loc
 }
 
+// isCancelled reports whether a VEVENT has STATUS:CANCELLED.
+func isCancelled(ev *ical.Event) bool {
+	return strings.EqualFold(propText(ev, ical.PropStatus), "CANCELLED")
+}
+
+// masterCancelled reports whether the master VEVENT in blob is cancelled. The
+// substring check skips decoding the blob for the common case.
+func masterCancelled(blob string) bool {
+	if !strings.Contains(strings.ToUpper(blob), "CANCELLED") {
+		return false
+	}
+	cal, err := decodeICS(blob)
+	if err != nil {
+		return false
+	}
+	for i := range cal.Events() {
+		ev := cal.Events()[i]
+		if ev.Props.Get(ical.PropRecurrenceID) == nil {
+			return isCancelled(&ev)
+		}
+	}
+	return false
+}
+
 // errOverrideCancelled marks an override whose STATUS is CANCELLED: the
 // occurrence it replaces is not shown.
 var errOverrideCancelled = errors.New("override cancelled")
@@ -235,7 +266,7 @@ func applyOverride(master Event, ov EventOverride) (EventInstance, error) {
 		return EventInstance{}, fmt.Errorf("override ICS has no VEVENT")
 	}
 	ev := events[0]
-	if strings.EqualFold(propText(&ev, ical.PropStatus), "CANCELLED") {
+	if isCancelled(&ev) {
 		return EventInstance{}, errOverrideCancelled
 	}
 

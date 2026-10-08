@@ -32,11 +32,9 @@ type ParsedObject struct {
 //     would be a more complete handling — deferred until users hit it.
 //   - TZName: extracted from DTSTART's TZID parameter, or empty for
 //     floating / UTC times.
-//   - Floating local times (no TZID, no Z suffix): parsed as time.Local.
-//     The Unix timestamp captures the instant for the user's current
-//     locale at parse time; if the user's tz changes later, floating
-//     events would display at a different absolute time. Documented as
-//     a known limitation.
+//   - Floating local times (no TZID, no Z suffix) and all-day DATEs: parsed
+//     in the configured display tz (configuredTZ). When that tz changes,
+//     Store.ReanchorFloatingTimes re-derives the stored instants.
 func ParseCalendarObject(rawICS string) (*ParsedObject, error) {
 	if rawICS == "" {
 		return nil, fmt.Errorf("ical: empty ICS data")

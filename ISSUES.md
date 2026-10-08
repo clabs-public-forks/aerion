@@ -27,8 +27,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K15 low** `ical_convert.go`: all-day times are frozen to the timezone at
-  parse time, and STATUS:CANCELLED is ignored. Unverified.
 - **K16 low** `bridge.go`: R16 says disabled bridge methods should return
   empty results, not errors. `sync.go` uses a package-level sync.Once (R17).
   Escape in the composer is handled on window. Unverified.

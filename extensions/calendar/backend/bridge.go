@@ -229,7 +229,12 @@ func (b *CalendarBridge) Calendar_SetDisplayTimezone(tz string) error {
 	if err := b.ensureInit(); err != nil {
 		return err
 	}
-	return b.api.SetDisplayTimezone(tz)
+	changed, err := b.api.SetDisplayTimezone(tz)
+	if changed {
+		// All-day and floating times moved; have open views refetch.
+		_ = b.deps.Core.Events().Publish("calendar:sync-complete", map[string]any{})
+	}
+	return err
 }
 
 // Calendar_ReprobeCalDAVOrganizerIdentities re-runs the principal
