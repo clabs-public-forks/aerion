@@ -24,8 +24,6 @@ has not yet been confirmed against the code.
 
 - **C12 medium** contacts backend: EXT_RULES R1, R2, R5 and R6 (see A4).
   Architectural.
-- **C14 low** `contactsView.svelte.ts:61-128`: no request sequencing, so a
-  stale response can win. Unverified.
 - **C15 low** `ContactDetail.svelte:146-172`: each blocks keyed by email can
   get duplicate keys. Unverified.
 

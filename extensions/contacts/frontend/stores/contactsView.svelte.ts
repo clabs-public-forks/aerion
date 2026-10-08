@@ -82,18 +82,27 @@ export function setSearchQuery(q: string): void {
 // 200-row single fetch silently truncated large addressbooks (#278).
 const BROWSE_PAGE_SIZE = 200
 
+// Request sequence numbers. A response whose number is no longer current
+// was overtaken by a newer request (new search, source switch, selection
+// change) and is dropped so a slow stale reply can't overwrite fresh state.
+let listSeq = 0
+let detailSeq = 0
+
 export async function reloadContacts(): Promise<void> {
+  const seq = ++listSeq
   loading = true
   try {
     const page = await ListContactsForBrowse(searchQuery, selectedSourceId, BROWSE_PAGE_SIZE, 0) || []
+    if (seq !== listSeq) return
     contacts = page
     hasMore = page.length === BROWSE_PAGE_SIZE
   } catch (err) {
+    if (seq !== listSeq) return
     console.error('Failed to list contacts for browse:', err)
     contacts = []
     hasMore = false
   } finally {
-    loading = false
+    if (seq === listSeq) loading = false
   }
 }
 
@@ -101,9 +110,12 @@ export async function reloadContacts(): Promise<void> {
 // the last fetch came back short (nothing more to load).
 export async function loadMoreContacts(): Promise<void> {
   if (loadingMore || !hasMore) return
+  const seq = listSeq
   loadingMore = true
   try {
     const page = await ListContactsForBrowse(searchQuery, selectedSourceId, BROWSE_PAGE_SIZE, contacts.length) || []
+    // A reload started meanwhile: this page belongs to the old list.
+    if (seq !== listSeq) return
     contacts = [...contacts, ...page]
     hasMore = page.length === BROWSE_PAGE_SIZE
   } catch (err) {
@@ -144,9 +156,13 @@ export async function activateContact(id: string | null): Promise<void> {
   // On responsive viewports, reveal the detail pane overlay. Self-gating
   // store call — no-op on full layout.
   if (isResponsive()) showViewer()
+  const seq = ++detailSeq
   try {
-    detail = await GetContactDetail(id)
+    const loaded = await GetContactDetail(id)
+    if (seq !== detailSeq || selectedContactId !== id) return
+    detail = loaded
   } catch (err) {
+    if (seq !== detailSeq || selectedContactId !== id) return
     console.error('Failed to load contact detail:', err)
     detail = null
   }
