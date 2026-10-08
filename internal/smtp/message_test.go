@@ -137,3 +137,34 @@ func TestToRFC822_Basic(t *testing.T) {
 		}
 	}
 }
+
+// TestToRFC822_AttachmentsWithoutBody verifies that attachments are serialized
+// even when the message has no body, including inline attachments that have
+// no HTML part to reference them.
+func TestToRFC822_AttachmentsWithoutBody(t *testing.T) {
+	msg := &ComposeMessage{
+		From:    Address{Address: "sender@example.com"},
+		To:      []Address{{Address: "recipient@example.com"}},
+		Subject: "Files",
+		Attachments: []Attachment{
+			{Filename: "report.pdf", ContentType: "application/pdf", Content: []byte("pdf-data")},
+			{Filename: "image.png", ContentType: "image/png", Content: []byte("png-data"), Inline: true, ContentID: "img1"},
+		},
+	}
+
+	data, err := msg.ToRFC822()
+	if err != nil {
+		t.Fatalf("ToRFC822() returned error: %v", err)
+	}
+	output := string(data)
+
+	for _, want := range []string{
+		"multipart/mixed",
+		`filename="report.pdf"`,
+		`filename="image.png"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("output missing %q", want)
+		}
+	}
+}

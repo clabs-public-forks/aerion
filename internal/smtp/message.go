@@ -81,10 +81,10 @@ type ComposeMessage struct {
 
 	// Options
 	RequestReadReceipt bool `json:"request_read_receipt"`
-	SignMessage         bool `json:"sign_message"`    // S/MIME sign this message
-	EncryptMessage      bool `json:"encrypt_message"` // S/MIME encrypt this message
-	PGPSignMessage      bool `json:"pgp_sign_message"`    // PGP sign this message
-	PGPEncryptMessage   bool `json:"pgp_encrypt_message"` // PGP encrypt this message
+	SignMessage        bool `json:"sign_message"`        // S/MIME sign this message
+	EncryptMessage     bool `json:"encrypt_message"`     // S/MIME encrypt this message
+	PGPSignMessage     bool `json:"pgp_sign_message"`    // PGP sign this message
+	PGPEncryptMessage  bool `json:"pgp_encrypt_message"` // PGP encrypt this message
 }
 
 // AllRecipients returns all recipients (To + Cc + Bcc)
@@ -155,8 +155,8 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 
 	// Choose message structure based on content
 	switch {
-	case hasAttachments && (hasHTML || hasText):
-		// multipart/mixed with multipart/alternative or just text
+	case hasAttachments:
+		// multipart/mixed with the body (if any) followed by attachments
 		if err := writeMultipartMixed(&buf, m, regularAttachments, inlineAttachments); err != nil {
 			return nil, err
 		}
@@ -268,6 +268,12 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 
 	hasHTML := m.HTMLBody != ""
 	hasText := m.TextBody != ""
+
+	// Inline attachments need an HTML part to reference them; without one,
+	// send them as regular attachments rather than dropping them.
+	if !hasHTML {
+		attachments = append(attachments, inlineAttachments...)
+	}
 
 	if hasHTML && hasText {
 		// Create multipart/alternative nested inside the mixed section.

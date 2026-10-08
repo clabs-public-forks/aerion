@@ -26,10 +26,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `internal/smime/verifier.go` `extractSignerInfo` selects the first embedded certificate with an email address; `cacheSenderCert` selects the first leaf. Neither resolves the certificate referenced by SignerInfo. An unrelated embedded certificate can supply the displayed identity or cached key. Use the actual signer certificate consistently.
 
-### [P1] Attachment-only messages lose their attachments
-
-`internal/smtp/message.go` `ToRFC822` selects multipart serialization only when attachments accompany a nonempty body. An attachment-only message in plain-text mode is sent as an empty message without its files. Serialize attachments regardless of body content.
-
 ### [P1] Sequential offline calendar writes retain stale transport state
 
 `extensions/calendar/backend/pending_writes.go` replays each saved ETag and provider ID unchanged. Two offline edits retain the same ETag: the first succeeds, the second conflicts and is discarded, losing the latest edit. An offline create followed by an edit can create a duplicate because the provider ID remains empty. Advance dependent queued operations after success or coalesce them while preserving conflict detection.
