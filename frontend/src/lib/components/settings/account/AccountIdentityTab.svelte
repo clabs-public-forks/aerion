@@ -240,7 +240,7 @@
           <button
             type="button"
             onclick={() => handleSetDefault(identity)}
-            class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
+            class="shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
               {identity.isDefault
                 ? 'border-primary bg-primary'
                 : 'border-muted-foreground hover:border-primary'}"

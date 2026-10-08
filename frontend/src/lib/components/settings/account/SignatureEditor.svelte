@@ -266,7 +266,7 @@
       content: value,
       editorProps: {
         attributes: {
-          class: 'signature-editor focus:outline-none min-h-[100px] p-3',
+          class: 'signature-editor focus:outline-hidden min-h-[100px] p-3',
         },
         // Handle paste events for images
         handlePaste: (view, event) => {
@@ -747,7 +747,7 @@
   <!-- Editor -->
   {#if rawHtmlMode}
     <textarea
-      class="w-full min-h-[100px] p-3 font-mono text-sm bg-background text-foreground border-none outline-none resize-y"
+      class="w-full min-h-[100px] p-3 font-mono text-sm bg-background text-foreground border-none outline-hidden resize-y"
       value={rawHtmlContent}
       oninput={handleRawHtmlInput}
       spellcheck="false"

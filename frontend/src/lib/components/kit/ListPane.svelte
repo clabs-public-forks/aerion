@@ -291,7 +291,7 @@
   role="listbox"
   aria-label={label ?? $_('kit.list')}
   tabindex="0"
-  class="flex-1 min-w-0 min-h-0 flex flex-col outline-none {flashing ? 'pane-focus-flash' : ''}"
+  class="flex-1 min-w-0 min-h-0 flex flex-col outline-hidden {flashing ? 'pane-focus-flash' : ''}"
   onkeydown={handleKeyDown}
   onfocus={handleFocus}
   onmousedown={handleMouseDown}

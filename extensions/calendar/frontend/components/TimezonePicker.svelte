@@ -201,7 +201,7 @@
         bind:this={searchInputRef}
         type="text"
         class="w-full h-8 px-2 mb-2 text-sm bg-background border border-border
-               rounded focus:outline-none focus:ring-2 focus:ring-primary/50"
+               rounded focus:outline-hidden focus:ring-2 focus:ring-primary/50"
         placeholder={$_('calendar.tzSelector.searchPlaceholder')}
         bind:value={searchQuery}
         onkeydown={onSearchKeydown}

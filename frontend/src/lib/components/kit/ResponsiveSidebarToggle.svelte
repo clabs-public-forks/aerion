@@ -22,7 +22,7 @@
 
 <button
   type="button"
-  class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+  class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors shrink-0"
   title={label}
   aria-label={label}
   aria-expanded={narrow ? undefined : !hidden}

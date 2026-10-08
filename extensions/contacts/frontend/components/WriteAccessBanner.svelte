@@ -107,7 +107,7 @@
     <div class="flex flex-wrap gap-2">
       {#each rows as source (source.id)}
         <div class="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1">
-          <Icon icon={providerIcon(source.type)} class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <Icon icon={providerIcon(source.type)} class="w-4 h-4 text-muted-foreground shrink-0" />
           <span class="text-xs text-foreground truncate max-w-[260px]">
             <span class="font-semibold">{providerLabel(source.type)}</span>
             <span class="text-muted-foreground"> · {source.name}</span>

@@ -524,7 +524,7 @@
         class="w-full flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors text-left"
         onclick={() => pgpCollapsed = !pgpCollapsed}
       >
-        <Icon icon={pgpCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
+        <Icon icon={pgpCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 shrink-0" />
         <Icon icon="mdi:key-outline" class="w-4 h-4" />
         {$_('security.pgp')}
         {#if pgpKeys.length > 0}
@@ -549,7 +549,7 @@
           <div class="space-y-2">
             {#each pgpKeys as key (key.id)}
               <div class="flex items-start gap-3 p-3 rounded-md border border-border bg-card">
-                <div class="flex-shrink-0 mt-0.5">
+                <div class="shrink-0 mt-0.5">
                   {#if key.isExpired}
                     <Icon icon="mdi:key-remove" class="w-5 h-5 text-destructive" />
                   {:else}
@@ -574,7 +574,7 @@
                     {$_('security.created')} {formatDate(key.createdAtKey)}{key.expiresAtKey ? ` · ${$_('security.expires')} ${formatDate(key.expiresAtKey)}` : ''}
                   </p>
                 </div>
-                <div class="flex items-center gap-1 flex-shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   {#if !key.isDefault}
                     <Button variant="ghost" size="sm" onclick={() => handleSetDefaultPGP(key.id)} title={$_('security.setAsDefault')}>
                       <Icon icon="mdi:star-outline" class="w-4 h-4" />
@@ -658,7 +658,7 @@
           class="w-full flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors text-left"
           onclick={() => keyServersCollapsed = !keyServersCollapsed}
         >
-          <Icon icon={keyServersCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-3.5 h-3.5 flex-shrink-0" />
+          <Icon icon={keyServersCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-3.5 h-3.5 shrink-0" />
           {$_('security.keyServersLabel')}
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{keyServers.length}</span>
         </button>
@@ -668,7 +668,7 @@
             <div class="space-y-1">
               {#each keyServers as server (server.id)}
                 <div class="flex items-center gap-3 p-2 rounded-md border border-border">
-                  <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground shrink-0" />
                   <span class="text-sm flex-1 truncate">{server.url.replace('https://', '')}</span>
                   <Button variant="ghost" size="sm" onclick={() => handleRemoveKeyServer(server.id)} title={$_('security.removeServer')}>
                     <Icon icon="mdi:close" class="w-3.5 h-3.5" />
@@ -683,7 +683,7 @@
               type="url"
               bind:value={newKeyServerURL}
               placeholder="https://"
-              class="flex-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              class="flex-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
               onkeydown={(e) => { if (e.key === 'Enter') handleAddKeyServer() }}
             />
             <Button variant="outline" size="sm" onclick={handleAddKeyServer} disabled={addingKeyServer || !newKeyServerURL.trim()}>
@@ -714,7 +714,7 @@
             type="email"
             bind:value={keyLookupEmail}
             placeholder={$_('security.searchByEmail')}
-            class="flex-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            class="flex-1 px-3 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleKeyLookup() }}
           />
           <Button variant="outline" size="sm" onclick={handleKeyLookup} disabled={keyLookupLoading || !keyLookupEmail.trim()}>
@@ -732,15 +732,15 @@
           <div class="space-y-2">
             {#each pgpSenderKeys as key (key.id)}
               <div class="flex items-center gap-3 p-2 rounded-md border border-border">
-                <Icon icon="mdi:key-variant" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Icon icon="mdi:key-variant" class="w-4 h-4 text-muted-foreground shrink-0" />
                 <div class="flex-1 min-w-0">
                   <span class="text-sm truncate block">{key.email}</span>
                   <span class="text-xs text-muted-foreground truncate block">{key.fingerprint?.slice(-16)} &middot; {key.algorithm}</span>
                 </div>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium flex-shrink-0">
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium shrink-0">
                   {key.source}
                 </span>
-                <span class="text-xs text-muted-foreground flex-shrink-0">
+                <span class="text-xs text-muted-foreground shrink-0">
                   {formatDate(key.lastSeenAt)}
                 </span>
                 <Button variant="ghost" size="sm" onclick={() => handleDeletePGPSenderKey(key.id)} title={$_('security.removeButton')}>
@@ -760,7 +760,7 @@
         class="w-full flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors text-left"
         onclick={() => smimeCollapsed = !smimeCollapsed}
       >
-        <Icon icon={smimeCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
+        <Icon icon={smimeCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 shrink-0" />
         <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
         {$_('security.smime')}
         {#if certificates.length > 0}
@@ -785,7 +785,7 @@
           <div class="space-y-2">
             {#each certificates as cert (cert.id)}
               <div class="flex items-start gap-3 p-3 rounded-md border border-border bg-card">
-                <div class="flex-shrink-0 mt-0.5">
+                <div class="shrink-0 mt-0.5">
                   {#if cert.isExpired}
                     <Icon icon="mdi:certificate-outline" class="w-5 h-5 text-destructive" />
                   {:else}
@@ -813,7 +813,7 @@
                     {$_('security.validLabel')} {formatDate(cert.notBefore)} - {formatDate(cert.notAfter)}
                   </p>
                 </div>
-                <div class="flex items-center gap-1 flex-shrink-0">
+                <div class="flex items-center gap-1 shrink-0">
                   {#if !cert.isDefault}
                     <Button variant="ghost" size="sm" onclick={() => handleSetDefault(cert.id)} title={$_('security.setAsDefault')}>
                       <Icon icon="mdi:star-outline" class="w-4 h-4" />
@@ -906,12 +906,12 @@
           <div class="space-y-2">
             {#each senderCerts as cert (cert.id)}
               <div class="flex items-center gap-3 p-2 rounded-md border border-border">
-                <Icon icon="mdi:account-key-outline" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Icon icon="mdi:account-key-outline" class="w-4 h-4 text-muted-foreground shrink-0" />
                 <div class="flex-1 min-w-0">
                   <span class="text-sm truncate block">{cert.email}</span>
                   <span class="text-xs text-muted-foreground truncate block">{cert.subject}</span>
                 </div>
-                <span class="text-xs text-muted-foreground flex-shrink-0">
+                <span class="text-xs text-muted-foreground shrink-0">
                   {formatDate(cert.lastSeenAt)}
                 </span>
                 <Button variant="ghost" size="sm" onclick={() => handleDeleteSenderCert(cert.id)} title={$_('security.removeButton')}>
@@ -949,7 +949,7 @@
             type="password"
             bind:value={importPassword}
             placeholder={$_('security.certificatePasswordPlaceholder')}
-            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImport() }}
           />
           <p class="text-xs text-muted-foreground mt-1">{$_('security.certificatePasswordHelp')}</p>
@@ -1021,7 +1021,7 @@
             type="email"
             bind:value={recipientImportEmail}
             placeholder="recipient@example.com"
-            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImportRecipientCert() }}
           />
           <p class="text-xs text-muted-foreground mt-1">{$_('security.recipientEmailHelp')}</p>
@@ -1071,7 +1071,7 @@
             type="password"
             bind:value={pgpImportPassphrase}
             placeholder={$_('security.keyPassphrasePlaceholder')}
-            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImportPGP() }}
           />
           <p class="text-xs text-muted-foreground mt-1">{$_('security.keyPassphraseHelp')}</p>
@@ -1121,7 +1121,7 @@
             type="email"
             bind:value={pgpRecipientImportEmail}
             placeholder="recipient@example.com"
-            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            class="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-hidden focus:ring-2 focus:ring-primary"
             onkeydown={(e) => { if (e.key === 'Enter') handleImportPGPRecipientKey() }}
           />
           <p class="text-xs text-muted-foreground mt-1">{$_('security.recipientEmailHelpKey')}</p>

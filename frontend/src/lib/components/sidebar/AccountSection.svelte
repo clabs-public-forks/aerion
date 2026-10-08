@@ -178,7 +178,7 @@
   {#if syncError}
     <div class="px-3 py-1.5">
       <div class="flex items-center gap-2 text-destructive">
-        <Icon icon="mdi:alert-circle" class="w-4 h-4 flex-shrink-0" />
+        <Icon icon="mdi:alert-circle" class="w-4 h-4 shrink-0" />
         <p class="text-xs">{$_('sidebar.syncError')}</p>
       </div>
     </div>

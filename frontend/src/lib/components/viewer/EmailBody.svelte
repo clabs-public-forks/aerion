@@ -745,7 +745,7 @@ ${processedHtml}
   {#if bodyHtml}
     {#if hasRemoteImages && imagesBlocked}
       <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-sm">
-        <Icon icon="mdi:image-off" class="w-4 h-4 text-yellow-600 flex-shrink-0" />
+        <Icon icon="mdi:image-off" class="w-4 h-4 text-yellow-600 shrink-0" />
         <span class="text-yellow-700 dark:text-yellow-400">{$_('viewer.remoteImagesBlocked')}</span>
 
         <div class="ml-auto flex items-center gap-1">

@@ -468,7 +468,7 @@
                 {@const found = allIdentities.find(x => x.identity.id === replyForwardIdentityID)}
                 {#if found}
                   {#if found.group.account?.color}
-                    <span class="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style="background-color: {found.group.account.color}"></span>
+                    <span class="inline-block w-2 h-2 rounded-full mr-1.5 shrink-0" style="background-color: {found.group.account.color}"></span>
                   {/if}
                   {found.identity.name} &lt;{found.identity.email}&gt;
                 {:else}
@@ -485,7 +485,7 @@
               <Select.Group>
                 <Select.GroupHeading class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground">
                   {#if group.account?.color}
-                    <span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background-color: {group.account.color}"></span>
+                    <span class="inline-block w-2 h-2 rounded-full shrink-0" style="background-color: {group.account.color}"></span>
                   {/if}
                   {group.account?.name || group.account?.email}
                 </Select.GroupHeading>

@@ -1573,7 +1573,7 @@
     <div style:display={getActiveExtension() === 'mail' ? 'contents' : 'none'}>
     <!-- Sidebar (Folder List) -->
     <aside
-      class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'} {mailSidebarHidden ? 'hidden' : ''}"
+      class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'shrink-0 border-r border-border bg-muted/30'} {mailSidebarHidden ? 'hidden' : ''}"
       style="{getLayoutMode() !== 'narrow' ? `width: ${sidebarWidth}px` : ''}"
       role="presentation"
       onclick={() => handlePaneClick('sidebar')}
@@ -1713,7 +1713,7 @@
 
 <!-- Shutdown Overlay -->
 {#if isShuttingDown}
-  <div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80">
+  <div class="fixed inset-0 z-100 flex items-center justify-center bg-black/80">
     <p class="text-white/90 text-sm font-medium">{$_('window.shuttingDown')}</p>
   </div>
 {/if}

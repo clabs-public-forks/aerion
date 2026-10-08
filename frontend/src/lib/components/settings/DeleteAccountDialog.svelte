@@ -73,7 +73,7 @@
 
     {#if error}
       <div class="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-        <Icon icon="mdi:alert-circle" class="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+        <Icon icon="mdi:alert-circle" class="w-5 h-5 text-destructive shrink-0 mt-0.5" />
         <p class="text-sm text-destructive">{error}</p>
       </div>
     {/if}

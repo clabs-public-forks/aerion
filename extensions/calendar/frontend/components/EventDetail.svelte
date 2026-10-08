@@ -378,7 +378,7 @@
   <div class="p-4 space-y-4">
     <!-- Header: summary + calendar color tag -->
     <div>
-      <h1 class="text-base font-semibold text-foreground break-words">
+      <h1 class="text-base font-semibold text-foreground wrap-break-word">
         {#if event.summary}
           <Linkified text={event.summary} />
         {/if}
@@ -422,7 +422,7 @@
         <div class="text-xs uppercase tracking-wide text-muted-foreground mb-0.5">
           {$_('calendar.detail.whenLabel')}
         </div>
-        <div class="text-foreground break-words">{whenLabel}</div>
+        <div class="text-foreground wrap-break-word">{whenLabel}</div>
         {#if !event.isAllDay && event.tzName && event.tzName !== calendarSettings.effectiveTimezone}
           <div class="text-xs text-muted-foreground mt-0.5">{calendarSettings.effectiveTimezone}</div>
         {/if}
@@ -434,7 +434,7 @@
           <div class="text-xs uppercase tracking-wide text-muted-foreground mb-0.5">
             {$_('calendar.detail.whereLabel')}
           </div>
-          <div class="text-foreground break-words">
+          <div class="text-foreground wrap-break-word">
             <Linkified text={event.location} />
           </div>
         </div>
@@ -467,7 +467,7 @@
             {$_('calendar.detail.repeatsLabel')}
           </div>
           {#if repeatsLabel.human !== ''}
-            <div class="text-foreground break-words">{repeatsLabel.human}</div>
+            <div class="text-foreground wrap-break-word">{repeatsLabel.human}</div>
           {/if}
           {#if repeatsLabel.human === '' && repeatsLabel.raw !== ''}
             <div class="text-foreground break-all text-xs font-mono">{repeatsLabel.raw}</div>
@@ -485,7 +485,7 @@
           <div class="text-xs uppercase tracking-wide text-muted-foreground mb-0.5">
             {$_('calendar.detail.aboutLabel')}
           </div>
-          <div class="cal-about-html text-foreground break-words text-sm" bind:this={aboutEl}>
+          <div class="cal-about-html text-foreground wrap-break-word text-sm" bind:this={aboutEl}>
             {@html event.descriptionHTML}
           </div>
         </div>
@@ -495,7 +495,7 @@
           <div class="text-xs uppercase tracking-wide text-muted-foreground mb-0.5">
             {$_('calendar.detail.aboutLabel')}
           </div>
-          <div class="text-foreground break-words text-sm whitespace-pre-wrap">
+          <div class="text-foreground wrap-break-word text-sm whitespace-pre-wrap">
             <Linkified text={event.description} />
           </div>
         </div>
@@ -530,7 +530,7 @@
         <div class="text-xs uppercase tracking-wide text-muted-foreground mb-0.5">
           {$_('calendar.detail.calendarLabel')}
         </div>
-        <div class="text-foreground break-words">
+        <div class="text-foreground wrap-break-word">
           {calendarInfo?.source.name ?? ''} / {calendarInfo?.calendar.displayName ?? ''}
         </div>
       </div>

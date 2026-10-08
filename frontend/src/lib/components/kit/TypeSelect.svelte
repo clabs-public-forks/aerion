@@ -111,7 +111,7 @@
   <div class="flex gap-1 items-center">
     <input
       type="text"
-      class="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       placeholder={$_('kit.type.customPlaceholder')}
       bind:value
       oninput={handleInputChange}

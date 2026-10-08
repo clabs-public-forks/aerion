@@ -82,7 +82,7 @@
             {w.sourceName}{#if w.dtstartUnix > 0}{' · '}{formatTime(w.dtstartUnix)}{/if}
           </div>
           {#if w.lastError}
-            <p class="text-xs text-destructive break-words">{w.lastError}</p>
+            <p class="text-xs text-destructive wrap-break-word">{w.lastError}</p>
           {/if}
           {#if w.lastAttemptUnix > 0}
             <div class="text-xs text-muted-foreground">

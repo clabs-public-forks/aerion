@@ -48,7 +48,7 @@
       content: value ?? '',
       editorProps: {
         attributes: {
-          class: 'rte-content focus:outline-none',
+          class: 'rte-content focus:outline-hidden',
         },
       },
       onTransaction: () => {

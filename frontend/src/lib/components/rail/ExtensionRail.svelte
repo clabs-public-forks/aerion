@@ -17,7 +17,7 @@
 
 {#if visible}
   <nav
-    class="flex flex-col items-stretch w-12 flex-shrink-0 bg-muted/30 border-r border-border pt-2"
+    class="flex flex-col items-stretch w-12 shrink-0 bg-muted/30 border-r border-border pt-2"
     aria-label="Active extension"
   >
     <RailButton

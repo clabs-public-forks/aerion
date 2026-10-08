@@ -140,13 +140,13 @@
     >
       <Icon
         icon={getFolderIcon(tree.folder.type)}
-        class="w-4 h-4 flex-shrink-0"
+        class="w-4 h-4 shrink-0"
       />
       <span class="truncate text-left">{tree.folder.name}</span>
       {#if hasChildren}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <span
-          class="flex-shrink-0 p-0.5 rounded hover:bg-muted"
+          class="shrink-0 p-0.5 rounded hover:bg-muted"
           role="button"
           tabindex="-1"
           onclick={(e: MouseEvent) => {

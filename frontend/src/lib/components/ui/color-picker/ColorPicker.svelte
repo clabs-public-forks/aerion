@@ -122,7 +122,7 @@
   <button
     type="button"
     bind:this={triggerRef}
-    class="w-8 h-8 rounded-md border border-border shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+    class="w-8 h-8 rounded-md border border-border shadow-xs cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
     style="background-color: {displayColor}"
     onclick={togglePopover}
     aria-label={$_('aria.selectColor')}
@@ -151,12 +151,12 @@
       <!-- Hex input -->
       <div class="flex items-center gap-2">
         <div
-          class="w-8 h-8 rounded border border-border flex-shrink-0"
+          class="w-8 h-8 rounded border border-border shrink-0"
           style="background-color: {hexInput}"
         ></div>
         <input
           type="text"
-          class="flex-1 h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
+          class="flex-1 h-8 px-2 text-sm bg-background border border-border rounded focus:outline-hidden focus:ring-2 focus:ring-primary/50 font-mono"
           placeholder="#000000"
           value={hexInput}
           oninput={handleHexInput}

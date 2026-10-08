@@ -106,7 +106,7 @@
         {contact.name || $_('contacts.common.unnamed')}
       </h1>
       {#if isWritable}
-        <div class="flex items-center gap-1 flex-shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           <Button variant="outline" size="sm" onclick={() => { if (contact) onEdit?.(contact) }}>
             <Icon icon="mdi:pencil" class="w-4 h-4 mr-1" />
             {$_('contacts.detail.edit')}
@@ -123,7 +123,7 @@
         </div>
       {:else if readonlyKind !== 'none'}
         <div
-          class="flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground"
+          class="flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground"
           title={readonlyKind === 'oauth'
             ? $_('contacts.detail.oauthReadOnlyNote')
             : $_('contacts.detail.cardDAVReadOnlyNote')}
@@ -140,7 +140,7 @@
       <dl class="grid grid-cols-[120px_1fr] gap-y-2 gap-x-4">
         {#if contact.emailItems?.length || contact.emails?.length}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.email')}</dt>
-          <dd class="m-0 break-words">
+          <dd class="m-0 wrap-break-word">
             {#if contact.emailItems && contact.emailItems.length > 0}
               {#each contact.emailItems as item (item.email)}
                 <div class="flex items-baseline gap-2">
@@ -180,7 +180,7 @@
 
         {#if contact.phones && contact.phones.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.phone')}</dt>
-          <dd class="m-0 break-words text-foreground">
+          <dd class="m-0 wrap-break-word text-foreground">
             {#each contact.phones as p (p.number + (p.type ?? ''))}
               <div class="flex items-baseline gap-2">
                 <span>{p.number}</span>
@@ -197,7 +197,7 @@
 
         {#if contact.addresses && contact.addresses.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.address')}</dt>
-          <dd class="m-0 break-words text-foreground space-y-2">
+          <dd class="m-0 wrap-break-word text-foreground space-y-2">
             {#each contact.addresses as a, i (i)}
               <div>
                 {#if a.type}
@@ -213,27 +213,27 @@
 
         {#if contact.org}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.org')}</dt>
-          <dd class="m-0 break-words text-foreground">{contact.org}</dd>
+          <dd class="m-0 wrap-break-word text-foreground">{contact.org}</dd>
         {/if}
 
         {#if contact.title}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.title')}</dt>
-          <dd class="m-0 break-words text-foreground">{contact.title}</dd>
+          <dd class="m-0 wrap-break-word text-foreground">{contact.title}</dd>
         {/if}
 
         {#if contact.bday}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.bday')}</dt>
-          <dd class="m-0 break-words text-foreground">{contact.bday}</dd>
+          <dd class="m-0 wrap-break-word text-foreground">{contact.bday}</dd>
         {/if}
 
         {#if contact.nickname}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.nickname')}</dt>
-          <dd class="m-0 break-words text-foreground">{contact.nickname}</dd>
+          <dd class="m-0 wrap-break-word text-foreground">{contact.nickname}</dd>
         {/if}
 
         {#if contact.urls && contact.urls.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.url')}</dt>
-          <dd class="m-0 break-words text-foreground">
+          <dd class="m-0 wrap-break-word text-foreground">
             {#each contact.urls as u (u.url + (u.type ?? ''))}
               <div class="flex items-baseline gap-2">
                 <a href={u.url} target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">{u.url}</a>
@@ -247,7 +247,7 @@
 
         {#if contact.impps && contact.impps.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.im')}</dt>
-          <dd class="m-0 break-words text-foreground">
+          <dd class="m-0 wrap-break-word text-foreground">
             {#each contact.impps as i (i.handle + (i.type ?? ''))}
               <div class="flex items-baseline gap-2">
                 <span>{i.handle}</span>
@@ -261,7 +261,7 @@
 
         {#if contact.categories && contact.categories.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.categories')}</dt>
-          <dd class="m-0 break-words text-foreground">
+          <dd class="m-0 wrap-break-word text-foreground">
             <div class="flex flex-wrap gap-1">
               {#each contact.categories as cat (cat)}
                 <span class="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{cat}</span>
@@ -272,12 +272,12 @@
 
         {#if contact.note}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.note')}</dt>
-          <dd class="m-0 break-words text-foreground whitespace-pre-wrap">{contact.note}</dd>
+          <dd class="m-0 wrap-break-word text-foreground whitespace-pre-wrap">{contact.note}</dd>
         {/if}
 
         {#if contact.sourceId}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.source')}</dt>
-          <dd class="m-0 break-words text-foreground">{sourceLabel}</dd>
+          <dd class="m-0 wrap-break-word text-foreground">{sourceLabel}</dd>
         {/if}
 
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.lastUpdated')}</dt>

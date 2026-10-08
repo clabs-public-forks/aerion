@@ -73,7 +73,7 @@
 {#if s.open}
   <div
     bind:this={menuEl}
-    class="fixed z-[200] min-w-[180px] max-w-[280px] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1 text-sm"
+    class="fixed z-200 min-w-[180px] max-w-[280px] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md py-1 text-sm"
     style="left: {pos.left}px; top: {pos.top}px;"
   >
     {#each s.suggestions as sug, i (sug)}

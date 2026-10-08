@@ -67,7 +67,7 @@
       {#if overlay}
         <button
           type="button"
-          class="p-2 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+          class="p-2 rounded-md hover:bg-muted transition-colors shrink-0"
           onclick={hideViewer}
           aria-label={$_('common.back')}
         >

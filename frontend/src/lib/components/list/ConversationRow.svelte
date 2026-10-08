@@ -110,9 +110,9 @@
       // Left padding is a half-step wider than the right — symmetric px reads
       // as left-light next to the right edge's date/star column
       micro: 'pl-3.5 pr-3 py-2 gap-2',
-      compact: 'pl-[1.125rem] pr-4 py-3 gap-3',
-      standard: 'pl-[1.375rem] pr-5 py-4 gap-4',
-      large: 'pl-[1.625rem] pr-6 py-5 gap-5',
+      compact: 'pl-4.5 pr-4 py-3 gap-3',
+      standard: 'pl-5.5 pr-5 py-4 gap-4',
+      large: 'pl-6.5 pr-6 py-5 gap-5',
     },
     avatar: {
       micro: 'w-8 h-8 text-xs',
@@ -176,7 +176,7 @@
     // Legacy always-reserved column ("Always show checkbox" setting ON):
     // opacity fade instead of width reveal — invisible until hover on
     // desktop, faintly visible on narrow (#30)
-    checkboxAlways: 'opacity-0 group-hover:opacity-40 hover:!opacity-100 max-[767px]:opacity-40 max-[767px]:active:opacity-100',
+    checkboxAlways: 'opacity-0 group-hover:opacity-40 hover:opacity-100! max-[767px]:opacity-40 max-[767px]:active:opacity-100',
     checkboxInner: {
       micro: 'w-3 h-3',
       compact: 'w-4 h-4',
@@ -452,7 +452,7 @@
   <div
     data-conversation-row
     draggable={getLayoutMode() !== 'narrow'}
-    class="group relative w-full flex items-start touch-pan-y {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
+    class="group relative w-full flex items-start touch-pan-y {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-hidden {selected
       ? 'bg-primary/20'
       : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread && getAccentUnreadStyle() === 'bar' ? 'border-l-2 border-l-primary' : ''} {swipeAnim === 'select' ? 'swipe-select-anim' : ''} {swipeAnim === 'delete' ? 'swipe-delete-anim' : ''}"
     onclick={handleRowClick}
@@ -500,7 +500,7 @@
          narrow/touch. Setting ON: legacy always-reserved column with opacity
          fade (invisible until hover on desktop, faint on narrow). -->
     <div
-      class="flex-shrink-0 flex items-center justify-center self-center {getAlwaysShowMessageCheckbox()
+      class="shrink-0 flex items-center justify-center self-center {getAlwaysShowMessageCheckbox()
         ? `${densityClasses.checkbox[density]} transition-opacity duration-200 ${checked ? 'opacity-100' : densityClasses.checkboxAlways}`
         : `overflow-hidden transition-all duration-200 ${checked ? densityClasses.checkbox[density] : densityClasses.checkboxHidden[density]}`}"
     >
@@ -530,7 +530,7 @@
         />
       {:else}
         <div
-          class="{densityClasses.avatar[density]} rounded-full flex-shrink-0 flex items-center justify-center font-medium {getAvatarColor(
+          class="{densityClasses.avatar[density]} rounded-full shrink-0 flex items-center justify-center font-medium {getAvatarColor(
             conversation
           )}"
         >
@@ -545,7 +545,7 @@
         <!-- Account Indicator (for unified inbox) -->
         {#if showAccountIndicator && accountColor}
           <span
-            class="w-2 h-2 rounded-full flex-shrink-0"
+            class="w-2 h-2 rounded-full shrink-0"
             style="background-color: {accountColor}"
             title={accountName}
           ></span>
@@ -564,14 +564,14 @@
             {senderDisplay.primary}{#if senderDisplay.others.length > 0}<span class="{densityClasses.text[density]} text-muted-foreground font-normal">, {senderDisplay.others.join(', ')}</span>{/if}
           </span>
           {#if senderDisplay.overflow > 0}
-            <span class="{densityClasses.text[density]} text-muted-foreground flex-shrink-0">+{senderDisplay.overflow}</span>
+            <span class="{densityClasses.text[density]} text-muted-foreground shrink-0">+{senderDisplay.overflow}</span>
           {/if}
         {/if}
 
         <!-- Message Count Badge -->
         {#if conversation.messageCount > 1}
           <span
-            class="flex-shrink-0 {densityClasses.badge[density]} rounded-full bg-muted text-muted-foreground"
+            class="shrink-0 {densityClasses.badge[density]} rounded-full bg-muted text-muted-foreground"
           >
             {conversation.messageCount}
           </span>
@@ -580,7 +580,7 @@
         <!-- Folder Badge (for search results) -->
         {#if isSearchResult && searchFolderName}
           <span
-            class="flex-shrink-0 {densityClasses.badge[density]} rounded bg-muted/50 text-muted-foreground flex items-center gap-1"
+            class="shrink-0 {densityClasses.badge[density]} rounded bg-muted/50 text-muted-foreground flex items-center gap-1"
             title={$_('messageList.foundIn', { values: { folder: searchFolderName } })}
           >
             <Icon icon="mdi:folder-outline" class="w-3 h-3" />
@@ -589,7 +589,7 @@
         {/if}
 
         <!-- Indicators -->
-        <div class="flex items-center gap-1 flex-shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           {#if isNonLocal}
             <span title={$_('search.notSyncedLocally')}>
               <Icon icon="mdi:cloud-outline" class="{densityClasses.icon[density]} text-muted-foreground" />
@@ -601,7 +601,7 @@
         </div>
 
         <!-- Date -->
-        <span class="{densityClasses.dateText[density]} text-muted-foreground flex-shrink-0 ml-auto">
+        <span class="{densityClasses.dateText[density]} text-muted-foreground shrink-0 ml-auto">
           {formatRelativeDate(new Date(conversation.latestDate))}
         </span>
       </div>
@@ -609,14 +609,14 @@
       <!-- Subject (with highlighting if in search mode) -->
       {#if highlightedSubject}
         <p
-          class="line-clamp-2 break-words {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
+          class="line-clamp-2 wrap-break-word {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
         >
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {@html highlightedSubject}
         </p>
       {:else}
         <p
-          class="line-clamp-2 break-words {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
+          class="line-clamp-2 wrap-break-word {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
         >
           {conversation.subject || $_('viewer.noSubject')}
         </p>
@@ -649,7 +649,7 @@
 
     <!-- Star -->
     <button
-      class="flex-shrink-0 p-1 -mr-1 rounded hover:bg-muted transition-colors duration-200"
+      class="shrink-0 p-1 -mr-1 rounded hover:bg-muted transition-colors duration-200"
       onclick={handleStarClick}
     >
       <Icon

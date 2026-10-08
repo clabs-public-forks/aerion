@@ -33,10 +33,10 @@
 </script>
 
 <div
-  class="flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-sm {colors[toast.type]} animate-slide-in"
+  class="flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-xs {colors[toast.type]} animate-slide-in"
   role="alert"
 >
-  <Icon icon={icons[toast.type]} class="w-5 h-5 flex-shrink-0 mt-0.5 {iconColors[toast.type]}" />
+  <Icon icon={icons[toast.type]} class="w-5 h-5 shrink-0 mt-0.5 {iconColors[toast.type]}" />
 
   <div class="flex-1 min-w-0">
     <p class="text-sm text-foreground">{toast.message}</p>
@@ -56,7 +56,7 @@
   </div>
 
   <button
-    class="p-1 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+    class="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
     onclick={onClose}
     aria-label={$_('aria.dismiss')}
   >

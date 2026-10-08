@@ -334,7 +334,7 @@
       ondrop={(e) => handleDrop(e, recipients.length)}
       type="email"
       {placeholder}
-      class="flex-1 min-w-[150px] bg-transparent text-sm focus:outline-none {dropTargetIndex === recipients.length ? 'border-l-2 border-primary' : ''}"
+      class="flex-1 min-w-[150px] bg-transparent text-sm focus:outline-hidden {dropTargetIndex === recipients.length ? 'border-l-2 border-primary' : ''}"
     />
   </div>
 

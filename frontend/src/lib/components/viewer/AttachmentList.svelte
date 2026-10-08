@@ -196,7 +196,7 @@
     {#each encryptedAttachments as att (att.filename)}
       {@const isDownloading = downloadingIds.has(att.filename)}
       <div class="flex items-center gap-3 p-2 rounded-md border border-border bg-muted/30 hover:bg-muted/50 transition-colors group">
-        <div class="flex-shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+        <div class="shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
           <Icon icon={getFileIcon(att.contentType)} class="w-5 h-5 text-primary" />
         </div>
         <div class="flex-1 min-w-0">
@@ -207,7 +207,7 @@
             {formatSize(att.size)}
           </div>
         </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           {#if isDownloading}
             <div class="p-2">
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />
@@ -253,7 +253,7 @@
     {#each attachments as att (att.id)}
       {@const isDownloading = downloadingIds.has(att.id)}
       <div class="flex items-center gap-3 p-2 rounded-md border border-border bg-muted/30 hover:bg-muted/50 transition-colors group">
-        <div class="flex-shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
+        <div class="shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
           <Icon icon={getFileIcon(att.contentType)} class="w-5 h-5 text-primary" />
         </div>
         <div class="flex-1 min-w-0">
@@ -267,7 +267,7 @@
             {/if}
           </div>
         </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           {#if isDownloading}
             <div class="p-2">
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />

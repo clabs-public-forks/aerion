@@ -537,7 +537,7 @@
   {#if showBackButton}
     <div class="flex items-center justify-end px-4 py-3 border-b border-border">
       <button
-        class="p-2 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+        class="p-2 rounded-md hover:bg-muted transition-colors shrink-0"
         title={$_('responsive.back')}
         aria-label={$_('aria.closeSidebar')}
         onclick={onBack}
@@ -645,7 +645,7 @@
       >
         <Icon
           icon="mdi:sync"
-          class="w-4 h-4 flex-shrink-0 {accountStore.isAnySyncing ? 'animate-spin' : ''}"
+          class="w-4 h-4 shrink-0 {accountStore.isAnySyncing ? 'animate-spin' : ''}"
         />
         <div class="flex-1 min-w-0">
           {#if syncStatus.accountName}

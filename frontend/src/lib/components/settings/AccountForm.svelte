@@ -726,7 +726,7 @@
 
       {#if selectedProvider?.notes}
         <div class="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-          <Icon icon="mdi:information-outline" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <Icon icon="mdi:information-outline" class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <p class="text-sm text-amber-600 dark:text-amber-400">
             {selectedProvider.notesKey ? $_(selectedProvider.notesKey) : selectedProvider.notes}
           </p>
@@ -854,7 +854,7 @@
               {:else if oauthStore.flowState === 'success'}
                 <!-- OAuth completed successfully -->
                 <div class="flex items-center gap-3 py-2">
-                  <div class="flex-shrink-0 w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <div class="shrink-0 w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
                     <Icon icon="mdi:check" class="w-5 h-5 text-green-500" />
                   </div>
                   <div class="flex-1 min-w-0">
@@ -880,7 +880,7 @@
                 <!-- OAuth failed -->
                 <div class="space-y-3">
                   <div class="flex items-start gap-3">
-                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <div class="shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
                       <Icon icon="mdi:alert" class="w-5 h-5 text-destructive" />
                     </div>
                     <div class="flex-1">
@@ -1133,7 +1133,7 @@
               <Label>{$_('account.authentication')}</Label>
               <div class="rounded-lg border border-border p-4">
                 <div class="flex items-center gap-3">
-                  <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div class="shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Icon icon={getOAuthButtonIcon(selectedProvider)} class="w-5 h-5" />
                   </div>
                   <div class="flex-1">
@@ -1276,7 +1276,7 @@
                         {@const found = allIdentities.find(x => x.identity.id === replyForwardIdentityID)}
                         {#if found}
                           {#if found.group.account?.color}
-                            <span class="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style="background-color: {found.group.account.color}"></span>
+                            <span class="inline-block w-2 h-2 rounded-full mr-1.5 shrink-0" style="background-color: {found.group.account.color}"></span>
                           {/if}
                           {found.identity.name} &lt;{found.identity.email}&gt;
                         {:else}
@@ -1293,7 +1293,7 @@
                       <Select.Group>
                         <Select.GroupHeading class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground">
                           {#if group.account?.color}
-                            <span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background-color: {group.account.color}"></span>
+                            <span class="inline-block w-2 h-2 rounded-full shrink-0" style="background-color: {group.account.color}"></span>
                           {/if}
                           {group.account?.name || group.account?.email}
                         </Select.GroupHeading>
@@ -1655,7 +1655,7 @@
         >
           <Icon
             icon={testResult.success ? 'mdi:check-circle' : 'mdi:alert-circle'}
-            class="w-5 h-5 flex-shrink-0 mt-0.5 {testResult.success
+            class="w-5 h-5 shrink-0 mt-0.5 {testResult.success
               ? 'text-green-500'
               : 'text-destructive'}"
           />

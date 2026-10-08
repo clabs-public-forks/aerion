@@ -213,7 +213,7 @@
         title={a.cn ? `${a.cn} <${a.email}>` : a.email}
       >
         <Avatar email={a.email} name={a.cn || a.email} density="compact" size={20} />
-        <span class="max-w-[12rem] truncate">{a.cn || a.email}</span>
+        <span class="max-w-48 truncate">{a.cn || a.email}</span>
         <span class={`rounded px-1.5 py-0.5 text-[10px] font-medium ${partStatBadgeClass(a.partStat)}`}>
           {$_(partStatBadgeKey(a.partStat))}
         </span>
@@ -244,7 +244,7 @@
   <div class="relative">
     <input
       type="text"
-      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       placeholder={placeholderText}
       bind:value={inputValue}
       bind:this={inputElement}

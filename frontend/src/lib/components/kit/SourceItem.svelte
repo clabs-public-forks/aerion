@@ -31,7 +31,7 @@
   onclick={(e) => onclick?.(e)}
 >
   {#if icon}
-    <Icon {icon} class="w-4 h-4 flex-shrink-0" />
+    <Icon {icon} class="w-4 h-4 shrink-0" />
   {/if}
   <span class="truncate">{label}</span>
 </div>

@@ -1405,12 +1405,12 @@
       {#if showSearch}
         <!-- Search input -->
         <div class="flex items-center gap-1 bg-muted rounded-md px-2 flex-1">
-          <Icon icon="mdi:magnify" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <Icon icon="mdi:magnify" class="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             bind:this={searchInputRef}
             type="text"
             placeholder={$_('messageList.searchMessages')}
-            class="bg-transparent border-none outline-none text-sm py-1.5 w-full min-w-[200px]"
+            class="bg-transparent border-none outline-hidden text-sm py-1.5 w-full min-w-[200px]"
             bind:value={searchQuery}
             oninput={handleSearchInput}
             onkeydown={handleSearchKeydown}
@@ -1418,7 +1418,7 @@
           {#if serverSearchMode}
             <button
               onclick={() => { serverSearchMode = false }}
-              class="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full flex-shrink-0 hover:bg-primary/30 transition-colors"
+              class="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full shrink-0 hover:bg-primary/30 transition-colors"
               title={$_('search.localSearch')}
             >
               {$_('search.server')}
@@ -1442,7 +1442,7 @@
         <h2 class="font-semibold text-foreground truncate">{folderName}</h2>
       {/if}
     </div>
-    <div class="flex items-center gap-1 flex-shrink-0">
+    <div class="flex items-center gap-1 shrink-0">
       {#if onCompose}
         <div class="mr-1"><ComposeButton onclick={onCompose} /></div>
       {/if}
@@ -1494,7 +1494,7 @@
               {/if}
               <DropdownMenu.Item
                 onSelect={() => setFilter(opt.value)}
-                class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
+                class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground"
               >
                 <Icon icon="mdi:check" class="w-4 h-4 mr-2 {filterMode === opt.value ? '' : 'invisible'}" />
                 {opt.label}
@@ -1646,7 +1646,7 @@
             <div class="flex justify-center py-4">
               <button
                 bind:this={loadMoreButtonRef}
-                class="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+                class="text-sm text-primary hover:underline focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
                 onclick={() => performServerSearch(0)}
                 disabled={isServerSearching}
               >
@@ -1723,7 +1723,7 @@
           <div class="flex justify-center py-4">
             <button
               bind:this={loadMoreButtonRef}
-              class="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+              class="text-sm text-primary hover:underline focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
               onclick={() => loadMoreSearchResults()}
               disabled={isSearching}
             >
@@ -1790,7 +1790,7 @@
         <div class="flex justify-center py-4">
           <button
             bind:this={loadMoreButtonRef}
-            class="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
+            class="text-sm text-primary hover:underline focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-2 py-1"
             onclick={() => {
               // Continue from the true end of the loaded window, not a
               // page-size increment — after a preserved reload (sync or

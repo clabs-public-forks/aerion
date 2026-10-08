@@ -137,7 +137,7 @@
       {#if errorMessage}
         <div class="flex items-start gap-2 p-2 bg-destructive/10 rounded text-sm">
           <Icon icon="mdi:alert-circle" class="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-          <div class="text-xs text-destructive break-words">{errorMessage}</div>
+          <div class="text-xs text-destructive wrap-break-word">{errorMessage}</div>
         </div>
       {/if}
     </div>

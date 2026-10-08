@@ -59,7 +59,7 @@
 </script>
 
 <div
-  class="rounded-full flex-shrink-0 inline-flex items-center justify-center font-medium overflow-hidden {showPhoto ? '' : cls}"
+  class="rounded-full shrink-0 inline-flex items-center justify-center font-medium overflow-hidden {showPhoto ? '' : cls}"
   style:width="{px}px"
   style:height="{px}px"
   style:font-size="{fontPx}px"

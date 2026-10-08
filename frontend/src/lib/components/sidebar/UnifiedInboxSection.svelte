@@ -91,7 +91,7 @@
       onclick={handleUnifiedClick}
     >
       <!-- Inbox Icon -->
-      <Icon icon="mdi:inbox-multiple" class="w-4 h-4 flex-shrink-0" />
+      <Icon icon="mdi:inbox-multiple" class="w-4 h-4 shrink-0" />
 
       <!-- Label -->
       <span class="flex-1 text-left text-sm font-medium truncate">{$_('sidebar.allInboxes')}</span>
@@ -121,7 +121,7 @@
             >
               <!-- Account Color Dot -->
               <span
-                class="w-2 h-2 rounded-full flex-shrink-0"
+                class="w-2 h-2 rounded-full shrink-0"
                 style="background-color: {getAccountColor(acc.account)}"
               ></span>
 

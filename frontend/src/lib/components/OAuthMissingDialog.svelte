@@ -77,7 +77,7 @@
 
     <button
       type="button"
-      class="text-sm text-primary hover:underline break-all text-left focus:outline-none focus-visible:outline-none focus:ring-0"
+      class="text-sm text-primary hover:underline break-all text-left focus:outline-hidden focus-visible:outline-hidden focus:ring-0"
       onclick={openInstallDocs}
     >
       https://aerion.3df.io/docs/getting-started/installation/

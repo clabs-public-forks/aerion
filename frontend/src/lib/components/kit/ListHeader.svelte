@@ -67,12 +67,12 @@
     {:else}
       <h2 class="font-semibold text-foreground truncate">{label}</h2>
       {#if count != null}
-        <span class="text-sm text-muted-foreground flex-shrink-0">{count}</span>
+        <span class="text-sm text-muted-foreground shrink-0">{count}</span>
       {/if}
     {/if}
   </div>
   {#if actions}
-    <div class="flex items-center gap-1 flex-shrink-0">
+    <div class="flex items-center gap-1 shrink-0">
       {@render actions()}
     </div>
   {/if}

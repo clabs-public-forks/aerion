@@ -175,7 +175,7 @@
                 <div class="flex items-center gap-3 min-w-0">
                   <Icon
                     icon={source.type === 'google' ? 'mdi:google' : source.type === 'microsoft' ? 'mdi:microsoft' : 'mdi:server'}
-                    class="w-5 h-5 text-muted-foreground flex-shrink-0"
+                    class="w-5 h-5 text-muted-foreground shrink-0"
                   />
                   <div class="min-w-0">
                     <div class="text-sm font-medium text-foreground truncate">{source.name}</div>
@@ -187,7 +187,7 @@
                   </div>
                 </div>
                 {#if source.writable}
-                  <div class="flex items-center gap-2 flex-shrink-0">
+                  <div class="flex items-center gap-2 shrink-0">
                     {#if source.type === 'google' || source.type === 'microsoft'}
                       <Button
                         size="sm"

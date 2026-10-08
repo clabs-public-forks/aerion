@@ -67,7 +67,7 @@
         <p>
           <button
             type="button"
-            class="text-primary hover:underline break-all focus:outline-none focus-visible:outline-none focus:ring-0"
+            class="text-primary hover:underline break-all focus:outline-hidden focus-visible:outline-hidden focus:ring-0"
             onclick={() => openExternal(CHANGELOG_URL)}
           >
             https://github.com/hkdb/aerion/blob/main/CHANGELOG.md
