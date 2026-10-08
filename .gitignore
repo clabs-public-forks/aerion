@@ -10,6 +10,7 @@ build/linux/AppDir
 .tools/
 .claude/*
 !.claude/skills/
+!.claude/rules/
 .crush
 
 # Flatpak build artifacts

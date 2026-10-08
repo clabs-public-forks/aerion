@@ -7,7 +7,8 @@ one of them, the design is wrong — back up and rethink.
 
 Companion docs:
 - `docs/EXTENSIONS.md` — full guide with examples and design rationale.
-- `docs/EXTENSION_ARCHITECTURE.md` — high-level invariants.
+- `context/EXTENSION_ARCHITECTURE.md` — high-level invariants (upstream's
+  private notes; not in this repository).
 - This file (`docs/EXT_RULES.md`) — the rule book, scannable, no prose.
 
 ## 1 · The boundary (hardest rules)

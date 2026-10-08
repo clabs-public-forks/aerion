@@ -9,8 +9,9 @@
 ## Layout Notes
 
 - `frontend/wailsjs/` holds generated Wails bindings; regenerate with `make generate` after binding changes.
-- `extensions/` (contacts, calendar) contains both backend and frontend code.
+- `extensions/` (contacts, calendar) contains both backend and frontend code. Check extension, core API, and kit changes against `docs/EXT_RULES.md` before committing.
 - Go tests live beside implementation files.
+- `docs/EXTENSIONS.md` (about 170 KB), `docs/CASAT2.md`, and `docs/LANGUAGE.md` are long: grep them or read by section, never whole.
 
 ## Commands
 
@@ -18,7 +19,7 @@ Toolchain: Go 1.25, Node.js 24 (matches CI), Wails v2 CLI. Linux needs GTK 3 and
 
 - `cd frontend && npm ci`: install locked frontend dependencies.
 - `cd frontend && npm run build`: build frontend assets. Run before Go checks that include the root package if `frontend/dist/` is missing; rebuild when validating changed assets.
-- `make dev`: launch the desktop app with hot reload.
+- `make dev`: launch the desktop app with hot reload. It blocks; for agent-driven UI checks use `.claude/skills/run-aerion/dev.sh` instead.
 - `make build`: production build in `build/bin/`.
 - `make generate`: regenerate Wails TypeScript bindings.
 - `make test`: run `go test ./...`.
@@ -37,7 +38,7 @@ Toolchain: Go 1.25, Node.js 24 (matches CI), Wails v2 CLI. Linux needs GTK 3 and
 - Start with checks relevant to the change.
 - Run `make test` when a change affects multiple Go packages or shared behavior, or when focused checks leave unresolved risks.
 - Use table-driven Go tests for critical paths and edge cases.
-- There is no frontend test script. For frontend changes, run `make lint` and `npm run check`, then verify the UI manually.
+- There is no frontend test script. For frontend changes, run `npm run lint` and `npm run check` in `frontend/`, then verify the UI manually.
 
 ## Documentation
 
@@ -65,11 +66,10 @@ Never push.
 
 ## Planning Files
 
-- `PLAN.md`: guides new features. Create it when needed with scope, milestones, acceptance criteria, and validation steps.
-- `TASKS.md`: current status of the tasks in progress.
+- `PLAN.md`: guides new features. Create it when needed with Scope; Milestones, each with acceptance criteria and validation steps; and these living `##` sections: Progress (one checkbox per milestone), Surprises & Discoveries, Decision Log, and Outcomes & Retrospective. Track progress in Progress, not a separate file.
 - `ISSUES.md`: issues found that may need fixing in this or a future session.
 - Keep task-specific progress out of `AGENTS.md`.
-- **Required:** remove completed plan, task, and issue items once they no longer need to be referenced, so these three files stay short and current.
+- **Required:** remove completed plan and issue items once they no longer need to be referenced, so these files stay short and current.
 
 ## Compaction
 
