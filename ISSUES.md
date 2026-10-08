@@ -18,10 +18,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `extensions/calendar/backend/pending_writes.go` `Drain` immediately selects the same failed row until all three attempts are exhausted. Sync invokes drain even after failures, so one offline sync can strand pending writes permanently; restored connectivity does not retry exhausted rows and no recovery UI exists. Defer transport retries across drain cycles and retain a recovery path.
 
-### [P2] Queued calendar writes lose invitation-delivery preferences
-
-`extensions/calendar/backend/pending_writes.go` omits `SendUpdates` from its payload and reconstructed event. Retrying a Google write drops the user's explicit `all`, `externalOnly`, or `none` query parameter. Persist and restore the preference so offline and immediate writes behave consistently.
-
 ### [P2] Drafts lose their sender identity
 
 `app/draft.go` `saveDraftToDB` never populates `IdentityID`, and `toComposeMessage` omits `From`. Reopening a draft saved with a nondefault alias selects the default identity; background pending-draft retries serialize an empty sender. Persist the selected identity on create/update and restore the sender for both editing and retries.

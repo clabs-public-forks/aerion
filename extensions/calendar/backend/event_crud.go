@@ -208,6 +208,7 @@ func (a *API) CreateEvent(in EventInput) (string, error) {
 			TZName:      ev.TZName,
 			RRuleText:   ev.RRuleText,
 			ICSBlob:     ev.ICSBlob,
+			SendUpdates: ev.SendUpdates,
 		}); qerr != nil {
 			return "", fmt.Errorf("queue offline write: %w", qerr)
 		}
@@ -627,6 +628,7 @@ func (a *API) updateAllAndPush(src Source, cal Calendar, master Event, in EventI
 			TZName:          ev.TZName,
 			RRuleText:       ev.RRuleText,
 			ICSBlob:         ev.ICSBlob,
+			SendUpdates:     ev.SendUpdates,
 		}); qerr != nil {
 			return fmt.Errorf("queue offline write: %w", qerr)
 		}

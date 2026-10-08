@@ -89,6 +89,11 @@ type PendingOp struct {
 	TZName          string
 	RRuleText       string
 	ICSBlob         string
+
+	// SendUpdates is the user's invitation-delivery choice for this write
+	// (see Event.SendUpdates); replayed so queued writes notify attendees
+	// the same way an immediate write would.
+	SendUpdates string
 }
 
 // pendingRow mirrors a row in the pending_writes table for read-back.
@@ -125,6 +130,7 @@ type pendingPayload struct {
 	TZName          string `json:"tzName,omitempty"`
 	RRuleText       string `json:"rruleText,omitempty"`
 	ICSBlob         string `json:"icsBlob,omitempty"`
+	SendUpdates     string `json:"sendUpdates,omitempty"`
 }
 
 // PendingQueue owns the pending_writes table + the drain loop. Shared
@@ -169,6 +175,7 @@ func (q *PendingQueue) Enqueue(op PendingOp) (string, error) {
 		TZName:          op.TZName,
 		RRuleText:       op.RRuleText,
 		ICSBlob:         op.ICSBlob,
+		SendUpdates:     op.SendUpdates,
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal pending payload: %w", err)
@@ -324,6 +331,7 @@ func (q *PendingQueue) processRow(ctx context.Context, row pendingRow) {
 		TZName:          row.Payload.TZName,
 		RRuleText:       row.Payload.RRuleText,
 		ICSBlob:         row.Payload.ICSBlob,
+		SendUpdates:     row.Payload.SendUpdates,
 	}
 
 	pushCtx, cancel := context.WithTimeout(ctx, 30*time.Second)

@@ -574,3 +574,36 @@ func TestPendingQueue_Drain_CalDAVCreateThenEditUpdatesResource(t *testing.T) {
 		t.Errorf("event etag/href = %q/%q, want \"v2\"//cal/%s.ics", ev.ETag, ev.Href, uid)
 	}
 }
+
+// --- Drain: invitation-delivery preference survives the queue -------------
+
+func TestPendingQueue_Drain_PreservesSendUpdates(t *testing.T) {
+	store := newTestStore(t)
+
+	var gotSendUpdates string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotSendUpdates = r.URL.Query().Get("sendUpdates")
+		_ = json.NewEncoder(w).Encode(googleEvent{
+			ID: "server-event-id", ICalUID: "evt@aerion-google", ETag: `"v1"`,
+		})
+	}))
+	defer srv.Close()
+
+	queue := NewPendingQueue(store, fakeSecrets{password: "x"}, fakeAuth{target: srv.URL}, &recordingEventBus{})
+	srcID, calID := seedGoogleSource(t, store, "primary")
+	if _, err := queue.Enqueue(PendingOp{
+		SourceID: srcID, CalendarID: calID,
+		Op: PendingOpCreate, CalendarURL: "primary",
+		UID: "evt@aerion-google", ICSBlob: minimalGoogleICS(t, "evt@aerion-google"),
+		SendUpdates: "externalOnly",
+	}); err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+
+	if err := queue.Drain(context.Background(), srcID); err != nil {
+		t.Fatalf("Drain: %v", err)
+	}
+	if gotSendUpdates != "externalOnly" {
+		t.Errorf("sendUpdates query = %q, want externalOnly", gotSendUpdates)
+	}
+}
