@@ -8,9 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M5 medium** `internal/sync/messages.go:70,340-350,447`: header-batch
-  recovery can Release a connection that the deferred closure releases
-  again. The pool then holds one session twice. Unverified.
 - **M7 medium** `internal/sync/fetch.go:577,830`: re-fetching a body inserts
   the attachments again, so they show up twice. Unverified.
 - **M2-M4 medium** `internal/imap/pool.go`: the slot check-then-dial window

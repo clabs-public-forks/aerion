@@ -345,9 +345,10 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 					}
 
 					// Re-select mailbox on new connection
+					// The deferred closure releases conn; releasing it here too
+					// would hand one session to two waiters.
 					_, err = conn.Client().SelectMailbox(ctx, f.Path)
 					if err != nil {
-						e.pool.Release(conn)
 						return fmt.Errorf("failed to select mailbox on new connection: %w", err)
 					}
 
