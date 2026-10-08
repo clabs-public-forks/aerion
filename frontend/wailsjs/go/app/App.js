@@ -78,6 +78,10 @@ export function Calendar_DeleteSource(arg1) {
   return window['go']['app']['App']['Calendar_DeleteSource'](arg1);
 }
 
+export function Calendar_DiscardStuckWrite(arg1) {
+  return window['go']['app']['App']['Calendar_DiscardStuckWrite'](arg1);
+}
+
 export function Calendar_DismissAlarm(arg1) {
   return window['go']['app']['App']['Calendar_DismissAlarm'](arg1);
 }
@@ -114,6 +118,10 @@ export function Calendar_ListSources() {
   return window['go']['app']['App']['Calendar_ListSources']();
 }
 
+export function Calendar_ListStuckWrites() {
+  return window['go']['app']['App']['Calendar_ListStuckWrites']();
+}
+
 export function Calendar_LogFrontend(arg1, arg2) {
   return window['go']['app']['App']['Calendar_LogFrontend'](arg1, arg2);
 }
@@ -132,6 +140,10 @@ export function Calendar_RenameSource(arg1, arg2) {
 
 export function Calendar_ReprobeCalDAVOrganizerIdentities(arg1) {
   return window['go']['app']['App']['Calendar_ReprobeCalDAVOrganizerIdentities'](arg1);
+}
+
+export function Calendar_RetryStuckWrite(arg1) {
+  return window['go']['app']['App']['Calendar_RetryStuckWrite'](arg1);
 }
 
 export function Calendar_SearchContacts(arg1, arg2) {

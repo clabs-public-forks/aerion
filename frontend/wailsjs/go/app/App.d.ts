@@ -57,6 +57,8 @@ export function Calendar_DeleteEvent(arg1:string,arg2:string):Promise<void>;
 
 export function Calendar_DeleteSource(arg1:string):Promise<void>;
 
+export function Calendar_DiscardStuckWrite(arg1:string):Promise<void>;
+
 export function Calendar_DismissAlarm(arg1:string):Promise<void>;
 
 export function Calendar_ForceSyncSource(arg1:string):Promise<void>;
@@ -75,6 +77,8 @@ export function Calendar_ListMicrosoftCalendarsForAccount(arg1:string):Promise<A
 
 export function Calendar_ListSources():Promise<Array<backend.Source>>;
 
+export function Calendar_ListStuckWrites():Promise<Array<backend.StuckWrite>>;
+
 export function Calendar_LogFrontend(arg1:string,arg2:string):Promise<void>;
 
 export function Calendar_OpenURL(arg1:string):Promise<void>;
@@ -84,6 +88,8 @@ export function Calendar_QueryFreeBusy(arg1:Array<string>,arg2:Array<string>,arg
 export function Calendar_RenameSource(arg1:string,arg2:string):Promise<void>;
 
 export function Calendar_ReprobeCalDAVOrganizerIdentities(arg1:string):Promise<number>;
+
+export function Calendar_RetryStuckWrite(arg1:string):Promise<string>;
 
 export function Calendar_SearchContacts(arg1:string,arg2:number):Promise<Array<v1.Contact>>;
 

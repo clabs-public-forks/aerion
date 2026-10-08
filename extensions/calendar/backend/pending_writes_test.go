@@ -667,3 +667,135 @@ func TestPendingQueue_Drain_HardFailureOneAttemptPerPassAndReset(t *testing.T) {
 		t.Fatalf("reset row should be eligible again, got %+v", row)
 	}
 }
+
+// --- Stuck writes: list, retry, discard ----------------------------------
+
+func TestPendingQueue_StuckWrites(t *testing.T) {
+	store := newTestStore(t)
+	queue := NewPendingQueue(store, fakeSecrets{password: "x"}, fakeAuth{target: ""}, &recordingEventBus{})
+	srcID, calID := seedGoogleSource(t, store, "primary")
+
+	enqueue := func(uid, summary string) string {
+		t.Helper()
+		id, err := queue.Enqueue(PendingOp{
+			SourceID: srcID, CalendarID: calID, Op: PendingOpUpdate,
+			CalendarURL: "primary", UID: uid, Summary: summary, DTStartUnix: 1700000000,
+		})
+		if err != nil {
+			t.Fatalf("Enqueue: %v", err)
+		}
+		return id
+	}
+	stuckID := enqueue("stuck@x", "Stuck")
+	freshID := enqueue("fresh@x", "Fresh")
+	if err := queue.recordFailure(stuckID, pendingMaxAttempts, "HTTP 400"); err != nil {
+		t.Fatalf("recordFailure: %v", err)
+	}
+	if err := queue.recordFailure(freshID, 1, "HTTP 500"); err != nil {
+		t.Fatalf("recordFailure: %v", err)
+	}
+
+	list, err := queue.ListStuck()
+	if err != nil {
+		t.Fatalf("ListStuck: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("ListStuck = %+v, want only the exhausted row", list)
+	}
+	got := list[0]
+	if got.ID != stuckID || got.SourceID != srcID || got.SourceName != "Test" || got.Op != "update" ||
+		got.Summary != "Stuck" || got.DTStartUnix != 1700000000 || got.LastError != "HTTP 400" || got.LastAttemptUnix == 0 {
+		t.Errorf("ListStuck[0] = %+v", got)
+	}
+
+	if src, err := queue.Retry(stuckID); err != nil || src != srcID {
+		t.Fatalf("Retry = %q, %v; want %q", src, err, srcID)
+	}
+	if st, err := queue.RetryStatus(stuckID); err != nil || st != RetryPending {
+		t.Errorf("RetryStatus before drain = %q, %v; want pending", st, err)
+	}
+	if row, err := queue.nextPending(srcID, nil); err != nil || row == nil || row.ID != stuckID {
+		t.Fatalf("after Retry nextPending = %+v, %v; want the retried row first", row, err)
+	}
+	if list, _ := queue.ListStuck(); len(list) != 0 {
+		t.Errorf("after Retry ListStuck = %+v, want empty", list)
+	}
+	// One more failure re-exhausts the retried row.
+	if err := queue.recordFailure(stuckID, 1, "HTTP 400"); err != nil {
+		t.Fatalf("recordFailure: %v", err)
+	}
+	if list, _ := queue.ListStuck(); len(list) != 1 || list[0].ID != stuckID {
+		t.Errorf("after failed retry ListStuck = %+v, want the row back", list)
+	}
+	if st, _ := queue.RetryStatus(stuckID); st != RetryFailed {
+		t.Errorf("RetryStatus after failure = %q, want failed", st)
+	}
+
+	if src, err := queue.Discard(freshID); err != nil || src != srcID {
+		t.Fatalf("Discard = %q, %v; want %q", src, err, srcID)
+	}
+	var n int
+	if err := store.DB().QueryRow(`SELECT COUNT(*) FROM pending_writes WHERE id = ?`, freshID).Scan(&n); err != nil || n != 0 {
+		t.Errorf("discarded row count = %d, %v; want 0", n, err)
+	}
+	if st, _ := queue.RetryStatus(freshID); st != RetrySynced {
+		t.Errorf("RetryStatus of removed row = %q, want synced", st)
+	}
+
+	if _, err := queue.Retry("missing"); err == nil {
+		t.Error("Retry(missing) = nil error, want not found")
+	}
+	if _, err := queue.Discard("missing"); err == nil {
+		t.Error("Discard(missing) = nil error, want not found")
+	}
+}
+
+// Discarding a stuck create removes its never-synced local event and any
+// later queued rows for the same event; other events are untouched.
+func TestPendingQueue_DiscardCreateDropsLocalEvent(t *testing.T) {
+	store := newTestStore(t)
+	queue := NewPendingQueue(store, fakeSecrets{password: "x"}, fakeAuth{target: ""}, &recordingEventBus{})
+	srcID, calID := seedGoogleSource(t, store, "primary")
+
+	now := time.Now().Unix()
+	for _, ev := range []Event{
+		{ID: "evt-new", CalendarID: calID, UID: "new@x", Summary: "New", DTStartUnix: now, DTEndUnix: now + 3600},
+		{ID: "evt-other", CalendarID: calID, UID: "other@x", Summary: "Other", DTStartUnix: now, DTEndUnix: now + 3600},
+	} {
+		if err := store.WithTx(func(tx *sql.Tx) error { return store.UpsertEventTx(tx, ev) }); err != nil {
+			t.Fatalf("UpsertEventTx: %v", err)
+		}
+	}
+	enqueue := func(op PendingOpKind, uid string) string {
+		t.Helper()
+		id, err := queue.Enqueue(PendingOp{SourceID: srcID, CalendarID: calID, Op: op, CalendarURL: "primary", UID: uid})
+		if err != nil {
+			t.Fatalf("Enqueue: %v", err)
+		}
+		return id
+	}
+	createID := enqueue(PendingOpCreate, "new@x")
+	enqueue(PendingOpUpdate, "new@x")
+	otherID := enqueue(PendingOpUpdate, "other@x")
+
+	if _, err := queue.Discard(createID); err != nil {
+		t.Fatalf("Discard: %v", err)
+	}
+
+	var rows, events int
+	_ = store.DB().QueryRow(`SELECT COUNT(*) FROM pending_writes`).Scan(&rows)
+	if rows != 1 {
+		t.Errorf("pending rows = %d, want 1 (only %s)", rows, otherID)
+	}
+	if st, _ := queue.RetryStatus(otherID); st != RetryPending {
+		t.Errorf("other row status = %q, want pending", st)
+	}
+	_ = store.DB().QueryRow(`SELECT COUNT(*) FROM events WHERE uid = 'new@x'`).Scan(&events)
+	if events != 0 {
+		t.Errorf("discarded create's local event still present")
+	}
+	_ = store.DB().QueryRow(`SELECT COUNT(*) FROM events WHERE uid = 'other@x'`).Scan(&events)
+	if events != 1 {
+		t.Errorf("unrelated event removed")
+	}
+}

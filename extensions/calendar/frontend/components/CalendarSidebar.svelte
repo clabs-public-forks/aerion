@@ -16,6 +16,8 @@
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import SidebarSyncStatus from '$lib/components/kit/SidebarSyncStatus.svelte'
   import AddCalendarMenu from './AddCalendarMenu.svelte'
+  import StuckWritesDialog from './StuckWritesDialog.svelte'
+  import { stuckWrites } from '$extensions/calendar/frontend/stores/stuckWrites.svelte'
   import { calendarSources } from '$extensions/calendar/frontend/stores/calendarSources.svelte'
   import { onMount, onDestroy } from 'svelte'
   // @ts-ignore - wailsjs bindings
@@ -46,7 +48,11 @@
   let nowTickId: ReturnType<typeof setInterval> | null = null
   onMount(() => {
     nowTickId = setInterval(() => { now = Date.now() }, 60_000)
+    stuckWrites.init()
   })
+
+  let showStuckWrites = $state(false)
+  const stuckLabel = $derived($_('calendar.stuckWrites.button', { values: { count: stuckWrites.items.length } }))
   onDestroy(() => {
     if (nowTickId !== null) clearInterval(nowTickId)
   })
@@ -159,6 +165,18 @@
         />
       {/snippet}
       {#snippet trailing()}
+        {#if stuckWrites.items.length > 0}
+          <button
+            class="flex items-center gap-1 p-1 rounded text-destructive hover:bg-muted/40"
+            title={stuckLabel}
+            onclick={() => { showStuckWrites = true }}
+            type="button"
+            aria-label={stuckLabel}
+          >
+            <Icon icon="mdi:cloud-alert-outline" class="w-4 h-4" />
+            <span>{stuckWrites.items.length}</span>
+          </button>
+        {/if}
         <button
           class="p-1 rounded hover:bg-muted/40"
           title={$_('calendar.sidebar.settings')}
@@ -172,3 +190,5 @@
     </SidebarFooter>
   {/snippet}
 </SidebarFrame>
+
+<StuckWritesDialog bind:open={showStuckWrites} />

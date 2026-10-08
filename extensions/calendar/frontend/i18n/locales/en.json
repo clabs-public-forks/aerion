@@ -12,6 +12,26 @@
       "queued": "Saved — will sync when you're back online.",
       "conflict": "This event was changed on the server. Please open it and re-apply your edit."
     },
+    "stuckWrites": {
+      "button": "{count, plural, one {# change failed to sync} other {# changes failed to sync}}",
+      "title": "Changes that failed to sync",
+      "description": "The server keeps rejecting these calendar changes. Retry once more, or discard a change to restore the server's version.",
+      "untitled": "(untitled event)",
+      "op": {
+        "create": "New event",
+        "update": "Edit",
+        "delete": "Deletion"
+      },
+      "lastAttempt": "Last tried {time}",
+      "retry": "Retry",
+      "discard": "Discard",
+      "confirmDiscard": "Discard this change?",
+      "working": "Working…",
+      "retried": "Change synced.",
+      "stillFailing": "The server rejected the change again.",
+      "pending": "A sync is already running. The change will be retried when it finishes.",
+      "discarded": "Change discarded. Restoring the server's version."
+    },
     "drag": {
       "errorSave": "Failed to save event: {message}",
       "recurringHint": "Drag is not available for recurring events. Use the detail view to edit."

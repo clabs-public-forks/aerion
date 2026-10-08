@@ -257,6 +257,143 @@ func (q *PendingQueue) ResetExhausted() error {
 	return err
 }
 
+// StuckWrite is a queued write that used up its retry budget. Listed in
+// the calendar UI so the user can retry or discard it.
+type StuckWrite struct {
+	ID              string `json:"id"`
+	SourceID        string `json:"sourceId"`
+	SourceName      string `json:"sourceName"`
+	Op              string `json:"op"`
+	Summary         string `json:"summary"`
+	DTStartUnix     int64  `json:"dtstartUnix"`
+	LastError       string `json:"lastError"`
+	LastAttemptUnix int64  `json:"lastAttemptUnix"`
+}
+
+// ListStuck returns rows past pendingMaxAttempts, oldest first.
+func (q *PendingQueue) ListStuck() ([]StuckWrite, error) {
+	rows, err := q.store.DB().Query(`
+		SELECT p.id, p.source_id, COALESCE(s.name, ''), p.op, p.payload_json,
+		       COALESCE(p.last_error, ''), COALESCE(p.last_attempt_unix, 0)
+		FROM pending_writes p
+		LEFT JOIN calendar_sources s ON s.id = p.source_id
+		WHERE p.attempt >= ?
+		ORDER BY p.created_unix ASC, p.rowid ASC`, pendingMaxAttempts)
+	if err != nil {
+		return nil, fmt.Errorf("query stuck pending_writes: %w", err)
+	}
+	defer rows.Close()
+	out := []StuckWrite{}
+	for rows.Next() {
+		var w StuckWrite
+		var payloadJSON string
+		if err := rows.Scan(&w.ID, &w.SourceID, &w.SourceName, &w.Op, &payloadJSON,
+			&w.LastError, &w.LastAttemptUnix); err != nil {
+			return nil, fmt.Errorf("scan stuck pending_writes: %w", err)
+		}
+		var p pendingPayload
+		if err := json.Unmarshal([]byte(payloadJSON), &p); err == nil {
+			w.Summary, w.DTStartUnix = p.Summary, p.DTStartUnix
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
+// Retry grants one row a single extra attempt so the next drain replays
+// it; another failure puts it straight back in ListStuck. Returns the
+// row's source ID.
+func (q *PendingQueue) Retry(id string) (string, error) {
+	sourceID, err := q.sourceOf(id)
+	if err != nil {
+		return "", err
+	}
+	if _, err := q.store.DB().Exec(`UPDATE pending_writes SET attempt = ? WHERE id = ?`, pendingMaxAttempts-1, id); err != nil {
+		return "", fmt.Errorf("reset pending_writes %s: %w", id, err)
+	}
+	return sourceID, nil
+}
+
+// Discard drops one row without replaying it. For other ops the local copy
+// keeps the unsynced change until the source is resynced. A discarded create
+// never reached the server, and not every provider prunes local-only events
+// on sync, so its local event goes too, along with later queued rows for
+// that event, which would otherwise fail against a missing remote event.
+// Returns the row's source ID.
+func (q *PendingQueue) Discard(id string) (string, error) {
+	var sourceID, calendarID, op, payloadJSON string
+	err := q.store.DB().QueryRow(
+		`SELECT source_id, calendar_id, op, payload_json FROM pending_writes WHERE id = ?`, id,
+	).Scan(&sourceID, &calendarID, &op, &payloadJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("pending write %s not found", id)
+	}
+	if err != nil {
+		return "", fmt.Errorf("load pending_writes %s: %w", id, err)
+	}
+	var p pendingPayload
+	if PendingOpKind(op) != PendingOpCreate || json.Unmarshal([]byte(payloadJSON), &p) != nil || p.UID == "" {
+		if err := q.deleteRow(id); err != nil {
+			return "", fmt.Errorf("delete pending_writes %s: %w", id, err)
+		}
+		return sourceID, nil
+	}
+
+	tx, err := q.store.DB().Begin()
+	if err != nil {
+		return "", fmt.Errorf("begin discard: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`
+		DELETE FROM pending_writes
+		WHERE id = ? OR (calendar_id = ? AND json_extract(payload_json, '$.uid') = ?)`,
+		id, calendarID, p.UID); err != nil {
+		return "", fmt.Errorf("delete pending_writes for %s: %w", p.UID, err)
+	}
+	if err := q.store.DeleteEventByUIDTx(tx, calendarID, p.UID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("commit discard: %w", err)
+	}
+	return sourceID, nil
+}
+
+// Retry outcomes reported by RetryStatus.
+const (
+	RetrySynced  = "synced"  // row replayed and removed
+	RetryFailed  = "failed"  // row replayed and is stuck again
+	RetryPending = "pending" // not replayed yet; the next drain will
+)
+
+// RetryStatus reports what happened to a row after Retry plus a drain.
+func (q *PendingQueue) RetryStatus(id string) (string, error) {
+	var attempt int
+	err := q.store.DB().QueryRow(`SELECT attempt FROM pending_writes WHERE id = ?`, id).Scan(&attempt)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return RetrySynced, nil
+	case err != nil:
+		return "", fmt.Errorf("load pending_writes %s: %w", id, err)
+	case attempt >= pendingMaxAttempts:
+		return RetryFailed, nil
+	default:
+		return RetryPending, nil
+	}
+}
+
+func (q *PendingQueue) sourceOf(id string) (string, error) {
+	var sourceID string
+	err := q.store.DB().QueryRow(`SELECT source_id FROM pending_writes WHERE id = ?`, id).Scan(&sourceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("pending write %s not found", id)
+	}
+	if err != nil {
+		return "", fmt.Errorf("load pending_writes %s: %w", id, err)
+	}
+	return sourceID, nil
+}
+
 // DrainAll iterates all sources known to the store and drains each in
 // turn. Used by callers that want a single entry point on the
 // system:network-online path.

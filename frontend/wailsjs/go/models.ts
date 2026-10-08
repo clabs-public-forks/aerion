@@ -1392,6 +1392,32 @@ export namespace backend {
 	        this.organizerIdentities = source["organizerIdentities"];
 	    }
 	}
+	export class StuckWrite {
+	    id: string;
+	    sourceId: string;
+	    sourceName: string;
+	    op: string;
+	    summary: string;
+	    dtstartUnix: number;
+	    lastError: string;
+	    lastAttemptUnix: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StuckWrite(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.sourceId = source["sourceId"];
+	        this.sourceName = source["sourceName"];
+	        this.op = source["op"];
+	        this.summary = source["summary"];
+	        this.dtstartUnix = source["dtstartUnix"];
+	        this.lastError = source["lastError"];
+	        this.lastAttemptUnix = source["lastAttemptUnix"];
+	    }
+	}
 
 }
 

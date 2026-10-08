@@ -415,6 +415,59 @@ func (b *CalendarBridge) Calendar_ForceSyncSource(sourceID string) error {
 	return b.syncer.ForceResyncSource(ctx, sourceID)
 }
 
+// Calendar_ListStuckWrites returns queued writes that keep failing with
+// non-transport errors and have used up their retry budget.
+func (b *CalendarBridge) Calendar_ListStuckWrites() ([]StuckWrite, error) {
+	if !b.gateEnabled() {
+		return []StuckWrite{}, nil
+	}
+	if err := b.ensureInit(); err != nil {
+		return nil, err
+	}
+	return b.api.queue.ListStuck()
+}
+
+// Calendar_RetryStuckWrite grants a stuck write one more attempt and syncs
+// its source, which replays the queue. Returns "synced", "failed" (stuck
+// again) or "pending" (the source was already syncing, so a later drain
+// replays it). Sync failures are reported through calendar:source-error.
+func (b *CalendarBridge) Calendar_RetryStuckWrite(id string) (string, error) {
+	if !b.gateEnabled() {
+		return "", errors.New("calendar: extension disabled")
+	}
+	if err := b.ensureInit(); err != nil {
+		return "", err
+	}
+	sourceID, err := b.api.queue.Retry(id)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	_ = b.syncer.SyncSource(ctx, sourceID)
+	return b.api.queue.RetryStatus(id)
+}
+
+// Calendar_DiscardStuckWrite drops a stuck write and force-resyncs its
+// source so the local copy returns to the server's version. Resync
+// failures are reported through calendar:source-error.
+func (b *CalendarBridge) Calendar_DiscardStuckWrite(id string) error {
+	if !b.gateEnabled() {
+		return errors.New("calendar: extension disabled")
+	}
+	if err := b.ensureInit(); err != nil {
+		return err
+	}
+	sourceID, err := b.api.queue.Discard(id)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	_ = b.syncer.ForceResyncSource(ctx, sourceID)
+	return nil
+}
+
 // Calendar_ListEventsInRange is the workhorse query for calendar views.
 // Expands recurring events into concrete occurrences within [fromUnix,
 // toUnix]. Honors per-calendar visibility (invisible calendars are

@@ -23,6 +23,13 @@ A Calendar button is added to the [rail](/docs/features/extensions#the-rail) on 
 
 To sync calendar events on demand, click the footer at the bottom of the Calendar sidebar.
 
+## Changes That Fail to Sync
+
+Edits made while offline are saved locally and sent when you're back online. If the server keeps rejecting a change (for example, a read-only calendar), a red cloud icon with a count appears in the sidebar footer. Click it to see each change and its server error, then:
+
+- **Retry** sends the change once more.
+- **Discard** drops the change and resyncs the calendar so it shows the server's version again. Discarding a new event removes it, since it never reached the server.
+
 ## Known Issues
 
 - All providers (CalDAV, Google, and Microsoft) rely on the server to send and parse invites. If your provider isn't set up to handle invites server-side, invitations may appear somewhat broken.
