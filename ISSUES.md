@@ -24,8 +24,6 @@ has not yet been confirmed against the code.
 
 - **C12 medium** contacts backend: EXT_RULES R1, R2, R5 and R6 (see A4).
   Architectural.
-- **C15 low** `ContactDetail.svelte:146-172`: each blocks keyed by email can
-  get duplicate keys. Unverified.
 
 ### Calendar
 
