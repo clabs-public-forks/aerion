@@ -8,9 +8,6 @@ aerion-creds
 build/bin/
 build/linux/AppDir
 .tools/
-.claude/*
-!.claude/skills/
-!.claude/rules/
 .crush
 
 # Flatpak build artifacts
@@ -62,3 +59,18 @@ npm-debug.log*
 
 # Generated OAuth credentials (make credentials)
 internal/oauth2/credentials_gen.go
+
+# Claude Code: commit shared config (CLAUDE.md, .claude/ skills, rules,
+# agents, settings.json); keep personal settings and runtime state local.
+CLAUDE.local.md
+.claude/CLAUDE.local.md
+.claude/settings.local.json
+.claude/scheduled_tasks.*
+.claude/routines/.state/
+.claude/worktrees/
+.claude/checkpoints/
+.claude/mailbox/
+.claude/agent-registry.json
+.claude/agent-memory-local/
+.claude/first-run
+.claude/assistant-daemon-state.json
