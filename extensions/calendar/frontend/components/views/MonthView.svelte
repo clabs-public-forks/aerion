@@ -8,6 +8,8 @@
   //     multi-day event renders as one continuous bar across its days (lane-
   //     packed, with ◀/▶ continuation markers where it crosses a week-row).
   //   - Last row (1fr): per-cell single-day event pills + "+N more" overflow.
+  //     A cell's pills start right below the lanes its own column uses, so
+  //     they also fill lanes that are empty on that day.
   // A background <button> per cell (spanning all rows, behind everything) keeps
   // the empty-area click → DayView navigation; EventCards stopPropagation so a
   // bar/pill click selects the event.
@@ -21,19 +23,33 @@
   // @ts-ignore - wailsjs bindings
   import type { backend } from '$wailsjs/go/models'
 
-  // Per-cell event count now tracks the available cell height (#323) instead of
-  // a fixed 3. PILL_PX = one EventCard row (text-xs + py-0.5) plus the gap-0.5;
-  // DAY_NUM_PX = the day-number header row. Calibrated by eye — see verification.
+  // Per-cell event count tracks the available cell height (#323). Sizes match
+  // the rendered rows: PILL_PX = one EventCard (20px) plus the gap-0.5;
+  // MORE_PX = the "+N more" line; BAND_PX = one multi-day lane; DAY_NUM_PX =
+  // the day-number header row; CELL_PAD_PX = the pill column's pb-1 plus the
+  // row's bottom border.
   const PILL_PX = 22
-  const DAY_NUM_PX = 24
-  const MIN_EVENTS_PER_CELL = 3
+  const PILL_GAP_PX = 2
+  const MORE_PX = 15
+  const BAND_PX = 20
+  const DAY_NUM_PX = 28
+  const CELL_PAD_PX = 5
 
   // Measured height of the 6-row grid (layout-driven, so no measure→render loop).
-  // Rows are equal height, so capacity per cell derives from gridHeight / 6.
+  // Rows are equal height, so each row gets gridHeight / 6.
   let gridHeight = $state(0)
-  const eventCapacity = $derived(
-    Math.max(MIN_EVENTS_PER_CELL, Math.floor((gridHeight / 6 - DAY_NUM_PX) / PILL_PX))
-  )
+
+  // Height left for single-day pills below a row's day numbers and bands.
+  function pillSpace(laneCount: number): number {
+    return gridHeight / 6 - DAY_NUM_PX - CELL_PAD_PX - laneCount * BAND_PX
+  }
+
+  // Pills to show in a cell: all of them when they fit, otherwise as many as
+  // leave room for the "+N more" line.
+  function visibleCount(total: number, space: number): number {
+    if (total * PILL_PX - PILL_GAP_PX <= space) return total
+    return Math.max(0, Math.floor((space - MORE_PX) / PILL_PX))
+  }
 
   type Cell = { date: Date; isOtherMonth: boolean; isToday: boolean }
 
@@ -47,7 +63,9 @@
     continuesRight: boolean // event continues past this week-row
   }
 
-  type BandRow = { blocks: BandBlock[]; laneCount: number }
+  // laneCount = lanes in the whole week-row; cellLanes[i] = lanes that column i
+  // actually uses, so its pills can move up into lanes left empty there.
+  type BandRow = { blocks: BandBlock[]; laneCount: number; cellLanes: number[] }
 
   // 6 rows × 7 cols = 42 cells starting from the grid-start (in tz).
   const gridStart = $derived(calendarView.monthGridStart(calendarView.anchorDate))
@@ -151,7 +169,13 @@
       }
 
       const laneCount = candidates.length === 0 ? 0 : Math.max(...candidates.map(b => b.laneIdx)) + 1
-      return { blocks: candidates, laneCount }
+      const cellLanes = Array.from({ length: 7 }, () => 0)
+      for (const block of candidates) {
+        for (let i = block.startColIdx; i <= block.endColIdx; i++) {
+          cellLanes[i] = Math.max(cellLanes[i], block.laneIdx + 1)
+        }
+      }
+      return { blocks: candidates, laneCount, cellLanes }
     })
   })
 
@@ -216,7 +240,6 @@
     <div class="flex-1 grid grid-rows-6 min-h-0" bind:clientHeight={gridHeight}>
       {#each weekRows as row, w (w)}
         {@const band = bandRows[w]}
-        {@const pillCap = Math.max(0, eventCapacity - band.laneCount)}
         <div
           class="relative grid grid-cols-7 border-b border-border min-h-0 overflow-hidden"
           style:grid-template-rows={`auto ${band.laneCount > 0 ? `repeat(${band.laneCount}, minmax(0, auto)) ` : ''}1fr`}
@@ -271,12 +294,14 @@
           <!-- Single-day pills + overflow, per cell -->
           {#each row.cells as cell, i (i)}
             {@const cellPills = pillsByCell[w * 7 + i]}
-            {@const visible = cellPills.slice(0, pillCap)}
+            {@const lanes = band.cellLanes[i]}
+            {@const space = pillSpace(lanes)}
+            {@const visible = cellPills.slice(0, visibleCount(cellPills.length, space))}
             {@const overflow = cellPills.length - visible.length}
             <div
               class="pointer-events-none flex flex-col gap-0.5 px-1 pb-1 min-h-0 overflow-hidden"
               style:grid-column={`${i + 1}`}
-              style:grid-row={`${2 + band.laneCount} / -1`}
+              style:grid-row={`${2 + lanes} / -1`}
             >
               {#each visible as inst (inst.id + ':' + inst.instanceStartUnix)}
                 <div class="pointer-events-auto min-w-0">
