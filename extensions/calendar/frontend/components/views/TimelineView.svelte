@@ -869,11 +869,17 @@
           {#each timedByDay[colIdx] as block (block.instance.id)}
             {@const dragOff = dragOffsetsFor(block)}
             {@const isRecurring = !!block.instance.rruleText}
+            <!-- Under ~32px there is no room for two lines, so time and title share one. -->
+            {@const oneLine = (dragOff ? dragOff.height : (block.heightPct / 100) * DAY_PX) < 32}
             <button
               type="button"
               class="absolute rounded text-[11px] text-foreground text-left
-                     px-1 py-0.5 overflow-hidden
+                     px-1 overflow-hidden flex gap-1
                      hover:brightness-110 transition-[filter]"
+              class:flex-col={!oneLine}
+              class:items-center={oneLine}
+              class:py-0.5={!oneLine}
+              class:gap-0={!oneLine}
               class:cursor-pointer={isRecurring}
               class:cursor-grab={!isRecurring && !dragOff}
               class:cursor-grabbing={!isRecurring && dragOff && dragState?.mode === 'move'}
@@ -895,14 +901,14 @@
               onpointermove={(e) => onBlockHoverMove(block, e)}
               onclick={(e) => onBlockClick(block.instance, e)}
             >
-              <div class="font-mono text-[10px] text-muted-foreground leading-tight">
+              <div class="shrink-0 font-mono text-[10px] text-muted-foreground {oneLine ? 'leading-[13px]' : 'leading-tight'}">
                 {new Intl.DateTimeFormat(undefined, {
                   hour: '2-digit', minute: '2-digit', hour12: false,
                   timeZone: calendarSettings.effectiveTimezone,
                 }).format(new Date(block.instance.instanceStartUnix * 1000))}
               </div>
-              <div class="truncate leading-tight">
-                {block.instance.summary || '(no title)'}
+              <div class="min-w-0 max-w-full truncate {oneLine ? 'leading-[13px]' : 'leading-tight'}">
+                {block.instance.summary || $_('calendar.detail.noTitle')}
               </div>
             </button>
           {/each}

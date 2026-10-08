@@ -4,6 +4,7 @@
   // color, and optional multi-day continuation flags. Click bubbles to the
   // parent via the onclick prop — no internal state.
 
+  import { _ } from 'svelte-i18n'
   import { calendarSettings } from '$extensions/calendar/frontend/stores/calendarSettings.svelte'
   import { eventChipFill } from '$extensions/calendar/frontend/lib/eventColor'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
@@ -70,7 +71,7 @@
   {#if !isAllDay}
     <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{timeLabel}</span>
   {/if}
-  <span class="flex-1 min-w-0 truncate">{instance.summary || '(no title)'}</span>
+  <span class="flex-1 min-w-0 truncate">{instance.summary || $_('calendar.detail.noTitle')}</span>
   {#if continuesRight}
     <span class="shrink-0 text-muted-foreground" aria-hidden="true">▶</span>
   {/if}
