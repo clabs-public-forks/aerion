@@ -197,7 +197,7 @@ type Extension interface {
 
 **`Register` is called once per process at startup, regardless of whether the extension is currently enabled.** This matches the architecture-doc rule that descriptive UI registrations (rail tab, account-setup hook) persist across enable/disable cycles. Active behaviors (sync schedulers, background work) are gated separately by `IsExtensionEnabled` checks; they are NOT skipped at Register time.
 
-The returned `Unregister` removes everything Register wired. Called by the host on process shutdown.
+The returned `Unregister` removes everything Register wired. Called by the host on process shutdown. It also tears down the bridge: the host hands the Extension its bridge with `AttachBridge` in `app/extension_<name>.go`, and `Unregister` calls the bridge's unexported `shutdown()`, which stops background services and closes the extension's SQLite store if `ensureInit` ran.
 
 ### Example: Contacts extension
 

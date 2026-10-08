@@ -52,6 +52,7 @@ func (a *App) initContactsExtension() {
 		// contacts-only OAuth flow.
 		GetStandaloneSourceToken: a.getValidContactSourceOAuthToken,
 	})
+	a.contactsExt.AttachBridge(a.ContactsBridge)
 
 	// Live-refresh the contact list after any source sync (background
 	// scheduler, post-add, or manual). The core carddav syncer fires a generic

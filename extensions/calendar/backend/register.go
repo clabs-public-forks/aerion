@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/hkdb/aerion/extensions/calendar"
@@ -14,6 +15,7 @@ import (
 // sub-phases.
 type Extension struct {
 	manifest coreapi.Manifest
+	bridge   *CalendarBridge
 }
 
 // NewExtension constructs the Extension lifecycle handle. Allocates only
@@ -74,11 +76,24 @@ func (e *Extension) Register(core coreapi.Core) (coreapi.Unregister, error) {
 	}
 
 	return func() {
+		if e.bridge != nil {
+			e.bridge.shutdown()
+		}
 		unregMicrosoftHook()
 		unregGoogleHook()
 		unregRail()
 	}, nil
 }
+
+// AttachBridge gives the extension its bridge so the Unregister returned by
+// Register can stop the bridge's background work and close its store when
+// the host shuts down.
+func (e *Extension) AttachBridge(b *CalendarBridge) {
+	e.bridge = b
+}
+
+// errShuttingDown is returned by bridge calls made after shutdown began.
+var errShuttingDown = errors.New("calendar: shutting down")
 
 // compile-time check: *Extension satisfies coreapi.Extension
 var _ coreapi.Extension = (*Extension)(nil)

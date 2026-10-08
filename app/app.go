@@ -1049,6 +1049,13 @@ func (a *App) Shutdown(ctx context.Context) {
 		log.Info().Msg("CardDAV scheduler stopped")
 	}
 
+	// Tear down extension registrations and their background work
+	// (calendar sync and alarms, extension stores) before the DB closes.
+	for _, unreg := range a.extensionUnregs {
+		unreg()
+	}
+	log.Info().Msg("Extensions stopped")
+
 	// Close all IMAP connections
 	if a.imapPool != nil {
 		a.imapPool.CloseAll()

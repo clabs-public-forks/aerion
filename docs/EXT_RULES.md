@@ -56,8 +56,8 @@ Companion docs:
 - **R11.** Per-extension SQLite is opened LAZILY inside the bridge's
   `ensureInit()` (sync.Once-gated), on the first enabled bridge call. A
   disabled extension never opens its DB. Once open, the DB stays open
-  until process exit — disable/enable cycles within a session reuse the
-  existing connection. Schema migrations run at the point of first open,
+  until host shutdown, when the extension's `Unregister` closes it —
+  disable/enable cycles within a session reuse the existing connection. Schema migrations run at the point of first open,
   not at app startup.
 - **R12.** Extensions never read each other's tables. Cross-extension data
   access flows through `coreapi`.

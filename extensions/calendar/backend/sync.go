@@ -67,10 +67,8 @@ func NewSyncer(store *Store, secrets coreapi.Secrets, events coreapi.EventBus, s
 // system wake/network events. Safe to call multiple times — second call
 // is effectively a no-op since the underlying state is per-source.
 //
-// Returns the parent context's cancel func so the caller (typically the
-// extension bridge) can shut down all goroutines together if it ever
-// implements clean teardown. (Currently the lifecycle pattern is "leave
-// them running until process exit," matching contacts.)
+// Returns the parent context's cancel func; the bridge calls it on host
+// shutdown to stop all sync goroutines together.
 func (s *Syncer) Start() context.CancelFunc {
 	s.mu.Lock()
 	if s.parentCtx == nil {

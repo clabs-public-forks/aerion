@@ -29,6 +29,7 @@ func (a *App) initCalendarExtension() {
 		DB:            a.db,
 		Core:          calendarCore,
 	})
+	a.calendarExt.AttachBridge(a.CalendarBridge)
 
 	// All OAuth slot resolution lives in internal/oauth2/core_provider.go
 	// now — google-calendar and microsoft-calendar are owned there. The

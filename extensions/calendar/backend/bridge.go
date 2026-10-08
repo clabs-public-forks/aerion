@@ -40,6 +40,7 @@ type CalendarBridge struct {
 	initErr  error
 	api      *API
 	syncer   *Syncer
+	stopSync context.CancelFunc
 	alarms   *AlarmScheduler
 }
 
@@ -140,11 +141,28 @@ func (b *CalendarBridge) ensureInit() error {
 		queue := NewPendingQueue(store, secrets, auth, b.deps.Core.Events())
 		b.api = NewAPI(store, secrets, auth, queue)
 		b.syncer = NewSyncer(store, secrets, b.deps.Core.Events(), b.deps.SettingsStore, auth, queue, b.deps.Core.Log())
-		b.syncer.Start()
+		b.stopSync = b.syncer.Start()
 		b.alarms = NewAlarmScheduler(store, b.deps.Core.Notifications(), b.deps.Core.Events(), b.deps.Core.Log())
 		b.alarms.Start(context.Background())
 	})
 	return b.initErr
+}
+
+// shutdown stops the syncer and alarm scheduler and closes the store if
+// ensureInit ran. It first claims initOnce so a bridge call racing the
+// shutdown can't start them afterwards; such calls get errShuttingDown.
+// Unexported so Wails doesn't bind it (R19); the Extension's Unregister
+// calls it.
+func (b *CalendarBridge) shutdown() {
+	b.initOnce.Do(func() { b.initErr = errShuttingDown })
+	if b.api == nil {
+		return
+	}
+	b.alarms.Stop()
+	b.stopSync()
+	if err := b.api.store.Close(); err != nil && b.deps.Core != nil {
+		b.deps.Core.Log().Warn(fmt.Sprintf("calendar: close store: %v", err))
+	}
 }
 
 // --- Wails-bound surface (Calendar_*) ----------------------------------------

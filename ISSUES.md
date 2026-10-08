@@ -46,9 +46,6 @@ has not yet been confirmed against the code.
   imports: EXT_RULES R1, R2 and R5. The bridge gets a token closure and the
   core DB, and the extension imports `internal/*`. This is architectural
   (see C12).
-- **A5 medium** `app/app.go:989-1064`: Shutdown never runs
-  `extensionUnregs`, stops the calendar alarm scheduler, or closes the
-  extension stores. Unverified.
 - **A8 low** `app/attachment.go:251-282`: validateOpenPath allows the whole
   data dir and doesn't resolve symlinks. Unverified.
 - **A9 low** `app/compose.go:577`: an invalid mailto URL, including its

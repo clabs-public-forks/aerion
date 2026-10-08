@@ -155,6 +155,20 @@ func (b *ContactsBridge) ensureInit() error {
 	return b.initErr
 }
 
+// shutdown closes the extension store if ensureInit ran. It first claims
+// initOnce so a bridge call racing the shutdown can't open it afterwards;
+// such calls get errShuttingDown. Unexported so Wails doesn't bind it
+// (R19); the Extension's Unregister calls it.
+func (b *ContactsBridge) shutdown() {
+	b.initOnce.Do(func() { b.initErr = errShuttingDown })
+	if b.api == nil {
+		return
+	}
+	if err := b.api.extStore.Close(); err != nil && b.deps.Core != nil {
+		b.deps.Core.Log().Warn(fmt.Sprintf("contacts: close store: %v", err))
+	}
+}
+
 // emitConflict translates a `*coreapi.ErrConflict` from a write path into
 // a `contacts:conflict` event the frontend listens for. Returns true when
 // the error was a conflict (and an event was emitted) so the caller can
