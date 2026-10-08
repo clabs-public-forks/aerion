@@ -12,7 +12,7 @@ This repository is a personal, customized downstream fork of [Aerion](https://gi
 
 ## Development Setup
 
-Use Go 1.25, Node.js 24 (matching CI), and the Wails v2 CLI. On Linux, install GTK 3 and WebKitGTK 4.1 development libraries.
+Use Go 1.26, Node.js 24 (matching CI), and the Wails v2 CLI. On Linux, install GTK 3 and WebKitGTK 4.1 development libraries.
 
 ```bash
 git clone https://github.com/clabs-public-forks/aerion.git
