@@ -30,10 +30,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `app/draft.go` `saveDraftToDB` never populates `IdentityID`, and `toComposeMessage` omits `From`. Reopening a draft saved with a nondefault alias selects the default identity; background pending-draft retries serialize an empty sender. Persist the selected identity on create/update and restore the sender for both editing and retries.
 
-### [P2] Undoing a move pushes another undo command
-
-`app/undo.go` `MoveMessagesToFolder` delegates to `MoveToFolder`, which pushes a new move command. Repeated undo toggles the same message between folders instead of reaching earlier user actions. Suppress undo recording while executing an undo.
-
 ### [P2] Unhealthy IMAP connections continue consuming pool capacity
 
 `internal/imap/pool.go` `Release` logs that an unhealthy connection is discarded but leaves it tracked. Acquisition skips it while counting it toward the limit; a pool full of dead connections causes waits and timeouts until idle cleanup. Remove unhealthy connections immediately and let waiting requests obtain replacements.

@@ -287,6 +287,12 @@ func (a *App) syncFlagsToIMAP(messages []*message.Message, folderID, flagType st
 
 // MoveToFolder moves messages to a specified folder
 func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
+	return a.moveToFolder(messageIDs, destFolderID, true)
+}
+
+// moveToFolder implements MoveToFolder. recordUndo is false when the move is
+// itself an undo, so undoing does not push a new command onto the stack.
+func (a *App) moveToFolder(messageIDs []string, destFolderID string, recordUndo bool) error {
 	log := logging.WithComponent("app")
 
 	if len(messageIDs) == 0 {
@@ -300,7 +306,7 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 	// fires exactly once per partition with a correct full-batch
 	// classification.
 	if spans, _ := a.messageStore.SpansMultipleAccounts(messageIDs); spans {
-		return a.moveToFolderCrossAccount(messageIDs, destFolderID)
+		return a.moveToFolderCrossAccount(messageIDs, destFolderID, recordUndo)
 	}
 
 	messages, err := a.messageStore.GetByIDs(messageIDs)
@@ -442,6 +448,10 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 			}
 		}
 	}()
+
+	if !recordUndo {
+		return nil
+	}
 
 	// Create undo command for each source folder
 	for sourceFolderID, msgs := range byFolder {
@@ -1332,7 +1342,7 @@ func (a *App) markAsNotSpamCrossAccount(messageIDs []string) error {
 }
 
 // moveToFolderCrossAccount fan-outs MoveToFolder() per source-account
-// partition. Each recursive call hits the public MoveToFolder with a
+// partition. Each recursive call hits moveToFolder with a
 // uniform-source-account slice; the existing
 // `messages[0].AccountID != destFolder.AccountID` guard in that function
 // then classifies the WHOLE partition correctly:
@@ -1343,14 +1353,14 @@ func (a *App) markAsNotSpamCrossAccount(messageIDs []string) error {
 //
 // Each partition's outcome is independent — a Gmail partition's failure
 // doesn't block an IMAP partition's success.
-func (a *App) moveToFolderCrossAccount(messageIDs []string, destFolderID string) error {
+func (a *App) moveToFolderCrossAccount(messageIDs []string, destFolderID string, recordUndo bool) error {
 	byAccount, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return err
 	}
 	var firstErr error
 	for _, ids := range byAccount {
-		if err := a.MoveToFolder(ids, destFolderID); err != nil && firstErr == nil {
+		if err := a.moveToFolder(ids, destFolderID, recordUndo); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}

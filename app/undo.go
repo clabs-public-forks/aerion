@@ -163,7 +163,8 @@ func (a *App) FindLocalMessageIDs(accountID, folderID string, rfc822MessageIDs [
 }
 
 // MoveMessagesToFolder implements undo.UndoContext
-// Delegates to the standard MoveToFolder pipeline (IMAP + local DB + events)
+// Delegates to the standard move pipeline (IMAP + local DB + events) without
+// recording another undo command.
 func (a *App) MoveMessagesToFolder(messageIDs []string, destFolderID string) error {
-	return a.MoveToFolder(messageIDs, destFolderID)
+	return a.moveToFolder(messageIDs, destFolderID, false)
 }
