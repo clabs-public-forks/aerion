@@ -516,9 +516,8 @@ func (e *Engine) parseMessageBody(raw []byte) (bodyText, bodyHTML string, hasAtt
 				Int("partBodyLen", len(partBody)).
 				Msg("Read part body successfully")
 
-			// First, check if content needs explicit quoted-printable decoding
-			// (go-message should handle this via Entity.Body, but some edge cases might slip through)
-			partBody = decodeQuotedPrintableIfNeeded(partBody)
+			// Fallback quoted-printable decode for parts that don't declare it
+			partBody = decodeQuotedPrintableIfNeeded(partBody, part.Header.Get("Content-Transfer-Encoding"))
 
 			// Decode charset to UTF-8
 			charset := params["charset"]
@@ -588,8 +587,8 @@ func (e *Engine) parseMessageBody(raw []byte) (bodyText, bodyHTML string, hasAtt
 
 		e.log.Debug().Int("bodyLen", len(body)).Msg("Read single-part message body")
 
-		// First, check if content needs explicit quoted-printable decoding
-		body = decodeQuotedPrintableIfNeeded(body)
+		// Fallback quoted-printable decode for bodies that don't declare it
+		body = decodeQuotedPrintableIfNeeded(body, entity.Header.Get("Content-Transfer-Encoding"))
 
 		// Decode charset to UTF-8
 		charset := params["charset"]

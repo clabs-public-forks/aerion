@@ -16,9 +16,16 @@ import (
 	"golang.org/x/text/encoding/htmlindex"
 )
 
-// decodeQuotedPrintableIfNeeded detects and decodes quoted-printable content if it wasn't already decoded.
-// This is a safety measure for cases where go-message might not automatically decode it.
-func decodeQuotedPrintableIfNeeded(content []byte) []byte {
+// decodeQuotedPrintableIfNeeded detects and decodes quoted-printable content
+// in a part that doesn't declare it, as a fallback for mislabelled mail.
+// go-message has already decoded a declared quoted-printable or base64 body,
+// so those are returned as is: decoding again would mangle text containing
+// "=XX" sequences or lines ending in "=".
+func decodeQuotedPrintableIfNeeded(content []byte, transferEncoding string) []byte {
+	switch strings.ToLower(strings.TrimSpace(transferEncoding)) {
+	case "quoted-printable", "base64":
+		return content
+	}
 	// Quick check: if content doesn't contain "=3D" or "=\n" patterns, it's likely not QP-encoded
 	contentStr := string(content)
 	if !strings.Contains(contentStr, "=3D") && !strings.Contains(contentStr, "=\n") && !strings.Contains(contentStr, "=\r\n") {

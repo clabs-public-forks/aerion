@@ -3,11 +3,9 @@ package email
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
-	"mime/quotedprintable"
 	"path/filepath"
 	"strings"
 
@@ -143,23 +141,19 @@ func (e *AttachmentExtractor) extractFromMultipart(messageID string, mr gomessag
 				continue
 			}
 
-			// Decode content if transfer-encoded
-			transferEncoding := strings.ToLower(part.Header.Get("Content-Transfer-Encoding"))
-			decodedContent := decodeContent(content, transferEncoding)
-
 			att := &message.Attachment{
 				ID:          uuid.New().String(),
 				MessageID:   messageID,
 				Filename:    filename,
 				ContentType: contentType,
-				Size:        len(decodedContent),
+				Size:        len(content),
 				ContentID:   contentID,
 				IsInline:    isInline && contentID != "",
 			}
 
 			attachments = append(attachments, &AttachmentData{
 				Attachment: att,
-				Content:    decodedContent,
+				Content:    content,
 			})
 		}
 	}
@@ -233,31 +227,8 @@ func (e *AttachmentExtractor) extractFromTNEF(messageID string, reader io.Reader
 	return attachments
 }
 
-// decodeContent decodes content based on transfer encoding
-func decodeContent(content []byte, encoding string) []byte {
-	switch encoding {
-	case "base64":
-		decoded := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
-		n, err := base64.StdEncoding.Decode(decoded, content)
-		if err != nil {
-			return content
-		}
-		return decoded[:n]
-	case "quoted-printable":
-		reader := quotedprintable.NewReader(bytes.NewReader(content))
-		decoded, err := io.ReadAll(reader)
-		if err != nil {
-			return content
-		}
-		return decoded
-	default:
-		return content
-	}
-}
-
 // decodeRFC2047 decodes RFC 2047 encoded strings (like filenames)
 func decodeRFC2047(s string) (string, error) {
 	dec := new(mime.WordDecoder)
 	return dec.DecodeHeader(s)
 }
-

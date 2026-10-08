@@ -8,8 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M11 low** `internal/email/download.go`, `attachment.go`: content
-  transfer encoding may be decoded twice. Unverified.
 - **M12 low** `internal/platform/singleinstance_linux.go`: the
   single-instance socket lives in /tmp instead of `$XDG_RUNTIME_DIR`.
   Unverified.
