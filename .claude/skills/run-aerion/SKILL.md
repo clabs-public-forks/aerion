@@ -40,8 +40,12 @@ and a plain import then gives a separate copy. Import the exact URL listed in
 
 ```js
 const ui = await window.go.app.App.GetUIState()
-const kb = await import('/src/lib/stores/keyboard.svelte.ts')
-const layout = await import('/src/lib/stores/layout.svelte.ts')
+// Resolve the URL the app actually loaded (it may carry ?t=<timestamp>).
+const url = (name) =>
+  performance.getEntriesByType('resource').map((e) => new URL(e.name).pathname + new URL(e.name).search)
+    .filter((u) => u.includes(name)).pop() ?? `/src/lib/stores/${name}`
+const kb = await import(url('keyboard.svelte.ts'))
+const layout = await import(url('layout.svelte.ts'))
 ;({ active: ui.activeExtension, collapsed: ui.collapsedSidebars, pane: kb.getFocusedPane(), mode: layout.getLayoutMode(), width: innerWidth })
 ```
 
@@ -61,14 +65,18 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
 - **Dev mode uses the user's real accounts and saved UI state.** It syncs real
   mail. Collapsed sidebars, the active view and widths are saved for real. Note
   the starting `GetUIState()` and restore it before stopping. The calendar
-  view mode is not saved; it resets to Month on reload. Never open the
+  view mode is not saved (`calendarView.svelte.ts` starts in month view on
+  every load). Never open the
   composer, which could save a draft to the user's account, and avoid opening
   real messages, which marks them read.
 - **Fake data instead of real data.** Bindings are looked up on
   `window.go.app.App` at call time, so a page script can replace one (for
-  example a calendar or contacts list call) to return made-up records. Make the
-  write bindings throw while doing this, so a stray click can't change real
-  data. Call the store's reload (or switch views) to pick up the fake data,
+  example a calendar or contacts list call) to return made-up records. While
+  doing this, block every binding that isn't a read, so a stray click can't
+  change real data. Extension bindings are named `Calendar_<Verb>` and
+  `Contacts_<Verb>`, so test the verb after the prefix:
+  `for (const k of Object.keys(window.go.app.App)) if (!/^(Get|List|Search|Is|Has|Find)/.test(k.replace(/^[A-Za-z]+_/, ''))) window.go.app.App[k] = () => Promise.reject(new Error('blocked: ' + k))`.
+  Call the store's reload (or switch views) to pick up the fake data,
   and reload the page to undo it. To check a mail layout without opening a
   message, add a copy of the markup to the page and measure it.
 - **Layout modes come from `matchMedia` on the viewport**: narrow below 768px,
@@ -79,15 +87,12 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
   without a resize, set a narrower width on the pane's element from
   `javascript_tool`. That checks how the pane's own content wraps, but it
   doesn't switch the app into its narrow layout mode.
-- **The tab often reports `document.visibilityState` as `hidden`.** Screenshots
-  can still work, but `requestAnimationFrame` never fires and timers are
-  throttled. Never `await` an animation frame in `javascript_tool`: it hangs
-  and Chrome reports the renderer as frozen. Pauses or freezes seen only in
-  this state come from the background tab, not from the app.
-- **The first screenshot after a hot reload often times out.** Wait a few
-  seconds and retry. If it keeps failing, check layout with
-  `getBoundingClientRect()` or `getClientRects()` from `javascript_tool`
-  instead.
+- **The tab is often `hidden`, and the first screenshot after a hot reload
+  often times out.** In a hidden tab `requestAnimationFrame` never fires and
+  timers are throttled, so never `await` an animation frame in
+  `javascript_tool` (it hangs), and treat pauses seen only there as the
+  background tab, not the app. Retry a timed-out screenshot after a few
+  seconds, or measure with `getBoundingClientRect()` instead.
 - **Clicks use the screenshot's coordinate frame**, which is reported with every
   screenshot (e.g. 1568×778 for a 2560px-wide viewport), not CSS pixels. In that
   frame, the rail buttons are at about x=15, y=42 / 70 / 100.
