@@ -2,10 +2,6 @@
 
 ## Open
 
-### [P3] Narrow/medium-layout list-header Compose not checked in the running app
-
-The Mail UI tweaks show a Compose icon in the message-list header when the viewer is an overlay (`viewerIsOverlay` in `App.svelte`). It passed static checks, but the viewport couldn't be resized during the dev-app check. Resize Chrome below 1024px and confirm the icon appears and opens the composer.
-
 ### [P3] Resizable panes can overflow just above the full-layout breakpoint
 
 At ~1025px wide, a 400px sidebar plus a 600px list (Mail, or Contacts' `contacts.list`) leaves the `flex-1` viewer/detail pane little or no room. Mail has always allowed this. A fix would cap list width to the space left after the sidebar and a minimum detail width (e.g. in `PaneResizeHandle` or `getPaneWidth`).

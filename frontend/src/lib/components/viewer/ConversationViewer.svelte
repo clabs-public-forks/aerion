@@ -1319,9 +1319,9 @@
     </div>
   {:else if conversation}
     <div class="conversation-viewer-content flex flex-col h-full">
-    <!-- Header with Actions -->
-    <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-      <div class="flex items-center gap-2">
+    <!-- Header with Actions (wraps on narrow widths instead of clipping) -->
+    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border">
+      <div class="flex flex-wrap items-center gap-2">
         {#if showBackButton}
           <button
             class="p-2 rounded-md hover:bg-muted transition-colors mr-1"
@@ -1401,7 +1401,7 @@
         </button>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 ml-auto">
         {#if conversation.messages && conversation.messages.length > 1}
           <button
             class="p-2 rounded-md hover:bg-muted transition-colors"
