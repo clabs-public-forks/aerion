@@ -159,10 +159,11 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 				}
 			}
 
+			// Counts only. UIDValidity, UIDNext and HighestModSeq are the
+			// watermarks SyncMessages compares against the server; writing
+			// STATUS values here first would hide a UIDVALIDITY reset and
+			// skip CONDSTORE flag changes.
 			if status != nil {
-				existing.UIDValidity = status.UIDValidity
-				existing.UIDNext = status.UIDNext
-				existing.HighestModSeq = status.HighestModSeq
 				existing.TotalCount = int(status.Messages)
 				existing.UnreadCount = int(status.Unseen)
 			}
