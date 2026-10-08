@@ -3,6 +3,7 @@ package backend
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // graphRecurrenceToRRule must cover all 6 Microsoft Graph pattern types and the
@@ -218,5 +219,121 @@ func TestMicrosoftTranslate_Sensitivity(t *testing.T) {
 		if g, _ := translateICSToGraphEvent(blob); g.Sensitivity != c.wantSens {
 			t.Errorf("%s round-trip sensitivity = %q, want %q", c.sens, g.Sensitivity, c.wantSens)
 		}
+	}
+}
+
+// A Graph series recurs on its own zone's wall clock. Times arrive in UTC
+// (Prefer header), so the stored master must be re-anchored or BYDAY is
+// matched against the UTC date and DST shifts the local time.
+func TestMicrosoftTranslate_SeriesExpandsInItsZone(t *testing.T) {
+	tests := []struct {
+		name       string
+		start, end string // UTC, as Graph returns them
+		recTZ      string
+		origTZ     string
+		iana       string
+		localHour  int
+		until      time.Time
+		wantCount  int
+	}{
+		{
+			// Mon 09:00 Sydney = Sun 23:00Z; DST starts Oct 4.
+			name:  "sydney across DST start, via originalStartTimeZone",
+			start: "2026-09-06T23:00:00.0000000", end: "2026-09-07T00:00:00.0000000",
+			origTZ: "AUS Eastern Standard Time", iana: "Australia/Sydney",
+			localHour: 9, until: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), wantCount: 8,
+		},
+		{
+			// Mon 21:00 New York = Tue 01:00Z; DST ends Nov 1.
+			name:  "new york across DST end, via recurrenceTimeZone",
+			start: "2026-10-06T01:00:00.0000000", end: "2026-10-06T02:00:00.0000000",
+			recTZ: "Eastern Standard Time", origTZ: "tzone://Microsoft/Custom", iana: "America/New_York",
+			localHour: 21, until: time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC), wantCount: 7,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ge := graphEvent{
+				ICalUID: "series-1",
+				Subject: "Weekly",
+				Start:   &graphTimePoint{DateTime: tc.start, TimeZone: "UTC"},
+				End:     &graphTimePoint{DateTime: tc.end, TimeZone: "UTC"},
+				Recurrence: &graphRecurrence{
+					Pattern: graphPattern{Type: "weekly", Interval: 1, DaysOfWeek: []string{"monday"}},
+					Range:   graphRange{Type: "noEnd", StartDate: "2026-09-07", RecurrenceTimeZone: tc.recTZ},
+				},
+				OriginalStartTimeZone: tc.origTZ,
+			}
+			blob, err := translateGraphEventToICS(ge)
+			if err != nil {
+				t.Fatalf("translate: %v", err)
+			}
+			ev := Event{ID: "e1", UID: ge.ICalUID, ICSBlob: blob, RRuleText: graphRecurrenceToRRule(ge.Recurrence)}
+			fillDenormalizedFieldsFromICS(&ev, blob)
+
+			insts, err := ExpandInRange(ev, nil, time.Unix(ev.DTStartUnix, 0), tc.until)
+			if err != nil {
+				t.Fatalf("expand: %v", err)
+			}
+			if len(insts) != tc.wantCount {
+				t.Fatalf("got %d instances, want %d", len(insts), tc.wantCount)
+			}
+			loc, _ := time.LoadLocation(tc.iana)
+			for _, inst := range insts {
+				local := time.Unix(inst.InstanceStartUnix, 0).In(loc)
+				if local.Weekday() != time.Monday || local.Hour() != tc.localHour || local.Minute() != 0 {
+					t.Errorf("instance at %s, want Monday %02d:00", local.Format(time.RFC1123), tc.localHour)
+				}
+			}
+		})
+	}
+}
+
+func TestMicrosoftTranslate_SeriesSentInItsZone(t *testing.T) {
+	tests := []struct {
+		name        string
+		dtstart     string
+		dtend       string
+		wantStart   string
+		wantZone    string
+		wantRecZone string
+		wantDayOfWk string
+	}{
+		{
+			name:      "sydney monday morning stays local",
+			dtstart:   "DTSTART;TZID=Australia/Sydney:20260907T090000",
+			dtend:     "DTEND;TZID=Australia/Sydney:20260907T100000",
+			wantStart: "2026-09-07T09:00:00.0000000", wantZone: "AUS Eastern Standard Time",
+			wantRecZone: "AUS Eastern Standard Time", wantDayOfWk: "monday",
+		},
+		{
+			name:      "utc series is unchanged",
+			dtstart:   "DTSTART:20260907T090000Z",
+			dtend:     "DTEND:20260907T100000Z",
+			wantStart: "2026-09-07T09:00:00.0000000", wantZone: "UTC",
+			wantRecZone: "", wantDayOfWk: "monday",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			blob := wrapICS("BEGIN:VEVENT\nUID:s1\nSUMMARY:Weekly\n" + tc.dtstart + "\n" + tc.dtend +
+				"\nRRULE:FREQ=WEEKLY;BYDAY=MO\nEND:VEVENT")
+			ge, err := translateICSToGraphEvent(blob)
+			if err != nil {
+				t.Fatalf("translate: %v", err)
+			}
+			if ge.Start.DateTime != tc.wantStart || ge.Start.TimeZone != tc.wantZone {
+				t.Errorf("start = %s %s, want %s %s", ge.Start.DateTime, ge.Start.TimeZone, tc.wantStart, tc.wantZone)
+			}
+			if ge.End.TimeZone != tc.wantZone {
+				t.Errorf("end zone = %s, want %s", ge.End.TimeZone, tc.wantZone)
+			}
+			if ge.Recurrence.Range.RecurrenceTimeZone != tc.wantRecZone {
+				t.Errorf("recurrenceTimeZone = %q, want %q", ge.Recurrence.Range.RecurrenceTimeZone, tc.wantRecZone)
+			}
+			if len(ge.Recurrence.Pattern.DaysOfWeek) != 1 || ge.Recurrence.Pattern.DaysOfWeek[0] != tc.wantDayOfWk {
+				t.Errorf("daysOfWeek = %v, want [%s]", ge.Recurrence.Pattern.DaysOfWeek, tc.wantDayOfWk)
+			}
+		})
 	}
 }

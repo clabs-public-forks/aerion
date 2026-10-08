@@ -100,9 +100,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K6 high** `provider_microsoft_translate.go:685-775`: recurrence is
-  expanded in UTC against a local-zone pattern, giving the wrong weekday
-  and DST shifts. Unverified.
 - **K7 medium** `store.go:927`, `provider_caldav.go:143-160`: after a force
   resync, events with overrides hit a foreign-key failure. Unverified.
 - **K8/K9 medium** `provider_google.go:91,190-205`: instance exceptions and

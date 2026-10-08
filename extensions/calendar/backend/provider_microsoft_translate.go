@@ -52,6 +52,9 @@ type graphEvent struct {
 	Status                     *graphEventStatus `json:"@removed,omitempty"`
 	Attendees                  []graphAttendee   `json:"attendees,omitempty"`
 	Organizer                  *graphRecipient   `json:"organizer,omitempty"`
+	// OriginalStartTimeZone is the zone the organizer created the event in
+	// (Windows or IANA name); a series recurs on that zone's wall clock.
+	OriginalStartTimeZone string `json:"originalStartTimeZone,omitempty"`
 	// OriginalStart is set on an exception/occurrence: the original (pre-edit)
 	// instance start = the RECURRENCE-ID. UTC ISO-8601.
 	OriginalStart string `json:"originalStart,omitempty"`
@@ -202,6 +205,9 @@ func translateICSToGraphEvent(icsBlob string) (graphEvent, error) {
 			return graphEvent{}, fmt.Errorf("translate RRULE: %w", rerr)
 		}
 		out.Recurrence = rec
+		if !isAllDay {
+			anchorGraphSeriesToZone(&out, dtstart.Location())
+		}
 	}
 
 	// First DISPLAY VALARM → reminderMinutesBeforeStart (Graph allows ONE).
@@ -251,6 +257,60 @@ func translateICSToGraphEvent(icsBlob string) (graphEvent, error) {
 	}
 
 	return out, nil
+}
+
+// anchorGraphSeriesToZone rewrites a recurring event's UTC start and end as
+// wall-clock times in loc and names loc as the recurrence zone, so Graph
+// evaluates the pattern's weekdays and DST transitions there instead of in
+// UTC. Graph takes Windows zone names; a zone without one stays in UTC.
+func anchorGraphSeriesToZone(out *graphEvent, loc *time.Location) {
+	win := windowsZoneName(loc)
+	if win == "" || loc == time.UTC {
+		return
+	}
+	for _, tp := range []*graphTimePoint{out.Start, out.End} {
+		t, err := parseGraphDateTime(tp.DateTime)
+		if err != nil {
+			return
+		}
+		tp.DateTime = t.In(loc).Format("2006-01-02T15:04:05.0000000")
+		tp.TimeZone = win
+	}
+	out.Recurrence.Range.RecurrenceTimeZone = win
+}
+
+// graphSeriesLocation returns the zone a Graph series recurs in: the
+// recurrence's own zone, else the zone the event was created in. Returns
+// nil when neither resolves.
+func graphSeriesLocation(ev graphEvent) *time.Location {
+	for _, name := range []string{ev.Recurrence.Range.RecurrenceTimeZone, ev.OriginalStartTimeZone} {
+		if name == "" {
+			continue
+		}
+		if loc, err := loadTZ(name); err == nil {
+			return loc
+		}
+	}
+	return nil
+}
+
+// anchorICSSeriesToZone rewrites DTSTART and DTEND (stored in UTC) as
+// wall-clock times with a TZID for loc, so the RRULE expands on the
+// series' wall clock: BYDAY and BYMONTHDAY match the organizer's dates and
+// occurrences follow DST.
+func anchorICSSeriesToZone(ev *ical.Event, loc *time.Location) error {
+	for _, name := range []string{ical.PropDateTimeStart, ical.PropDateTimeEnd} {
+		prop := ev.Props.Get(name)
+		if prop == nil {
+			continue
+		}
+		t, err := prop.DateTime(time.UTC)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", name, err)
+		}
+		ev.Props.SetDateTime(name, t.In(loc))
+	}
+	return nil
 }
 
 // extractGraphTimes converts ICS DTSTART/DTEND to Graph time points.
@@ -597,6 +657,11 @@ func translateGraphEventToICS(ev graphEvent) (string, error) {
 		rrule := graphRecurrenceToRRule(ev.Recurrence)
 		if rrule != "" {
 			setRRuleText(icalEv.Props, rrule)
+		}
+		if loc := graphSeriesLocation(ev); loc != nil && loc != time.UTC && !isAllDay {
+			if err := anchorICSSeriesToZone(icalEv, loc); err != nil {
+				return "", fmt.Errorf("anchor series zone: %w", err)
+			}
 		}
 	}
 

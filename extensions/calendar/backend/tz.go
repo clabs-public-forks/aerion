@@ -34,6 +34,25 @@ func loadTZ(tzid string) (*time.Location, error) {
 	return nil, fmt.Errorf("unknown TZID %q", tzid)
 }
 
+// ianaToWindowsZone is the reverse of windowsZones. When several Windows
+// names map to one IANA zone, the lexically smallest wins so the choice is
+// stable.
+var ianaToWindowsZone = func() map[string]string {
+	out := make(map[string]string, len(windowsZones))
+	for win, iana := range windowsZones {
+		if cur, ok := out[iana]; !ok || win < cur {
+			out[iana] = win
+		}
+	}
+	return out
+}()
+
+// windowsZoneName returns the Windows zone name for an IANA location, or ""
+// when no Windows zone maps to it.
+func windowsZoneName(loc *time.Location) string {
+	return ianaToWindowsZone[loc.String()]
+}
+
 // decodeICS decodes the first VCALENDAR in blob and rewrites its TZID
 // parameters to IANA names (see normalizeTZIDs). Use it for read-only
 // parsing; blobs that are edited and sent back keep their original TZIDs so
