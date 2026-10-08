@@ -30,8 +30,6 @@ has not yet been confirmed against the code.
 
 ### Frontend
 
-- **F7 low** `ConversationViewer.svelte:470-520`: a stale load's finally
-  still clears loading. Unverified.
 
 ### Dependencies
 

@@ -467,7 +467,11 @@
     }
   }
 
+  // Bumped per load so a slower, superseded load leaves the state alone.
+  let loadSeq = 0
+
   async function loadConversation(tid: string, fid: string) {
+    const seq = ++loadSeq
     // Clear any pending mark-as-read timer from previous conversation
     if (markAsReadTimer) {
       clearTimeout(markAsReadTimer)
@@ -481,7 +485,7 @@
       const result = await GetConversation(tid, fid)
 
       // Stale guard: user navigated away while we were fetching
-      if (threadId !== tid) return
+      if (seq !== loadSeq || threadId !== tid) return
 
       conversation = result
 
@@ -509,19 +513,23 @@
         fetchUnfetchedBodies(conversation.messages)
       }
     } catch (err) {
+      if (seq !== loadSeq) return
       console.error('Failed to load conversation:', err)
       error = $_('viewer.failedToLoad')
     } finally {
-      loading = false
-      // Scroll the latest message's header to the top. A single message
-      // stays at the top so the subject and sender remain visible.
-      await tick()
-      if (contentContainerRef) {
-        const msgs = contentContainerRef.querySelectorAll<HTMLElement>('[data-message-id]')
-        const latest = msgs.length > 1 ? msgs[msgs.length - 1] : null
-        contentContainerRef.scrollTop = latest
-          ? latest.getBoundingClientRect().top - contentContainerRef.getBoundingClientRect().top + contentContainerRef.scrollTop
-          : 0
+      // A superseded load must not end the newer load's spinner or scroll.
+      if (seq === loadSeq) {
+        loading = false
+        // Scroll the latest message's header to the top. A single message
+        // stays at the top so the subject and sender remain visible.
+        await tick()
+        if (contentContainerRef) {
+          const msgs = contentContainerRef.querySelectorAll<HTMLElement>('[data-message-id]')
+          const latest = msgs.length > 1 ? msgs[msgs.length - 1] : null
+          contentContainerRef.scrollTop = latest
+            ? latest.getBoundingClientRect().top - contentContainerRef.getBoundingClientRect().top + contentContainerRef.scrollTop
+            : 0
+        }
       }
     }
   }
