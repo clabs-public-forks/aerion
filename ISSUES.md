@@ -64,8 +64,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K13 medium** `rrule_expand.go:77`: FREQ=SECONDLY has no expansion cap.
-  Unverified.
 - **K14 medium** `rrule_expand.go:61,77`: expansion misses multi-day
   overlaps and moved overrides. Unverified.
 - **K15 low** `ical_convert.go`: all-day times are frozen to the timezone at

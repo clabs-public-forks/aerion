@@ -8,11 +8,22 @@ import (
 	"time"
 
 	"github.com/emersion/go-ical"
+	"github.com/teambition/rrule-go"
+)
+
+// Expansion limits per series. A rule like FREQ=SECONDLY, or one that
+// started long before the window, would otherwise generate millions of
+// occurrences. maxExpandSteps bounds the occurrences walked from DTSTART;
+// maxExpandInstances bounds those returned in the window.
+const (
+	maxExpandSteps     = 100_000
+	maxExpandInstances = 5_000
 )
 
 // ExpandInRange expands a stored Event into concrete EventInstances within
 // `[from, to]`. Non-recurring events return at most one instance; recurring
-// events return zero or more via `Component.RecurrenceSet(loc).Between(...)`.
+// events return zero or more from `Component.RecurrenceSet(loc)`, capped by
+// the expansion limits.
 // RECURRENCE-ID overrides REPLACE the matching default-expanded instance
 // (matched by occurrence start time = override's RECURRENCE-ID).
 //
@@ -74,7 +85,7 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 		return nil, fmt.Errorf("rrule_expand: build recurrence set: %w", err)
 	}
 
-	occurrences := set.Between(from, to, true)
+	occurrences := occurrencesBetween(set, from, to)
 
 	// Index overrides by their RECURRENCE-ID for O(1) lookup. Multiple
 	// overrides at the same instant shouldn't happen; if they do, the last
@@ -251,4 +262,22 @@ func applyOverride(master Event, ov EventOverride) (EventInstance, error) {
 		inst.Location = v
 	}
 	return inst, nil
+}
+
+// occurrencesBetween returns the set's occurrences in [from, to], stopping
+// after maxExpandSteps occurrences from DTSTART or maxExpandInstances in the
+// window, whichever comes first.
+func occurrencesBetween(set *rrule.Set, from, to time.Time) []time.Time {
+	next := set.Iterator()
+	var out []time.Time
+	for range maxExpandSteps {
+		t, ok := next()
+		if !ok || t.After(to) || len(out) >= maxExpandInstances {
+			break
+		}
+		if !t.Before(from) {
+			out = append(out, t)
+		}
+	}
+	return out
 }

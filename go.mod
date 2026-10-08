@@ -17,6 +17,7 @@ require (
 	github.com/icholy/digest v1.2.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/rs/zerolog v1.35.1
+	github.com/teambition/rrule-go v1.8.2
 	github.com/teamwork/tnef v0.0.0-20200108124832-7deabccfdb32
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/zalando/go-keyring v0.2.8
@@ -54,7 +55,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.53.0 // indirect
-	github.com/teambition/rrule-go v1.8.2 // indirect
 	github.com/teamwork/test v0.0.0-20200108114543-02621bae84ad // indirect
 	github.com/teamwork/utils v1.0.0 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
