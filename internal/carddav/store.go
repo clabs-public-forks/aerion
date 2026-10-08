@@ -561,24 +561,6 @@ func (s *Store) DeleteAddressbookByID(id string) error {
 	return nil
 }
 
-// DeleteRecordsForAddressbook removes every contact_records row held by the
-// given addressbook (cascading through contact_emails + sub-tables AND
-// carddav_record_state via the FK ON DELETE CASCADE), but LEAVES the
-// addressbook row itself in place. Used by the OAuth full-sync path to clear
-// the local cache before re-landing the provider's current record set.
-func (s *Store) DeleteRecordsForAddressbook(addressbookID string) error {
-	if addressbookID == "" {
-		return nil
-	}
-	if _, err := s.db.Exec(`
-		DELETE FROM contact_records
-		WHERE id IN (SELECT record_id FROM carddav_record_state WHERE addressbook_id = ?)
-	`, addressbookID); err != nil {
-		return fmt.Errorf("delete records for addressbook: %w", err)
-	}
-	return nil
-}
-
 // ============================================================================
 // Contact CRUD — Phase 2b.2.a
 //
@@ -600,7 +582,7 @@ func (s *Store) DeleteRecordsForAddressbook(addressbookID string) error {
 // Two delete semantics are now distinct:
 //   - DeleteContactByHref / DeleteContactsByHrefs: delete the entire RECORD
 //     (and cascade-delete all its emails). Used by sync's delta-deletion path.
-//   - DeleteContactsForAddressbook: delete all records for an addressbook.
+//   - ReplaceAddressbookRecords: delete the records a full sync didn't return.
 // ============================================================================
 
 // execQueryer is satisfied by both *sql.DB and *sql.Tx; lets upsertContactTx
@@ -712,8 +694,9 @@ type RecordSyncEntry struct {
 //     send_count/last_used/name_overridden).
 //  3. Upserts the carddav_record_state row with the new href/etag/synced_at.
 //
-// All entries in one transaction. Used by the sync engine to land batches of
-// vCards from sync-collection/multiget.
+// All entries in one transaction: any failure rolls the whole batch back, so
+// a sync never commits a partial record set. Used by the sync engine to land
+// batches of vCards from sync-collection/multiget.
 func (s *Store) UpsertRecordsBatch(entries []RecordSyncEntry) error {
 	if len(entries) == 0 {
 		return nil
@@ -725,19 +708,79 @@ func (s *Store) UpsertRecordsBatch(entries []RecordSyncEntry) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := upsertRecordsTx(tx, entries); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit batch upsert: %w", err)
+	}
+	s.log.Debug().Int("total", len(entries)).Msg("Batch record upsert complete")
+	return nil
+}
+
+// ReplaceAddressbookRecords makes entries the complete record set of an
+// addressbook: it upserts every entry, then deletes the records whose href is
+// not among them. Unlike delete-all-then-insert, unchanged records keep their
+// IDs and per-email usage history, and a failure leaves the old set intact.
+func (s *Store) ReplaceAddressbookRecords(addressbookID string, entries []RecordSyncEntry) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := upsertRecordsTx(tx, entries); err != nil {
+		return err
+	}
+
+	keep := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		keep[e.Href] = true
+	}
+	rows, err := tx.Query(`SELECT record_id, href FROM carddav_record_state WHERE addressbook_id = ?`, addressbookID)
+	if err != nil {
+		return fmt.Errorf("list addressbook records: %w", err)
+	}
+	var stale []string
+	for rows.Next() {
+		var id, href string
+		if err := rows.Scan(&id, &href); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan addressbook record: %w", err)
+		}
+		if !keep[href] {
+			stale = append(stale, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("list addressbook records: %w", err)
+	}
+	for _, id := range stale {
+		if _, err := tx.Exec(`DELETE FROM contact_records WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("delete stale record %s: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit addressbook replace: %w", err)
+	}
+	s.log.Debug().Int("upserted", len(entries)).Int("deleted", len(stale)).Msg("Addressbook records replaced")
+	return nil
+}
+
+// upsertRecordsTx writes entries inside tx, reusing the record_id already
+// mapped to each (addressbook_id, href). It stops at the first error.
+func upsertRecordsTx(tx *sql.Tx, entries []RecordSyncEntry) error {
 	now := time.Now()
-	inserted := 0
 	for _, e := range entries {
 		if e.Record == nil {
 			continue
 		}
 		if e.AddressbookID == "" || e.Href == "" {
-			s.log.Warn().Msg("Skipping record with missing addressbook_id or href")
-			continue
+			return fmt.Errorf("record %q is missing its addressbook or href", e.Href)
 		}
 
-		// Reuse existing record_id when (addressbook_id, href) matches; new
-		// otherwise.
 		var existingID string
 		err := tx.QueryRow(`
 			SELECT record_id FROM carddav_record_state
@@ -749,8 +792,7 @@ func (s *Store) UpsertRecordsBatch(entries []RecordSyncEntry) error {
 				e.Record.ID = uuid.New().String()
 			}
 		case err != nil:
-			s.log.Warn().Err(err).Str("href", e.Href).Msg("Failed to look up existing record")
-			continue
+			return fmt.Errorf("look up record %s: %w", e.Href, err)
 		default:
 			e.Record.ID = existingID
 		}
@@ -759,8 +801,7 @@ func (s *Store) UpsertRecordsBatch(entries []RecordSyncEntry) error {
 		e.Record.SourceRef = e.AddressbookID
 
 		if err := contact.UpsertRecordTx(tx, e.Record); err != nil {
-			s.log.Warn().Err(err).Str("href", e.Href).Msg("Failed to upsert record in batch")
-			continue
+			return fmt.Errorf("upsert record %s: %w", e.Href, err)
 		}
 
 		if _, err := tx.Exec(`
@@ -772,16 +813,9 @@ func (s *Store) UpsertRecordsBatch(entries []RecordSyncEntry) error {
 				etag = excluded.etag,
 				synced_at = excluded.synced_at
 		`, e.Record.ID, e.AddressbookID, e.Href, e.ETag, now); err != nil {
-			s.log.Warn().Err(err).Str("href", e.Href).Msg("Failed to upsert carddav_record_state")
-			continue
+			return fmt.Errorf("upsert record state %s: %w", e.Href, err)
 		}
-		inserted++
 	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit batch upsert: %w", err)
-	}
-	s.log.Debug().Int("inserted", inserted).Int("total", len(entries)).Msg("Batch record upsert complete")
 	return nil
 }
 
@@ -1148,17 +1182,6 @@ func ParsedRecordToContactRecord(p *ParsedRecord, recordID, addressbookID string
 		})
 	}
 	return rec
-}
-
-// DeleteContactsForAddressbook deletes all CardDAV contact records belonging to
-// an addressbook. Cascades to contact_emails and carddav_record_state via FK.
-func (s *Store) DeleteContactsForAddressbook(addressbookID string) error {
-	_, err := s.db.Exec(`
-		DELETE FROM contact_records
-		WHERE source = 'carddav'
-		  AND id IN (SELECT record_id FROM carddav_record_state WHERE addressbook_id = ?)
-	`, addressbookID)
-	return err
 }
 
 // DeleteContactByHref deletes a CardDAV contact (entire record) by its href.

@@ -8,9 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M1 high** `internal/sync/folders.go:163-185`: SyncFolders stores the
-  STATUS UIDVALIDITY and HIGHESTMODSEQ before SyncMessages compares them, so
-  UIDVALIDITY resets and CONDSTORE flag changes are missed. Unverified.
 - **M5 medium** `internal/sync/messages.go:70,340-350,447`: header-batch
   recovery can Release a connection that the deferred closure releases
   again. The pool then holds one session twice. Unverified.
@@ -80,18 +77,9 @@ has not yet been confirmed against the code.
 
 ### Contacts
 
-- **C1 high** `internal/carddav/sync.go:420-476`, `store.go:717-790`: full
-  sync deletes all records and then upserts. Its errors are only logged, and
-  the sync token still advances, so contacts can be lost for good.
-  Unverified.
 - **C2 high** `internal/carddav/sync.go:55-130`, `scheduler.go:95-125`: no
   per-source guard, so overlapping syncs interleave delete-all and upsert.
   Unverified.
-- **C8 medium** `internal/carddav/sync.go:225-245`: any incremental error
-  falls back to a destructive full sync, which resets the email ranking
-  history. Unverified.
-- **C7 medium** `internal/carddav/sync.go:262-310`: errors from delta
-  deletes are swallowed and the token advances. Unverified.
 - **C3/C4 medium** `internal/carddav/vcard_build.go`: editing drops a
   PHOTO URI, N prefix/suffix/middle names, PREF, extra TYPEs and
   X-ABLabel. Unverified.

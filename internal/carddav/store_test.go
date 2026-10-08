@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hkdb/aerion/internal/contact"
 	"github.com/hkdb/aerion/internal/database"
 )
 
@@ -454,4 +455,49 @@ func assertCount(t *testing.T, db *database.DB, query string, want int, args ...
 	if got != want {
 		t.Errorf("count: query=%q want=%d got=%d args=%v", query, want, got, args)
 	}
+}
+
+func TestReplaceAddressbookRecords(t *testing.T) {
+	db := openCardDAVTestDB(t)
+	s := NewStore(db.DB)
+	seedSource(t, s, "src1", "ab1", true, true, []*Contact{
+		{ID: "c1", Email: "a@x.com", DisplayName: "A", Href: "/ab1/a.vcf"},
+		{ID: "c2", Email: "b@x.com", DisplayName: "B", Href: "/ab1/b.vcf"},
+	})
+	idOf := func(href string) string {
+		var id string
+		_ = s.db.QueryRow(`SELECT record_id FROM carddav_record_state WHERE href = ?`, href).Scan(&id)
+		return id
+	}
+	bID := idOf("/ab1/b.vcf")
+
+	entry := func(href, fn, email string) RecordSyncEntry {
+		return RecordSyncEntry{
+			Record:        &contact.Record{Fn: fn, Emails: []contact.RecordEmail{{Email: email}}},
+			AddressbookID: "ab1",
+			Href:          href,
+		}
+	}
+
+	// A failed replace leaves the old set untouched.
+	bad := []RecordSyncEntry{entry("/ab1/c.vcf", "C", "c@x.com"), entry("", "X", "x@x.com")}
+	if err := s.ReplaceAddressbookRecords("ab1", bad); err == nil {
+		t.Fatal("expected error for entry without href")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM carddav_record_state WHERE addressbook_id = 'ab1'`, 2)
+
+	good := []RecordSyncEntry{entry("/ab1/b.vcf", "B2", "b@x.com"), entry("/ab1/c.vcf", "C", "c@x.com")}
+	if err := s.ReplaceAddressbookRecords("ab1", good); err != nil {
+		t.Fatal(err)
+	}
+	if idOf("/ab1/a.vcf") != "" {
+		t.Error("a.vcf should be deleted")
+	}
+	if got := idOf("/ab1/b.vcf"); got != bID {
+		t.Errorf("b.vcf record id changed: %q -> %q", bID, got)
+	}
+	if idOf("/ab1/c.vcf") == "" {
+		t.Error("c.vcf should be inserted")
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM contact_records WHERE id = ? AND fn = 'B2'`, 1, bID)
 }
