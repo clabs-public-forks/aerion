@@ -13,6 +13,9 @@ import { toTzDate, fromTzDate } from '$extensions/calendar/frontend/lib/tzMath'
 
 export type ViewKind = 'month' | 'week' | 'day' | 'agenda'
 
+// Days shown per Agenda page; prev/next step by the same amount.
+const AGENDA_DAYS = 14
+
 let viewKind = $state<ViewKind>('month')
 let anchorDate = $state<Date>(startOfMonth(new Date()))
 let selectedEventId = $state<string | null>(null)
@@ -56,7 +59,7 @@ const visibleRange = $derived.by<{ fromUnix: number; toUnix: number }>(() => {
   // agenda: 2 weeks centered on anchor (≈10 days back, 4 forward feels weird;
   // use 14d forward starting from anchor for simplicity).
   const start = startOfDay(anchorDate)
-  return { fromUnix: secondsAt(start), toUnix: secondsAt(addDays(start, 14)) }
+  return { fromUnix: secondsAt(start), toUnix: secondsAt(addDays(start, AGENDA_DAYS)) }
 })
 
 function setViewKind(k: ViewKind) {
@@ -83,8 +86,12 @@ function goPrev() {
     anchorDate = startOfMonth(addMonths(anchorDate, -1))
     return
   }
-  if (viewKind === 'week' || viewKind === 'agenda') {
+  if (viewKind === 'week') {
     anchorDate = addDays(anchorDate, -7)
+    return
+  }
+  if (viewKind === 'agenda') {
+    anchorDate = addDays(anchorDate, -AGENDA_DAYS)
     return
   }
   if (viewKind === 'day') {
@@ -97,8 +104,12 @@ function goNext() {
     anchorDate = startOfMonth(addMonths(anchorDate, 1))
     return
   }
-  if (viewKind === 'week' || viewKind === 'agenda') {
+  if (viewKind === 'week') {
     anchorDate = addDays(anchorDate, 7)
+    return
+  }
+  if (viewKind === 'agenda') {
+    anchorDate = addDays(anchorDate, AGENDA_DAYS)
     return
   }
   if (viewKind === 'day') {

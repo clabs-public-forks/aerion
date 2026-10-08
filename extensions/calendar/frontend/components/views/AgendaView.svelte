@@ -27,7 +27,7 @@
   import type { backend } from '$wailsjs/go/models'
 
   type EventRow = {
-    id: string                 // instance.id
+    id: string                 // instance.id + day, unique per listed day
     instance: backend.EventInstance
     date: Date                 // local-day this row belongs to
     isFirstInDay: boolean      // render day header above this row
@@ -53,11 +53,23 @@
   // Flatten events into rows. Sort by day (using tz-aware startOfDay so
   // grouping reflects the user's chosen tz), then all-day-first within
   // day, then by start time. Mark `isFirstInDay` on the first of each day.
+  // Events that began before the window are listed under its first day,
+  // and all-day events repeat on every day they cover within the window.
   const rows = $derived.by<EventRow[]>(() => {
     const out: { id: string; instance: backend.EventInstance; date: Date }[] = []
+    const range = calendarView.visibleRange
+    const windowStart = new Date(range.fromUnix * 1000)
     for (const inst of events.instances) {
-      const date = calendarView.startOfDay(new Date(inst.instanceStartUnix * 1000))
-      out.push({ id: inst.id, instance: inst, date })
+      let date = calendarView.startOfDay(new Date(inst.instanceStartUnix * 1000))
+      if (date < windowStart) date = windowStart
+      do {
+        out.push({ id: `${inst.id}@${date.getTime()}`, instance: inst, date })
+        date = calendarView.addDays(date, 1)
+      } while (
+        inst.isAllDay
+        && date.getTime() / 1000 < inst.instanceEndUnix
+        && date.getTime() / 1000 < range.toUnix
+      )
     }
     out.sort((a, b) => {
       const da = a.date.getTime()
@@ -84,7 +96,9 @@
   }
 
   function onActivate(id: string) {
-    calendarView.selectEvent(id)
+    selectedRowId = id
+    const row = rows.find(r => r.id === id)
+    if (row) calendarView.selectEvent(row.instance.id)
   }
 
   // Header label combines the existing `calendar.viewSwitcher.agenda` key with
@@ -144,7 +158,7 @@
             : timeFmt.format(new Date(item.instance.instanceStartUnix * 1000))}
         </span>
         <span class="flex-1 min-w-0 truncate text-sm text-foreground">
-          {item.instance.summary || ''}
+          {item.instance.summary || $_('calendar.detail.noTitle')}
         </span>
         <span class="shrink-0 hidden md:inline truncate max-w-[40%] text-xs text-muted-foreground">
           {calendarLabel(item.instance)}
