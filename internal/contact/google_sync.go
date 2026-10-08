@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/hkdb/aerion/internal/logging"
@@ -31,6 +32,10 @@ type SyncResult struct {
 	NextSyncToken string         // Token for next incremental sync
 	IsFullSync    bool           // True if this was a full sync (no valid token)
 }
+
+// googleConnectionsURL is the People API connections endpoint (a var so
+// tests can point it at a local server).
+var googleConnectionsURL = "https://people.googleapis.com/v1/people/me/connections"
 
 // GoogleContactsSyncer syncs contacts from Google People API.
 // Uses the people.connections endpoint to fetch all user's saved contacts.
@@ -64,18 +69,22 @@ func (s *GoogleContactsSyncer) SyncContactsDelta(accessToken, syncToken string) 
 	}
 
 	for {
-		// Build API URL with pagination and sync token
-		apiURL := "https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,phoneNumbers,addresses,organizations,photos&pageSize=1000"
-		if pageToken != "" {
-			apiURL += "&pageToken=" + pageToken
+		// Build API URL. Every page repeats the first call's parameters,
+		// syncToken included, as the People API requires when paginating.
+		params := url.Values{
+			"personFields": {"names,emailAddresses,phoneNumbers,addresses,organizations,photos"},
+			"pageSize":     {"1000"},
 		}
-		if syncToken != "" && pageToken == "" {
-			// Only include syncToken on first request (not pagination requests)
-			apiURL += "&syncToken=" + syncToken
+		if pageToken != "" {
+			params.Set("pageToken", pageToken)
+		}
+		if syncToken != "" {
+			params.Set("syncToken", syncToken)
 		}
 		if requestSync {
-			apiURL += "&requestSyncToken=true"
+			params.Set("requestSyncToken", "true")
 		}
+		apiURL := googleConnectionsURL + "?" + params.Encode()
 
 		req, err := http.NewRequest("GET", apiURL, nil)
 		if err != nil {
