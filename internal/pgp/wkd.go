@@ -5,43 +5,82 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"golang.org/x/net/idna"
 )
 
 // LookupWKD performs a Web Key Directory lookup for a given email address.
 // Returns the ASCII-armored public key if found, or empty string + nil error if not found.
 // Only a key with a user ID for email counts as found.
 func LookupWKD(email string) (string, error) {
-	parts := strings.SplitN(email, "@", 2)
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid email address: %s", email)
+	localpart, domain, err := wkdTarget(email)
+	if err != nil {
+		return "", err
 	}
 
-	localpart := strings.ToLower(parts[0])
-	domain := strings.ToLower(parts[1])
-
-	// z-base-32 encode SHA-1 hash of the localpart
-	hash := sha1.Sum([]byte(localpart))
+	// z-base-32 encode SHA-1 hash of the lowercased localpart
+	hash := sha1.Sum([]byte(strings.ToLower(localpart)))
 	encoded := zBase32Encode(hash[:])
+	l := url.QueryEscape(localpart)
 
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	// Try direct method first: https://<domain>/.well-known/openpgpkey/hu/<hash>?l=<localpart>
-	directURL := fmt.Sprintf("https://%s/.well-known/openpgpkey/hu/%s?l=%s", domain, encoded, localpart)
+	directURL := fmt.Sprintf("https://%s/.well-known/openpgpkey/hu/%s?l=%s", domain, encoded, l)
 	if armored := fetchWKD(client, directURL, email); armored != "" {
 		return armored, nil
 	}
 
 	// Try advanced method: https://openpgpkey.<domain>/.well-known/openpgpkey/<domain>/hu/<hash>?l=<localpart>
-	advancedURL := fmt.Sprintf("https://openpgpkey.%s/.well-known/openpgpkey/%s/hu/%s?l=%s", domain, domain, encoded, localpart)
+	advancedURL := fmt.Sprintf("https://openpgpkey.%s/.well-known/openpgpkey/%s/hu/%s?l=%s", domain, domain, encoded, l)
 	if armored := fetchWKD(client, advancedURL, email); armored != "" {
 		return armored, nil
 	}
 
 	return "", nil
+}
+
+// wkdTarget splits email for a WKD lookup. The domain must be a DNS name
+// with at least two labels (IDNs are converted to ASCII), so an address
+// can't point the lookup at an IP, port, path, or local host.
+func wkdTarget(email string) (localpart, domain string, err error) {
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at == len(email)-1 || strings.ContainsAny(email[:at], "@/\\ \t\r\n") {
+		return "", "", fmt.Errorf("invalid email address: %s", email)
+	}
+	domain, err = idna.Lookup.ToASCII(strings.ToLower(email[at+1:]))
+	if err != nil || !isDNSName(domain) {
+		return "", "", fmt.Errorf("invalid email domain: %s", email)
+	}
+	return email[:at], domain, nil
+}
+
+// isDNSName reports whether s is a hostname of two or more LDH labels with a
+// non-numeric top-level label (which rules out IPv4 literals).
+func isDNSName(s string) bool {
+	if len(s) > 253 {
+		return false
+	}
+	labels := strings.Split(s, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return false
+		}
+		for _, r := range label {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+				return false
+			}
+		}
+	}
+	tld := labels[len(labels)-1]
+	return strings.Trim(tld, "0123456789") != ""
 }
 
 // fetchWKD fetches url and returns the armored key it holds for email, or
