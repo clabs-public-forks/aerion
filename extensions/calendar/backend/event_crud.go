@@ -285,6 +285,31 @@ func (a *API) UpdateEvent(in EventUpdateInput, scope EditScope) error {
 	return fmt.Errorf("calendar: unknown edit scope %q", scope)
 }
 
+// MoveEvent changes only the start and end of a non-recurring event (the
+// timeline's drag and resize), keeping every other field as stored: body,
+// rich-text body, reminder, transparency, visibility and attendees.
+// sendUpdates is passed through for providers that notify attendees.
+func (a *API) MoveEvent(eventID string, dtstartUnix, dtendUnix int64, sendUpdates string) error {
+	master, err := a.store.GetEvent(eventID)
+	if err != nil {
+		return fmt.Errorf("get event: %w", err)
+	}
+	if master.RRuleText != "" {
+		return errors.New("calendar: recurring events can't be moved directly")
+	}
+	in := eventToEventInput(*master)
+	in.Description = unescapeICalText(master.Description)
+	in.DescriptionHTML = extractAltDescHTML(master.ICSBlob)
+	in.Transparency = master.Transparency
+	in.Visibility = master.Visibility
+	if m := primaryReminderMinutes(master.ICSBlob); m != nil {
+		in.Reminder = &ReminderSpec{OffsetMinutes: *m}
+	}
+	in.DTStartUnix, in.DTEndUnix = dtstartUnix, dtendUnix
+	in.SendUpdates = sendUpdates
+	return a.UpdateEvent(EventUpdateInput{EventID: eventID, EventInput: in}, EditScopeAll)
+}
+
 // updateInstance handles scope=this and scope=this-and-future updates for
 // any writable source. Push-first ordering: provider.PushInstance commits
 // the remote change; then we persist the local-side state (override row

@@ -81,6 +81,8 @@ export function Calendar_ListStuckWrites():Promise<Array<backend.StuckWrite>>;
 
 export function Calendar_LogFrontend(arg1:string,arg2:string):Promise<void>;
 
+export function Calendar_MoveEvent(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
+
 export function Calendar_OpenURL(arg1:string):Promise<void>;
 
 export function Calendar_QueryFreeBusy(arg1:Array<string>,arg2:Array<string>,arg3:number,arg4:number):Promise<Array<backend.FreeBusyResult>>;

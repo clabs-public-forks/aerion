@@ -126,6 +126,10 @@ export function Calendar_LogFrontend(arg1, arg2) {
   return window['go']['app']['App']['Calendar_LogFrontend'](arg1, arg2);
 }
 
+export function Calendar_MoveEvent(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['Calendar_MoveEvent'](arg1, arg2, arg3, arg4);
+}
+
 export function Calendar_OpenURL(arg1) {
   return window['go']['app']['App']['Calendar_OpenURL'](arg1);
 }

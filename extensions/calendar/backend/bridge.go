@@ -331,6 +331,24 @@ func (b *CalendarBridge) Calendar_UpdateEvent(in EventUpdateInput, scope string)
 	return nil
 }
 
+// Calendar_MoveEvent moves or resizes a non-recurring event, keeping all
+// its other fields. Backs the timeline's drag and resize.
+func (b *CalendarBridge) Calendar_MoveEvent(eventID string, dtstartUnix, dtendUnix int64, sendUpdates string) error {
+	if !b.gateEnabled() {
+		return errors.New("calendar: extension disabled")
+	}
+	if err := b.ensureInit(); err != nil {
+		return err
+	}
+	if err := b.api.MoveEvent(eventID, dtstartUnix, dtendUnix, sendUpdates); err != nil {
+		return err
+	}
+	if b.alarms != nil {
+		_ = b.alarms.Reevaluate()
+	}
+	return nil
+}
+
 // Calendar_DeleteEvent removes an event. Scope semantics mirror
 // Calendar_UpdateEvent; instanceUnix is the picked occurrence's
 // recurrenceIdUnix and is ignored for scope "all".

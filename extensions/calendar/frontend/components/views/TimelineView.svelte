@@ -26,7 +26,7 @@
   import { toTzDate, fromTzDate } from '$extensions/calendar/frontend/lib/tzMath'
   import { toasts } from '$lib/stores/toast'
   // @ts-ignore - wailsjs bindings
-  import { Calendar_UpdateEvent } from '$wailsjs/go/app/App.js'
+  import { Calendar_MoveEvent } from '$wailsjs/go/app/App.js'
   import SendInvitationsDialog from '$extensions/calendar/frontend/components/SendInvitationsDialog.svelte'
   // @ts-ignore - wailsjs bindings
   import type { backend } from '$wailsjs/go/models'
@@ -404,19 +404,8 @@
     currentColIdx: number
     currentDeltaMinutes: number
     movedPastThreshold: boolean
-    // Snapshot of master fields we need to round-trip through
-    // Calendar_UpdateEvent without losing summary / description / location.
-    masterSummary: string
-    masterDescription: string
-    masterLocation: string
-    masterCalendarID: string
-    masterIsAllDay: boolean
-    masterTZName: string
-    // Attendees + organizer snapshot so drag-drop preserves them across
-    // the save (without these, the backend's updateAllAndPush wipes the
-    // attendee list because it always overwrites ev.Attendees from in.Attendees).
-    masterAttendees: backend.AttendeeInput[]
-    masterOrganizer: backend.OrganizerInput | null
+    // Attendee count decides whether the drop asks about sending updates.
+    attendeeCount: number
     // sourceKind for the SendInvitationsDialog provider note.
     masterSourceKind: 'google' | 'microsoft' | 'caldav-server' | 'caldav-none' | 'local' | ''
   }
@@ -495,28 +484,7 @@
       currentColIdx: colIdx,
       currentDeltaMinutes: 0,
       movedPastThreshold: false,
-      masterSummary: block.instance.summary ?? '',
-      masterDescription: block.instance.description ?? '',
-      masterLocation: block.instance.location ?? '',
-      masterCalendarID: block.instance.calendarId,
-      masterIsAllDay: !!block.instance.isAllDay,
-      masterTZName: block.instance.tzName ?? '',
-      // Snapshot attendees + organizer so the save preserves them. Drop
-      // server-side fields like scheduleStatus when remapping Attendee →
-      // AttendeeInput (those are output-only and would break Wails
-      // serialization).
-      masterAttendees: (block.instance.attendees ?? []).map(a => ({
-        email: a.email,
-        cn: a.cn ?? '',
-        partStat: a.partStat ?? 'NEEDS-ACTION',
-        role: a.role ?? 'REQ-PARTICIPANT',
-        rsvp: a.rsvp ?? false,
-        cuType: a.cuType ?? '',
-        delegate: a.delegate ?? '',
-      })) as unknown as backend.AttendeeInput[],
-      masterOrganizer: block.instance.organizer
-        ? { email: block.instance.organizer.email, cn: block.instance.organizer.cn ?? '' }
-        : null,
+      attendeeCount: block.instance.attendees?.length ?? 0,
       masterSourceKind: sourceKindOf(block.instance.calendarId),
     }
   }
@@ -614,7 +582,7 @@
     // If the event has attendees, intercept with SendInvitationsDialog
     // (same UX as Edit-via-composer). Cancel reverts the visual snap.
     // Otherwise save directly.
-    if (ds.masterAttendees.length > 0) {
+    if (ds.attendeeCount > 0) {
       pendingDragSave = { ds, newStartUnix, newEndUnix }
       sendInvitationsOpen = true
       return
@@ -629,27 +597,14 @@
     sendUpdates: string,
   ) {
     try {
-      await Calendar_UpdateEvent({
-        eventId: ds.eventId,
-        calendarId: ds.masterCalendarID,
-        summary: ds.masterSummary,
-        description: ds.masterDescription,
-        location: ds.masterLocation,
-        dtstartUnix: newStartUnix,
-        dtendUnix: newEndUnix,
-        isAllDay: ds.masterIsAllDay,
-        // Preserve the event's anchor tz across a drag — moving an LA-anchored
-        // event must not silently re-label it as UTC just because the drag
-        // touchpoint happens to live in the user's effective-tz grid.
-        tz: ds.masterTZName || undefined,
-        // Preserve attendees + organizer across the drag. Without these,
-        // the backend's updateAllAndPush would wipe the attendee list
-        // (in.Attendees absent → in.Attendees is nil → backend overwrites
-        // ev.Attendees with nil).
-        attendees: ds.masterAttendees,
-        organizer: ds.masterOrganizer ?? undefined,
-        sendUpdates: ds.masterAttendees.length > 0 ? sendUpdates : undefined,
-      } as unknown as backend.EventUpdateInput, 'all')
+      // The backend keeps every other field as stored (body, reminder,
+      // transparency, visibility, attendees, time zone).
+      await Calendar_MoveEvent(
+        ds.eventId,
+        newStartUnix,
+        newEndUnix,
+        ds.attendeeCount > 0 ? sendUpdates : '',
+      )
       // Wait for the events store to reflect the new state BEFORE clearing
       // dragState — otherwise the block would briefly snap back to its old
       // position (from the stale block.instance) before the refetch lands.
@@ -932,7 +887,7 @@
 
 <SendInvitationsDialog
   bind:open={sendInvitationsOpen}
-  attendeeCount={pendingDragSave?.ds.masterAttendees.length ?? 0}
+  attendeeCount={pendingDragSave?.ds.attendeeCount ?? 0}
   sourceKind={pendingDragSave?.ds.masterSourceKind ?? ''}
   onConfirm={onSendInvitationsConfirm}
   onCancel={onSendInvitationsCancel}

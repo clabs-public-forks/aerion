@@ -64,8 +64,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K10 medium** `TimelineView.svelte:632-651`: drag and resize drop
-  transparency, visibility, reminder and HTML. Unverified.
 - **K12 medium** `event_crud.go:708,966,1008,1042`: all-day UNTIL, EXDATE and
   RECURRENCE-ID are written as UTC date-times. Unverified.
 - **K13 medium** `rrule_expand.go:77`: FREQ=SECONDLY has no expansion cap.
