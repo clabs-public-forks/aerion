@@ -207,6 +207,7 @@ func (v *Verifier) verifyMultipartSigned(raw []byte, params map[string]string) (
 		Status:      StatusSigned,
 		SignerEmail: signerEmail,
 		SignerKeyID: signerKeyID,
+		signer:      signer,
 	}, signedContent
 }
 

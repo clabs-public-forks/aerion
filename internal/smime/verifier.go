@@ -3,6 +3,7 @@ package smime
 import (
 	"bytes"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
@@ -319,9 +320,10 @@ func (v *Verifier) verifySigners(p7 *pkcs7.PKCS7, signers []*x509.Certificate, s
 	}
 
 	return &SignatureResult{
-		Status:      StatusSigned,
-		SignerEmail: signerEmail,
-		SignerName:  signerName,
+		Status:       StatusSigned,
+		SignerEmail:  signerEmail,
+		SignerName:   signerName,
+		signerEmails: certEmails(signers[0]),
 	}
 }
 
@@ -385,6 +387,21 @@ func signerIdentity(cert *x509.Certificate) (email, name string) {
 		email = cert.EmailAddresses[0]
 	}
 	return email, cert.Subject.CommonName
+}
+
+// oidEmailAddress is the PKCS#9 emailAddress subject attribute, which older
+// certificates use instead of a subjectAltName rfc822Name.
+var oidEmailAddress = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
+
+// certEmails returns every email address cert names.
+func certEmails(cert *x509.Certificate) []string {
+	emails := append([]string(nil), cert.EmailAddresses...)
+	for _, name := range cert.Subject.Names {
+		if email, ok := name.Value.(string); ok && name.Type.Equal(oidEmailAddress) {
+			emails = append(emails, email)
+		}
+	}
+	return emails
 }
 
 // cacheSenderCert stores the signer's certificate for future reference.

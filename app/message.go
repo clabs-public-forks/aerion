@@ -219,6 +219,9 @@ func (a *App) ProcessSMIMEMessage(messageID string) (*SMIMEViewResult, error) {
 			// Verification unwrap failed, use the encrypted content as-is
 			innerBytes = rawBody
 		}
+		if sigResult != nil {
+			sigResult.CheckSender(msg.FromEmail)
+		}
 	}
 
 	// Step 3: Set signature status
@@ -337,6 +340,9 @@ func (a *App) ProcessPGPMessage(messageID string) (*PGPViewResult, error) {
 		if innerBytes == nil {
 			// Verification unwrap failed, use the encrypted content as-is
 			innerBytes = rawBody
+		}
+		if sigResult != nil {
+			sigResult.CheckSender(msg.FromEmail)
 		}
 	}
 

@@ -272,3 +272,44 @@ func TestVerifyPKCS7ChecksChainAtCurrentTime(t *testing.T) {
 		t.Fatalf("status = %q (%s), want %q for a signature claiming a time inside an expired cert's validity", result.Status, result.ErrorMessage, StatusExpiredCert)
 	}
 }
+
+func TestCheckSender(t *testing.T) {
+	ca := newTestCert(t, "Trusted CA", "", true, nil)
+	signer := newTestCert(t, "Alice", "Alice@Example.com", false, ca)
+
+	tests := []struct {
+		name   string
+		status SignatureStatus
+		from   string
+		want   SignatureStatus
+	}{
+		{"matching from", StatusSigned, "alice@example.com", StatusSigned},
+		{"forged from", StatusSigned, "ceo@example.com", StatusSignerMismatch},
+		{"empty from", StatusSigned, "", StatusSignerMismatch},
+		{"untrusted left alone", StatusUnknownSigner, "ceo@example.com", StatusUnknownSigner},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, _ := newTestVerifier(t, ca.cert)
+			result := v.verifyPKCS7(signTestMessage(t, signer))
+			result.Status = tt.status
+			result.CheckSender(tt.from)
+			if result.Status != tt.want {
+				t.Fatalf("status = %q, want %q", result.Status, tt.want)
+			}
+		})
+	}
+}
+
+func TestCertEmailsIncludesSubjectEmailAddress(t *testing.T) {
+	cert := &x509.Certificate{
+		EmailAddresses: []string{"alt@example.com"},
+		Subject: pkix.Name{Names: []pkix.AttributeTypeAndValue{
+			{Type: oidEmailAddress, Value: "subject@example.com"},
+		}},
+	}
+	got := certEmails(cert)
+	if len(got) != 2 || got[0] != "alt@example.com" || got[1] != "subject@example.com" {
+		t.Fatalf("certEmails = %v", got)
+	}
+}

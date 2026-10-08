@@ -1,7 +1,10 @@
 // Package smime provides S/MIME signing and verification for email messages
 package smime
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // SignatureStatus represents the S/MIME verification result
 type SignatureStatus string
@@ -13,6 +16,9 @@ const (
 	StatusUnknownSigner SignatureStatus = "unknown_signer" // Valid sig, untrusted CA
 	StatusSelfSigned    SignatureStatus = "self_signed"   // Valid sig, self-signed cert
 	StatusExpiredCert   SignatureStatus = "expired_cert"  // Valid sig, expired cert
+	// StatusSignerMismatch: valid sig, trusted chain, but the certificate
+	// does not name the message's From address
+	StatusSignerMismatch SignatureStatus = "signer_mismatch"
 )
 
 // Certificate represents a user's imported S/MIME certificate
@@ -52,6 +58,26 @@ type SignatureResult struct {
 	SignerEmail  string          `json:"signerEmail"`
 	SignerName   string          `json:"signerName"`
 	ErrorMessage string          `json:"errorMessage,omitempty"`
+
+	// signerEmails holds every address the signer certificate names.
+	signerEmails []string
+}
+
+// CheckSender downgrades a trusted signature to StatusSignerMismatch when
+// the signer certificate doesn't name from. A signature only proves who
+// signed; shown as "signed by" beside a different From it would vouch for
+// a forged sender.
+func (r *SignatureResult) CheckSender(from string) {
+	if r.Status != StatusSigned {
+		return
+	}
+	for _, email := range r.signerEmails {
+		if strings.EqualFold(email, from) {
+			return
+		}
+	}
+	r.Status = StatusSignerMismatch
+	r.ErrorMessage = "signer certificate does not match the From address"
 }
 
 // ImportResult holds the result of a PKCS#12 certificate import

@@ -1702,6 +1702,11 @@
                           <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
                           <span>{$_('viewer.smimeExpiredCert', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
+                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'signer_mismatch'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
+                          <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
+                          <span>{$_('viewer.smimeSignerMismatch', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
+                        </div>
                       {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'invalid'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
@@ -1750,6 +1755,11 @@
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
                           <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
                           <span>{$_('viewer.pgpRevokedKey', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
+                        </div>
+                      {:else if pgpResults[msg.id]?.pgpStatus === 'signer_mismatch'}
+                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
+                          <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
+                          <span>{$_('viewer.pgpSignerMismatch', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
                         </div>
                       {:else if pgpResults[msg.id]?.pgpStatus === 'invalid'}
                         <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">

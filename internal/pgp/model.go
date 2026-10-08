@@ -1,7 +1,11 @@
 // Package pgp provides PGP/MIME signing, verification, encryption, and decryption for email messages
 package pgp
 
-import "time"
+import (
+	"time"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
+)
 
 // SignatureStatus represents the PGP verification result
 type SignatureStatus string
@@ -13,6 +17,9 @@ const (
 	StatusUnknownKey SignatureStatus = "unknown_key" // Valid sig, no matching public key
 	StatusExpiredKey SignatureStatus = "expired_key" // Valid sig, expired key
 	StatusRevokedKey SignatureStatus = "revoked_key" // Valid sig, revoked key
+	// StatusSignerMismatch: valid sig, known key, but no user ID on the key
+	// names the message's From address
+	StatusSignerMismatch SignatureStatus = "signer_mismatch"
 )
 
 // Key represents a user's imported PGP keypair
@@ -55,6 +62,21 @@ type SignatureResult struct {
 	SignerEmail  string          `json:"signerEmail"`
 	SignerKeyID  string          `json:"signerKeyId"`
 	ErrorMessage string          `json:"errorMessage,omitempty"`
+
+	// signer is the verified signing key, used by CheckSender.
+	signer *openpgp.Entity
+}
+
+// CheckSender downgrades a valid signature to StatusSignerMismatch when no
+// user ID on the signing key names from. A signature only proves who
+// signed; shown as "signed by" beside a different From it would vouch for
+// a forged sender.
+func (r *SignatureResult) CheckSender(from string) {
+	if r.Status != StatusSigned || r.signer == nil || HasUserIDForEmail(r.signer, from) {
+		return
+	}
+	r.Status = StatusSignerMismatch
+	r.ErrorMessage = "signing key does not match the From address"
 }
 
 // KeyServer represents an HKP key server entry
