@@ -36,7 +36,7 @@ func BuildTLSConfig(host string, store *Store) *tls.Config {
 
 			// Check our trust store
 			fingerprint := Fingerprint(rawCerts[0])
-			if store != nil && store.IsTrusted(fingerprint) {
+			if store != nil && store.IsTrusted(host, fingerprint) {
 				return nil // We trust this cert
 			}
 
@@ -57,7 +57,7 @@ func BuildTLSConfig(host string, store *Store) *tls.Config {
 // reuse one shared transport across all CardDAV/CalDAV sources (and the auth
 // broker hands out an account-level client before the DAV host is known), so a
 // fixed-host config like BuildTLSConfig won't do. Same trust logic: system CA
-// first, then the trusted-cert fingerprint store, else a structured *Error.
+// first, then the fingerprint store (scoped to the server name), else a structured *Error.
 func BuildTLSConfigDynamic(store *Store) *tls.Config {
 	return &tls.Config{
 		InsecureSkipVerify: true, // real verification happens in VerifyConnection
@@ -73,7 +73,7 @@ func BuildTLSConfigDynamic(store *Store) *tls.Config {
 			}
 
 			fingerprint := Fingerprint(leaf.Raw)
-			if store != nil && store.IsTrusted(fingerprint) {
+			if store != nil && store.IsTrusted(cs.ServerName, fingerprint) {
 				return nil
 			}
 

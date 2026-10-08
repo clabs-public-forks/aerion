@@ -12,8 +12,6 @@ has not yet been confirmed against the code.
   revocation check, so a revoked signer still shows as trusted. Needs an
   owner decision: OCSP or CRL fetches on every view tell the CA what is
   being read. (The signing-time half of S6 is fixed.)
-- **S8 low** `internal/certificate/store.go:26-38`: a trusted certificate
-  fingerprint is accepted for any host. Unverified.
 - **S9 low** `app/oauth.go:672-682`: TestOAuthConnection gives STARTTLS IMAP
   no ServerName, so the connection test always fails. Unverified.
 - **S10 low** `ConversationViewer.svelte:1000-1008`: the print iframe has no

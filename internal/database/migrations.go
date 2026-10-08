@@ -1358,4 +1358,30 @@ var migrations = []Migration{
 			ALTER TABLE smime_sender_certs ADD COLUMN trusted INTEGER NOT NULL DEFAULT 0;
 		`,
 	},
+	{
+		Version: 45,
+		SQL: `
+			-- Certificate trust is per host: a fingerprint accepted for one
+			-- server must not vouch for any other. Rebuild the table so the
+			-- same certificate can be trusted for several hosts. Rows without
+			-- a host can't be scoped, so they are dropped and re-prompted.
+
+			CREATE TABLE trusted_certificates_new (
+				id TEXT PRIMARY KEY,
+				fingerprint TEXT NOT NULL,
+				host TEXT NOT NULL,
+				subject TEXT NOT NULL,
+				issuer TEXT NOT NULL,
+				not_before DATETIME,
+				not_after DATETIME,
+				accepted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE (fingerprint, host)
+			);
+			INSERT OR IGNORE INTO trusted_certificates_new
+				SELECT id, fingerprint, lower(host), subject, issuer, not_before, not_after, accepted_at
+				FROM trusted_certificates WHERE host != '';
+			DROP TABLE trusted_certificates;
+			ALTER TABLE trusted_certificates_new RENAME TO trusted_certificates;
+		`,
+	},
 }

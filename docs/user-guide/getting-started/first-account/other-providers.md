@@ -157,4 +157,5 @@ After entering your settings, Aerion will attempt to connect to the server. If t
 
 - Ensure the security setting matches your server
 - For self-signed certificates, you may need to add an exception
+- An accepted certificate is trusted only for the incoming server it was accepted for and that account's outgoing server. Other servers presenting the same certificate are still rejected
 - Contact your server administrator for the correct SSL/TLS settings

@@ -44,14 +44,17 @@ func openTestStore(t *testing.T) *Store {
 	}
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS trusted_certificates (
 		id TEXT PRIMARY KEY,
-		fingerprint TEXT NOT NULL UNIQUE,
+		fingerprint TEXT NOT NULL,
 		host TEXT NOT NULL,
 		subject TEXT,
 		issuer TEXT,
 		not_before TEXT,
 		not_after TEXT,
-		accepted_at DATETIME
-	)`)
+		accepted_at DATETIME,
+		UNIQUE (fingerprint, host)
+	);
+	CREATE TABLE accounts (imap_host TEXT NOT NULL, smtp_host TEXT NOT NULL);
+	INSERT INTO accounts VALUES ('mail.example.com', 'smtp.example.com')`)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -171,30 +174,59 @@ func TestClassifyError(t *testing.T) {
 	}
 }
 
-func TestAcceptSession(t *testing.T) {
-	store := openTestStore(t)
-
-	fp := "aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344"
-	store.AcceptSession(fp)
-
-	if !store.IsTrusted(fp) {
-		t.Fatal("IsTrusted = false after AcceptSession, want true")
+// TestTrustIsHostScoped checks that an accepted fingerprint is trusted only
+// for its host and for the SMTP host of an account using that IMAP host.
+func TestTrustIsHostScoped(t *testing.T) {
+	const fp = "aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344"
+	tests := []struct {
+		name      string
+		permanent bool
+		host      string
+		want      bool
+	}{
+		{"session same host", false, "mail.example.com", true},
+		{"session host case-insensitive", false, "MAIL.example.com", true},
+		{"session account smtp host", false, "smtp.example.com", true},
+		{"session other host", false, "evil.example.net", false},
+		{"session empty host", false, "", false},
+		{"permanent same host", true, "mail.example.com", true},
+		{"permanent account smtp host", true, "smtp.example.com", true},
+		{"permanent other host", true, "evil.example.net", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := openTestStore(t)
+			if tt.permanent {
+				if err := store.AcceptPermanently("Mail.Example.com", &CertificateInfo{Fingerprint: fp}); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := store.AcceptSession("mail.example.com", fp); err != nil {
+				t.Fatal(err)
+			}
+			if got := store.IsTrusted(tt.host, fp); got != tt.want {
+				t.Errorf("IsTrusted(%q) = %v, want %v", tt.host, got, tt.want)
+			}
+			if store.IsTrusted("mail.example.com", "00"+fp[2:]) {
+				t.Error("IsTrusted = true for an unknown fingerprint")
+			}
+		})
 	}
 }
 
-func TestIsTrustedDefault(t *testing.T) {
+func TestTrustRequiresHost(t *testing.T) {
 	store := openTestStore(t)
-
-	fp := "0000000000000000000000000000000000000000000000000000000000000000"
-	if store.IsTrusted(fp) {
-		t.Fatal("IsTrusted = true for unknown fingerprint, want false")
+	if err := store.AcceptSession(" ", "aa"); err == nil {
+		t.Error("AcceptSession with no host: want error")
+	}
+	if err := store.AcceptPermanently("", &CertificateInfo{Fingerprint: "aa"}); err == nil {
+		t.Error("AcceptPermanently with no host: want error")
 	}
 }
 
 // TestBuildTLSConfigDynamic exercises the host-agnostic TOFU verifier used by
 // the DAV transports. Drives VerifyConnection directly (no TLS server needed):
 // an untrusted self-signed cert is rejected with a structured *Error; once its
-// fingerprint is trusted it passes; an empty chain errors.
+// fingerprint is trusted for the server name it passes; an empty chain errors.
 func TestBuildTLSConfigDynamic(t *testing.T) {
 	store := openTestStore(t)
 	der := generateTestCert(t)
@@ -226,8 +258,14 @@ func TestBuildTLSConfigDynamic(t *testing.T) {
 		t.Fatalf("expected *Error, got %T: %v", err, err)
 	}
 
-	// Trust the fingerprint → now accepted.
-	store.AcceptSession(Fingerprint(der))
+	// Trusted for another host → still rejected.
+	_ = store.AcceptSession("other.example.com", Fingerprint(der))
+	if err := cfg.VerifyConnection(cs); err == nil {
+		t.Fatal("expected cert trusted only for another host to be rejected")
+	}
+
+	// Trust the fingerprint for this host → now accepted.
+	_ = store.AcceptSession("test.example.com", Fingerprint(der))
 	if err := cfg.VerifyConnection(cs); err != nil {
 		t.Fatalf("expected store-trusted cert to pass, got %v", err)
 	}

@@ -2,51 +2,89 @@ package certificate
 
 import (
 	"database/sql"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// Store manages trusted certificates in the database and session memory
+// Store manages trusted certificates in the database and session memory.
+// Trust is scoped to a host: a fingerprint accepted for one server never
+// vouches for another.
 type Store struct {
 	db      *sql.DB
 	mu      sync.RWMutex
-	session map[string]bool // fingerprint -> trusted (session only)
+	session map[trustKey]bool // session-only trust
 }
+
+type trustKey struct{ host, fingerprint string }
 
 // NewStore creates a new certificate trust store
 func NewStore(db *sql.DB) *Store {
 	return &Store{
 		db:      db,
-		session: make(map[string]bool),
+		session: make(map[trustKey]bool),
 	}
 }
 
-// IsTrusted checks if a certificate fingerprint is trusted (DB or session)
-func (s *Store) IsTrusted(fingerprint string) bool {
-	// Check session memory first (fast path)
+func normalizeHost(host string) string {
+	return strings.ToLower(strings.TrimSpace(host))
+}
+
+// IsTrusted reports whether the certificate fingerprint was accepted for
+// host, permanently or for this session. A certificate accepted for an
+// account's IMAP host also covers that account's SMTP host, since only IMAP
+// connections can prompt for trust.
+func (s *Store) IsTrusted(host, fingerprint string) bool {
+	host = normalizeHost(host)
+	if host == "" {
+		return false
+	}
+	hosts := []string{host}
+	rows, err := s.db.Query(
+		"SELECT DISTINCT lower(imap_host) FROM accounts WHERE lower(smtp_host) = ? AND lower(imap_host) != ?",
+		host, host,
+	)
+	if err == nil {
+		for rows.Next() {
+			var h string
+			if rows.Scan(&h) == nil {
+				hosts = append(hosts, h)
+			}
+		}
+		rows.Close()
+	}
+
 	s.mu.RLock()
-	if s.session[fingerprint] {
-		s.mu.RUnlock()
-		return true
+	for _, h := range hosts {
+		if s.session[trustKey{h, fingerprint}] {
+			s.mu.RUnlock()
+			return true
+		}
 	}
 	s.mu.RUnlock()
 
-	// Check database
+	query := "SELECT COUNT(*) FROM trusted_certificates WHERE fingerprint = ? AND host IN (?" +
+		strings.Repeat(",?", len(hosts)-1) + ")"
+	args := []interface{}{fingerprint}
+	for _, h := range hosts {
+		args = append(args, h)
+	}
 	var count int
-	err := s.db.QueryRow(
-		"SELECT COUNT(*) FROM trusted_certificates WHERE fingerprint = ?",
-		fingerprint,
-	).Scan(&count)
-	if err != nil {
+	if err := s.db.QueryRow(query, args...).Scan(&count); err != nil {
 		return false
 	}
 	return count > 0
 }
 
-// AcceptPermanently stores a certificate in the database
+// AcceptPermanently stores a certificate in the database as trusted for host
 func (s *Store) AcceptPermanently(host string, info *CertificateInfo) error {
+	host = normalizeHost(host)
+	if host == "" {
+		return fmt.Errorf("host is required to trust a certificate")
+	}
 	id := uuid.New().String()
 	_, err := s.db.Exec(
 		`INSERT OR REPLACE INTO trusted_certificates (id, fingerprint, host, subject, issuer, not_before, not_after, accepted_at)
@@ -56,11 +94,16 @@ func (s *Store) AcceptPermanently(host string, info *CertificateInfo) error {
 	return err
 }
 
-// AcceptSession stores a certificate fingerprint in session memory only
-func (s *Store) AcceptSession(fingerprint string) {
+// AcceptSession trusts a certificate fingerprint for host in session memory only
+func (s *Store) AcceptSession(host, fingerprint string) error {
+	host = normalizeHost(host)
+	if host == "" {
+		return fmt.Errorf("host is required to trust a certificate")
+	}
 	s.mu.Lock()
-	s.session[fingerprint] = true
+	s.session[trustKey{host, fingerprint}] = true
 	s.mu.Unlock()
+	return nil
 }
 
 // GetByHosts returns permanently trusted certificates for the given hosts
@@ -77,7 +120,7 @@ func (s *Store) GetByHosts(hosts []string) ([]*CertificateInfo, error) {
 			query += ","
 		}
 		query += "?"
-		args[i] = h
+		args[i] = normalizeHost(h)
 	}
 	query += ") ORDER BY accepted_at DESC"
 
@@ -106,9 +149,13 @@ func (s *Store) Remove(fingerprint string) error {
 		return err
 	}
 
-	// Also remove from session
+	// Also remove from session, for every host
 	s.mu.Lock()
-	delete(s.session, fingerprint)
+	for k := range s.session {
+		if k.fingerprint == fingerprint {
+			delete(s.session, k)
+		}
+	}
 	s.mu.Unlock()
 
 	return nil
