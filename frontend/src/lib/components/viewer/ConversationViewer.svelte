@@ -1508,8 +1508,8 @@
                     </div>
 
                     {#if msg.replyTo && msg.replyTo.toLowerCase() !== msg.fromEmail.toLowerCase()}
-                      <div class="text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-                        <span class="opacity-60">{$_('viewer.replyTo')}</span>
+                      <div class="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                        <span class="opacity-60">{$_('viewer.replyTo')}</span>&nbsp;
                         <span
                           role="button"
                           tabindex="0"
@@ -1523,8 +1523,8 @@
 
                     {#if msg.toList}
                       {@const recipients = parseRecipients(msg.toList)}
-                      <div class="text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-                        <span class="opacity-60">{$_('viewer.to')}</span>
+                      <div class="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                        <span class="opacity-60">{$_('viewer.to')}</span>&nbsp;
                         {#each recipients as recipient, i (recipient.email + ':' + i)}
                           <span
                             role="button"
@@ -1533,7 +1533,7 @@
                             title={$_('viewer.copyEmail')}
                             onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.to')) }}
                             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.to')) }}}
-                          >{recipient.name || recipient.email}{i < recipients.length - 1 ? ',' : ''}</span>
+                          >{recipient.name || recipient.email}{i < recipients.length - 1 ? ', ' : ''}</span>
                         {/each}
                       </div>
                     {/if}
@@ -1541,8 +1541,8 @@
                     {#if msg.ccList}
                       {@const ccRecipients = parseRecipients(msg.ccList)}
                       {#if ccRecipients.length > 0}
-                        <div class="text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-                          <span class="opacity-60">{$_('viewer.cc')}</span>
+                        <div class="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                          <span class="opacity-60">{$_('viewer.cc')}</span>&nbsp;
                           {#each ccRecipients as recipient, i (recipient.email + ':' + i)}
                             <span
                               role="button"
@@ -1551,7 +1551,7 @@
                               title={$_('viewer.copyEmail')}
                               onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.cc')) }}
                               onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.cc')) }}}
-                            >{recipient.name || recipient.email}{i < ccRecipients.length - 1 ? ',' : ''}</span>
+                            >{recipient.name || recipient.email}{i < ccRecipients.length - 1 ? ', ' : ''}</span>
                           {/each}
                         </div>
                       {/if}
@@ -1560,8 +1560,8 @@
                     {#if msg.bccList}
                       {@const bccRecipients = parseRecipients(msg.bccList)}
                       {#if bccRecipients.length > 0}
-                        <div class="text-sm text-muted-foreground flex flex-wrap items-center gap-1">
-                          <span class="opacity-60">{$_('viewer.bcc')}</span>
+                        <div class="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                          <span class="opacity-60">{$_('viewer.bcc')}</span>&nbsp;
                           {#each bccRecipients as recipient, i (recipient.email + ':' + i)}
                             <span
                               role="button"
@@ -1570,7 +1570,7 @@
                               title={$_('viewer.copyEmail')}
                               onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.bcc')) }}
                               onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.bcc')) }}}
-                            >{recipient.name || recipient.email}{i < bccRecipients.length - 1 ? ',' : ''}</span>
+                            >{recipient.name || recipient.email}{i < bccRecipients.length - 1 ? ', ' : ''}</span>
                           {/each}
                         </div>
                       {/if}
