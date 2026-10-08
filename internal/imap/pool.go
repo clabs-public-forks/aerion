@@ -121,23 +121,35 @@ func NewPool(config PoolConfig, getCredentials func(accountID string) (*ClientCo
 func (p *Pool) GetConnection(ctx context.Context, accountID string) (*PooledConnection, error) {
 	p.mu.Lock()
 
-	// Try to find an available connection
-	if conns, ok := p.connections[accountID]; ok {
-		for _, conn := range conns {
-			conn.mu.Lock()
-			if !conn.inUse && conn.isHealthyLocked() {
-				conn.inUse = true
-				conn.lastUsed = time.Now()
-				conn.mu.Unlock()
-				p.mu.Unlock()
-
-				p.log.Debug().
-					Str("account", accountID).
-					Msg("Reusing existing connection")
-				return conn, nil
-			}
+	// Try to find an available connection, dropping idle dead ones so they
+	// stop counting toward the limit.
+	var dead []*PooledConnection
+	for _, conn := range p.connections[accountID] {
+		conn.mu.Lock()
+		if conn.inUse {
 			conn.mu.Unlock()
+			continue
 		}
+		if !conn.isHealthyLocked() {
+			conn.mu.Unlock()
+			dead = append(dead, conn)
+			continue
+		}
+		conn.inUse = true
+		conn.lastUsed = time.Now()
+		conn.mu.Unlock()
+		for _, d := range dead {
+			p.discardLocked(d)
+		}
+		p.mu.Unlock()
+
+		p.log.Debug().
+			Str("account", accountID).
+			Msg("Reusing existing connection")
+		return conn, nil
+	}
+	for _, d := range dead {
+		p.discardLocked(d)
 	}
 
 	// Count current connections for this account
@@ -162,10 +174,15 @@ func (p *Pool) GetConnection(ctx context.Context, accountID string) (*PooledConn
 
 	// Wait for a connection, context cancellation, or timeout
 	select {
-	case conn := <-waiter:
-		if conn == nil {
+	case conn, ok := <-waiter:
+		if !ok {
 			// Channel was closed by CloseAccount/CloseAll — pool is being cleared
 			return nil, fmt.Errorf("connection pool closed")
+		}
+		if conn == nil {
+			// A dead connection was removed, freeing a slot — retry so a
+			// replacement can be created.
+			return p.GetConnection(ctx, accountID)
 		}
 		return conn, nil
 	case <-ctx.Done():
@@ -313,6 +330,7 @@ func (p *Pool) Release(conn *PooledConnection) {
 		p.log.Debug().
 			Str("account", conn.accountID).
 			Msg("Released connection is unhealthy, discarding")
+		p.discardLocked(conn)
 		return
 	}
 
@@ -361,6 +379,17 @@ func (p *Pool) Discard(conn *PooledConnection) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	p.discardLocked(conn)
+
+	p.log.Debug().
+		Str("account", conn.accountID).
+		Msg("Discarded dead connection from pool")
+}
+
+// discardLocked force-closes conn, removes it from the pool, and wakes the
+// first waiter for its account so it can create a replacement in the freed
+// slot. Caller must hold p.mu and must not hold conn.mu.
+func (p *Pool) discardLocked(conn *PooledConnection) {
 	// Force-close the connection (known dead, skip graceful logout)
 	conn.mu.Lock()
 	if conn.client != nil {
@@ -369,23 +398,27 @@ func (p *Pool) Discard(conn *PooledConnection) {
 	}
 	conn.mu.Unlock()
 
-	// Remove from pool
-	if conns, ok := p.connections[conn.accountID]; ok {
-		for i, c := range conns {
-			if c == conn {
-				p.connections[conn.accountID] = append(conns[:i], conns[i+1:]...)
-				break
-			}
-		}
-		// Clean up empty account entry
-		if len(p.connections[conn.accountID]) == 0 {
-			delete(p.connections, conn.accountID)
+	conns := p.connections[conn.accountID]
+	removed := false
+	for i, c := range conns {
+		if c == conn {
+			p.connections[conn.accountID] = append(conns[:i], conns[i+1:]...)
+			removed = true
+			break
 		}
 	}
+	if !removed {
+		return
+	}
+	// Clean up empty account entry
+	if len(p.connections[conn.accountID]) == 0 {
+		delete(p.connections, conn.accountID)
+	}
 
-	p.log.Debug().
-		Str("account", conn.accountID).
-		Msg("Discarded dead connection from pool")
+	if waiters := p.waiters[conn.accountID]; len(waiters) > 0 {
+		p.waiters[conn.accountID] = waiters[1:]
+		waiters[0] <- nil
+	}
 }
 
 // CloseAccount closes all connections for a specific account.

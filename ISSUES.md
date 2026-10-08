@@ -30,10 +30,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `app/draft.go` `saveDraftToDB` never populates `IdentityID`, and `toComposeMessage` omits `From`. Reopening a draft saved with a nondefault alias selects the default identity; background pending-draft retries serialize an empty sender. Persist the selected identity on create/update and restore the sender for both editing and retries.
 
-### [P2] Unhealthy IMAP connections continue consuming pool capacity
-
-`internal/imap/pool.go` `Release` logs that an unhealthy connection is discarded but leaves it tracked. Acquisition skips it while counting it toward the limit; a pool full of dead connections causes waits and timeouts until idle cleanup. Remove unhealthy connections immediately and let waiting requests obtain replacements.
-
 ### [P2] Unlimited-history sync never reconciles an empty mailbox
 
 `internal/sync/messages.go` `SyncMessages` skips deletion reconciliation when a successful remote search returns zero messages, local rows remain, and `syncPeriodDays == 0`. Emptying a folder in another client leaves stale messages indefinitely. Distinguish search errors from valid empty results and reconcile confirmed empty mailboxes.
