@@ -8,9 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M10 low** `app/draft.go:296-428`: the old IMAP draft is deleted before
-  the new one is appended, and UpdateSyncStatus can overwrite a newer edit's
-  pending state. Unverified.
 - **M11 low** `internal/email/download.go`, `attachment.go`: content
   transfer encoding may be decoded twice. Unverified.
 - **M12 low** `internal/platform/singleinstance_linux.go`: the
