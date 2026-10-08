@@ -155,9 +155,9 @@ export async function activateContact(id: string | null): Promise<void> {
 
 // Update a contact (local or CardDAV) with a multi-field patch. The backend
 // dispatches by source — local writes via UpsertRecord, CardDAV PUTs to the
-// server. On 412 conflict the backend emits "contacts:conflict" via the
-// event listener wired in ContactsPane; this method's caller doesn't see the
-// conflict directly.
+// server. On 412 conflict the backend emits "contacts:conflict" (ContactsPane
+// reloads and shows the toast) and this method rejects; callers use
+// isConflictError to keep the user's edits without a second error toast.
 export async function updateContact(id: string, patch: v1.ContactPatch): Promise<void> {
   await UpdateContact(id, patch)
   // Refresh the list + detail view so changes are visible immediately.
@@ -165,6 +165,14 @@ export async function updateContact(id: string, patch: v1.ContactPatch): Promise
   if (selectedContactId === id) {
     await activateContact(id)
   }
+}
+
+// Reports whether a rejected update/delete was a 412 conflict. Matches the
+// text of coreapi.ErrConflict.Error() (internal/core/api/v1/errors.go), which
+// is all Wails passes through.
+export function isConflictError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return msg.startsWith('conflict on contact')
 }
 
 // Delete a local (sent-recipient) contact entirely. After deletion the list

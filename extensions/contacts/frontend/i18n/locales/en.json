@@ -80,6 +80,7 @@
     },
     "edit": {
       "title": "Edit contact",
+      "conflict": "This contact was changed elsewhere while you were editing. Your edits are still here: save again to replace the newer version, or cancel to keep it.",
       "photoChange": "Change…",
       "photoRemove": "Remove",
       "photoUrlOnly": "(linked from server — pick a file to replace with an inline photo)",
@@ -151,7 +152,7 @@
       "completeMessage": "Contacts sync is set up."
     },
     "toast": {
-      "conflict": "This contact was changed elsewhere. Your edit was discarded — refreshed with the latest version.",
+      "conflict": "This contact was changed elsewhere and has been refreshed with the latest version.",
       "deleted": "Contact deleted",
       "failedDelete": "Failed to delete contact.",
       "added": "Contact added",

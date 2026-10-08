@@ -53,8 +53,6 @@ has not yet been confirmed against the code.
 
 ### Contacts
 
-- **C11 medium** `ContactEditDialog.svelte:197-215`: a 412 conflict reports
-  success and closes the dialog, losing the edits. Unverified.
 - **C12 medium** contacts backend: EXT_RULES R1, R2, R5 and R6 (see A4).
   Architectural.
 - **C13 low** `internal/contact/google_sync.go:70-75`: syncToken is sent only

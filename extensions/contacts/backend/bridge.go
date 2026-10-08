@@ -170,22 +170,19 @@ func (b *ContactsBridge) shutdown() {
 }
 
 // emitConflict translates a `*coreapi.ErrConflict` from a write path into
-// a `contacts:conflict` event the frontend listens for. Returns true when
-// the error was a conflict (and an event was emitted) so the caller can
-// short-circuit further error handling — the user's intent was acknowledged,
-// just superseded by the server.
-func (b *ContactsBridge) emitConflict(err error) bool {
+// a `contacts:conflict` event, which the pane uses to refresh its views.
+// The error is returned unchanged so the caller still sees the write did not
+// land (an edit dialog stays open with the user's edits instead of claiming
+// success).
+func (b *ContactsBridge) emitConflict(err error) error {
 	var conflict *coreapi.ErrConflict
-	if !errors.As(err, &conflict) {
-		return false
-	}
-	if b.deps.Emitter != nil {
+	if errors.As(err, &conflict) && b.deps.Emitter != nil {
 		b.deps.Emitter("contacts:conflict", map[string]string{
 			"contactId": conflict.ContactID,
 			"message":   conflict.Message,
 		})
 	}
-	return true
+	return err
 }
 
 // ============================================================================
@@ -341,9 +338,9 @@ func (b *ContactsBridge) Contacts_SyncAllSources() error {
 //   - Local records → contact.Store.UpsertRecord (full-fidelity write)
 //   - CardDAV records → server PUT gated on the source's writable flag
 //
-// 412 conflicts surface as a contacts:conflict event the UI listens for;
-// the method returns nil on conflict (the user's edit was discarded but
-// the local cache now matches the server, so the UI just reloads).
+// A 412 conflict refreshes the local cache from the server, emits a
+// contacts:conflict event so the UI reloads, and returns the
+// *coreapi.ErrConflict so the caller knows the edit did not land.
 func (b *ContactsBridge) Contacts_UpdateContact(idOrEmail string, patch coreapi.ContactPatch) error {
 	if !b.gateEnabled() {
 		return nil
@@ -351,18 +348,14 @@ func (b *ContactsBridge) Contacts_UpdateContact(idOrEmail string, patch coreapi.
 	if err := b.ensureInit(); err != nil {
 		return err
 	}
-	err := b.api.UpdateContact(idOrEmail, patch)
-	if b.emitConflict(err) {
-		return nil
-	}
-	return err
+	return b.emitConflict(b.api.UpdateContact(idOrEmail, patch))
 }
 
 // Contacts_DeleteLocalContact removes a contact. Local records
 // cascade-delete in the unified store; CardDAV records DELETE on the
 // server (gated on writable) and then cascade locally. 412 conflicts
-// surface via the contacts:conflict event. Idempotent on local + 404
-// paths.
+// emit the contacts:conflict event and return the conflict error.
+// Idempotent on local + 404 paths.
 //
 // Note: there's a separate top-level `App.DeleteContact` from pre-
 // extension days for legacy callers. This one is gated to the extension's
@@ -374,11 +367,7 @@ func (b *ContactsBridge) Contacts_DeleteLocalContact(idOrEmail string) error {
 	if err := b.ensureInit(); err != nil {
 		return err
 	}
-	err := b.api.DeleteContact(idOrEmail)
-	if b.emitConflict(err) {
-		return nil
-	}
-	return err
+	return b.emitConflict(b.api.DeleteContact(idOrEmail))
 }
 
 // ResizedContactPhoto is the return shape for Contacts_ResizeContactPhoto.

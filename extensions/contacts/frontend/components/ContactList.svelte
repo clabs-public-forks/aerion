@@ -19,7 +19,7 @@
   import ListRow from '$lib/components/kit/ListRow.svelte'
   import Avatar from '$lib/components/kit/Avatar.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
-  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact, isConflictError } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
   import WriteAccessBanner from './WriteAccessBanner.svelte'
@@ -78,7 +78,8 @@
       toasts.success($_('contacts.toast.deleted'))
     } catch (err) {
       console.error('Failed to delete contact:', err)
-      toasts.error($_('contacts.toast.failedDelete'))
+      // ContactsPane already toasts conflicts.
+      if (!isConflictError(err)) toasts.error($_('contacts.toast.failedDelete'))
     } finally {
       deleting = false
       pendingDelete = null

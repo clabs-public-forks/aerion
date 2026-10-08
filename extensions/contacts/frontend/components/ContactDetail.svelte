@@ -5,7 +5,7 @@
   import { Button } from '$lib/components/ui/button'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import Icon from '@iconify/svelte'
-  import { contactsView, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, deleteLocalContact, isConflictError } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
   // @ts-ignore - wailsjs bindings
@@ -80,7 +80,8 @@
       toasts.success($_('contacts.toast.deleted'))
     } catch (err) {
       console.error('Failed to delete contact:', err)
-      toasts.error($_('contacts.toast.failedDelete'))
+      // ContactsPane already toasts conflicts.
+      if (!isConflictError(err)) toasts.error($_('contacts.toast.failedDelete'))
     } finally {
       deleting = false
     }

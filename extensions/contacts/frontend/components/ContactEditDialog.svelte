@@ -13,7 +13,7 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import Icon from '@iconify/svelte'
-  import { updateContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { updateContact, isConflictError } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
@@ -56,6 +56,8 @@
 
   let saving = $state(false)
   let errors = $state<Record<string, string>>({})
+  // Set when a save hit a server-side conflict; the edits stay in the form.
+  let conflict = $state(false)
 
   // Hydrate state from `contact` each time the dialog opens. Reading from
   // `contact` here (not inside reactive markup) prevents a flash of stale
@@ -106,6 +108,7 @@
         url: contact.photoUrl ?? '',
       }
       errors = {}
+      conflict = false
     }
   })
 
@@ -220,6 +223,11 @@
       close()
     } catch (err) {
       console.error('Failed to update contact:', err)
+      // ContactsPane already toasts conflicts; keep the dialog and edits open.
+      if (isConflictError(err)) {
+        conflict = true
+        return
+      }
       const msg = (err as Error)?.message ?? String(err)
       toasts.error(`${$_('contacts.toast.failedUpdate')}: ${msg}`)
     } finally {
@@ -238,6 +246,13 @@
     <Dialog.Header>
       <Dialog.Title>{$_('contacts.edit.title')}</Dialog.Title>
     </Dialog.Header>
+
+    {#if conflict}
+      <div role="alert" class="mt-2 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+        <Icon icon="mdi:alert" class="w-4 h-4 mt-0.5 shrink-0" />
+        <span>{$_('contacts.edit.conflict')}</span>
+      </div>
+    {/if}
 
     <div class="mt-2">
       <ContactFieldsForm
