@@ -64,8 +64,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K7 medium** `store.go:927`, `provider_caldav.go:143-160`: after a force
-  resync, events with overrides hit a foreign-key failure. Unverified.
 - **K8/K9 medium** `provider_google.go:91,190-205`: instance exceptions and
   cancelled tombstones are ignored, and a full resync after 410 never
   deletes events. Also, `translateICSToGoogleJSON` sends only the RRULE

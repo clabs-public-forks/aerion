@@ -917,8 +917,9 @@ func (s *Store) DeleteEventByUIDTx(tx *sql.Tx, calendarID, uid string) error {
 }
 
 // ListEventETags returns a (uid → etag) map for one calendar. Used by sync
-// to diff against the server's REPORT response. Skips events with empty
-// ETag (shouldn't exist in practice; defensive).
+// to diff against the server's REPORT response. Events with an empty etag
+// (blanked by ClearEventETagsForSource) are included with "" so sync still
+// treats them as existing rows: it reuses their id and can delete them.
 func (s *Store) ListEventETags(calendarID string) (map[string]string, error) {
 	rows, err := s.DB().Query(`SELECT uid, etag FROM events WHERE calendar_id = ?`, calendarID)
 	if err != nil {
@@ -930,9 +931,6 @@ func (s *Store) ListEventETags(calendarID string) (map[string]string, error) {
 		var uid, etag string
 		if err := rows.Scan(&uid, &etag); err != nil {
 			return nil, fmt.Errorf("scan event etag: %w", err)
-		}
-		if etag == "" {
-			continue
 		}
 		out[uid] = etag
 	}
