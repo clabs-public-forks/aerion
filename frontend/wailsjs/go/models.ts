@@ -916,6 +916,7 @@ export namespace backend {
 	    summary: string;
 	    description?: string;
 	    descriptionHTML?: string;
+	    reminderMinutes?: number;
 	    location?: string;
 	    dtstartUnix: number;
 	    dtendUnix: number;
@@ -942,6 +943,7 @@ export namespace backend {
 	        this.summary = source["summary"];
 	        this.description = source["description"];
 	        this.descriptionHTML = source["descriptionHTML"];
+	        this.reminderMinutes = source["reminderMinutes"];
 	        this.location = source["location"];
 	        this.dtstartUnix = source["dtstartUnix"];
 	        this.dtendUnix = source["dtendUnix"];
@@ -1002,6 +1004,7 @@ export namespace backend {
 	    freq: string;
 	    untilUnix: number;
 	    count: number;
+	    keep?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new RecurrenceSpec(source);
@@ -1012,6 +1015,7 @@ export namespace backend {
 	        this.freq = source["freq"];
 	        this.untilUnix = source["untilUnix"];
 	        this.count = source["count"];
+	        this.keep = source["keep"];
 	    }
 	}
 	export class EventInput {
@@ -1084,6 +1088,7 @@ export namespace backend {
 	    summary: string;
 	    description?: string;
 	    descriptionHTML?: string;
+	    reminderMinutes?: number;
 	    location?: string;
 	    dtstartUnix: number;
 	    dtendUnix: number;
@@ -1114,6 +1119,7 @@ export namespace backend {
 	        this.summary = source["summary"];
 	        this.description = source["description"];
 	        this.descriptionHTML = source["descriptionHTML"];
+	        this.reminderMinutes = source["reminderMinutes"];
 	        this.location = source["location"];
 	        this.dtstartUnix = source["dtstartUnix"];
 	        this.dtendUnix = source["dtendUnix"];

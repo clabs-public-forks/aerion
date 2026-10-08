@@ -754,6 +754,10 @@ type Event struct {
 	// before being handed to the frontend. Empty falls back to plaintext
 	// Description rendering.
 	DescriptionHTML string `json:"descriptionHTML,omitempty"`
+	// ReminderMinutes is the offset of the first VALARM the composer can
+	// show, so an edit starts from it. NOT a DB column; set by
+	// Calendar_GetEvent.
+	ReminderMinutes *int   `json:"reminderMinutes,omitempty"`
 	Location        string `json:"location,omitempty"`
 	DTStartUnix     int64  `json:"dtstartUnix"`
 	DTEndUnix       int64  `json:"dtendUnix"`

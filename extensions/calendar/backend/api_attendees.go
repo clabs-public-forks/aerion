@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/emersion/go-ical"
 )
 
 // UpdateMyAttendeeStatus changes the current user's PARTSTAT on an event
@@ -72,13 +74,16 @@ func (a *API) UpdateMyAttendeeStatus(eventID string, selfEmails []string, partSt
 	}
 	ev.Attendees = updatedAttendees
 
-	// Re-serialize ICS so the JSON column and the ICSBlob stay coherent.
-	// Re-use the existing EventInput conversion shape that serializeVEVENT
-	// expects; rebuild from the Event fields we have.
-	in := eventToEventInput(*ev)
-	newICS, err := serializeVEVENT(ev.UID, in)
-	if err != nil {
-		return fmt.Errorf("re-serialize event: %w", err)
+	// Keep the ICSBlob coherent with the JSON column. Edit only our own
+	// ATTENDEE lines in place, so the RRULE, alarms, exceptions and
+	// VTIMEZONEs survive; rebuild from the Event fields only when the blob
+	// has no matching line.
+	newICS, ok := setAttendeePartStat(ev.ICSBlob, self, normalizedPartStat)
+	if !ok {
+		newICS, err = serializeVEVENT(ev.UID, eventToEventInput(*ev))
+		if err != nil {
+			return fmt.Errorf("re-serialize event: %w", err)
+		}
 	}
 	ev.ICSBlob = newICS
 
@@ -160,6 +165,36 @@ func attendeesFromInput(in EventInput) ([]Attendee, *Organizer) {
 		org = &Organizer{Email: in.Organizer.Email, CommonName: in.Organizer.CommonName}
 	}
 	return out, org
+}
+
+// setAttendeePartStat sets PARTSTAT on every ATTENDEE in blob whose address
+// is in self, across the master and its overrides, and drops their RSVP
+// request. It reports false when blob can't be decoded or has no such line.
+func setAttendeePartStat(blob string, self map[string]struct{}, partStat string) (string, bool) {
+	cal, err := ical.NewDecoder(strings.NewReader(blob)).Decode()
+	if err != nil {
+		return "", false
+	}
+	found := false
+	for _, c := range cal.Children {
+		if c.Name != ical.CompEvent {
+			continue
+		}
+		for i := range c.Props[ical.PropAttendee] {
+			p := &c.Props[ical.PropAttendee][i]
+			if _, ok := self[strings.ToLower(calAddressEmail(p.Value))]; !ok {
+				continue
+			}
+			p.Params.Set(ical.ParamParticipationStatus, partStat)
+			p.Params.Del(ical.ParamRSVP)
+			found = true
+		}
+	}
+	if !found {
+		return "", false
+	}
+	out, err := encodeICS(cal)
+	return out, err == nil
 }
 
 // eventToEventInput rebuilds the write-side EventInput shape from a loaded

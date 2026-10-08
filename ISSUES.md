@@ -100,9 +100,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K3 high** `EventComposerDialog.svelte:358`, `event_crud.go:571,702`:
-  editing resets the reminder, rebuilds RRULE from only FREQ, UNTIL and
-  COUNT, and drops overrides and X-properties. Unverified.
 - **K5 high** `provider_caldav.go:170`, `event_crud.go:926`: alarms are only
   generated for the 7 days after a write or sync. Unverified.
 - **K6 high** `provider_microsoft_translate.go:685-775`: recurrence is
@@ -112,7 +109,8 @@ has not yet been confirmed against the code.
   resync, events with overrides hit a foreign-key failure. Unverified.
 - **K8/K9 medium** `provider_google.go:91,190-205`: instance exceptions and
   cancelled tombstones are ignored, and a full resync after 410 never
-  deletes events. Unverified.
+  deletes events. Also, `translateICSToGoogleJSON` sends only the RRULE
+  line, never EXDATE or RDATE. Unverified.
 - **K10 medium** `TimelineView.svelte:632-651`: drag and resize drop
   transparency, visibility, reminder and HTML. Unverified.
 - **K11 medium** `store.go:1246-1266`: stale pending alarms are never

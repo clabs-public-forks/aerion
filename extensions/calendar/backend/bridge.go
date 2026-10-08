@@ -552,6 +552,7 @@ func (b *CalendarBridge) Calendar_GetEvent(eventID string) (*Event, error) {
 	// breaks. Idempotent for providers that already store plaintext (Graph text
 	// bodies, Google) — no backslash escapes → returned unchanged.
 	ev.Description = unescapeICalText(ev.Description)
+	ev.ReminderMinutes = primaryReminderMinutes(ev.ICSBlob)
 
 	// One About-body engine, two modes. Exchange/Graph put full HTML straight
 	// into the DESCRIPTION column; sanitize + render as HTML. Everything else

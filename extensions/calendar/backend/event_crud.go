@@ -84,6 +84,12 @@ type RecurrenceSpec struct {
 	Freq      string `json:"freq"`      // "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"
 	UntilUnix int64  `json:"untilUnix"` // 0 = open-ended (mutually exclusive with Count)
 	Count     int    `json:"count"`     // 0 = open-ended
+	// Keep asks an edit to leave the event's existing RRULE unchanged (the
+	// user didn't touch the recurrence controls). Ignored if Freq differs.
+	Keep bool `json:"keep,omitempty"`
+	// rule is the RRULE UpdateEvent resolved against the series' own (see
+	// mergeRRule); rruleText returns it when set.
+	rule string
 }
 
 // ReminderSpec describes a single DISPLAY VALARM relative to DTSTART.
@@ -257,6 +263,11 @@ func (a *API) UpdateEvent(in EventUpdateInput, scope EditScope) error {
 	}
 	if !src.Writable {
 		return ErrNotWritable
+	}
+	if r := in.Recurrence; r != nil {
+		resolved := *r
+		resolved.rule = mergeRRule(master.RRuleText, r)
+		in.Recurrence = &resolved
 	}
 
 	// Non-recurring or scope=All → straight replace + remote PUT.
@@ -559,7 +570,12 @@ func (a *API) DeleteEvent(eventID string, scope EditScope, instanceUnix int64) e
 // events with scope=All (drops overrides — matches Phase 3 local semantics
 // and CalDAV's whole-VCALENDAR-replacement semantics).
 func (a *API) updateAllAndPush(src Source, cal Calendar, master Event, in EventInput) error {
-	icsBlob, err := serializeVEVENT(master.UID, in)
+	// The composer sends no zone; keep the series' own so a recurring
+	// event doesn't move to UTC and shift across DST.
+	if in.TZName == "" {
+		in.TZName = master.TZName
+	}
+	icsBlob, keepExceptions, err := mergeVEVENT(master, in)
 	if err != nil {
 		return fmt.Errorf("serialize event: %w", err)
 	}
@@ -642,11 +658,13 @@ func (a *API) updateAllAndPush(src Source, cal Calendar, master Event, in EventI
 		if err := a.store.UpsertEventTx(tx, ev); err != nil {
 			return err
 		}
-		// Drop ALL overrides — they were attached to the old RRULE shape
-		// and may not map cleanly to the new occurrence set.
-		if _, err := tx.Exec(
-			`DELETE FROM event_recurrence_overrides WHERE event_id = ?`, ev.ID); err != nil {
-			return err
+		// Overrides were attached to the old series timing; once that
+		// changes they may not map onto the new occurrence set.
+		if !keepExceptions {
+			if _, err := tx.Exec(
+				`DELETE FROM event_recurrence_overrides WHERE event_id = ?`, ev.ID); err != nil {
+				return err
+			}
 		}
 		return a.extractAndUpsertAlarmsTx(tx, ev)
 	})
@@ -707,6 +725,9 @@ func rruleText(spec *RecurrenceSpec) string {
 	if spec == nil {
 		return ""
 	}
+	if spec.rule != "" {
+		return spec.rule
+	}
 	parts := []string{"FREQ=" + spec.Freq}
 	if spec.UntilUnix > 0 {
 		parts = append(parts, "UNTIL="+formatICSDateTime(time.Unix(spec.UntilUnix, 0)))
@@ -730,7 +751,7 @@ func setEventStartEnd(event *ical.Event, in EventInput) {
 	}
 	loc := time.UTC
 	if in.TZName != "" {
-		if l, err := time.LoadLocation(in.TZName); err == nil {
+		if l, err := loadTZ(in.TZName); err == nil {
 			loc = l
 		}
 	}
@@ -838,6 +859,16 @@ func masterEvent(blob string) *ical.Event {
 
 // serializeVEVENT builds a single-event VCALENDAR for events.ics_blob.
 func serializeVEVENT(uid string, in EventInput) (string, error) {
+	cal := ical.NewCalendar()
+	cal.Props.SetText(ical.PropVersion, "2.0")
+	cal.Props.SetText(ical.PropProductID, "-//Aerion//Calendar Extension//EN")
+	cal.Children = append(cal.Children, newVEVENT(uid, in, rruleText(in.Recurrence)).Component)
+	return encodeICS(cal)
+}
+
+// newVEVENT builds the VEVENT for in, writing rrule (when non-empty) as its
+// RRULE.
+func newVEVENT(uid string, in EventInput, rrule string) *ical.Event {
 	event := ical.NewEvent()
 	event.Props.SetText(ical.PropUID, uid)
 	event.Props.SetDateTime(ical.PropDateTimeStamp, time.Now().UTC())
@@ -864,8 +895,8 @@ func serializeVEVENT(uid string, in EventInput) (string, error) {
 
 	setEventStartEnd(event, in)
 
-	if rt := rruleText(in.Recurrence); rt != "" {
-		setRRuleText(event.Props, rt)
+	if rrule != "" {
+		setRRuleText(event.Props, rrule)
 	}
 
 	if in.Reminder != nil {
@@ -881,17 +912,7 @@ func serializeVEVENT(uid string, in EventInput) (string, error) {
 	// ORGANIZER + ATTENDEE properties. Emitted after the base props so they
 	// land in a consistent position in the wire form.
 	emitAttendeesIntoVEVENT(event, in.Organizer, in.Attendees)
-
-	cal := ical.NewCalendar()
-	cal.Props.SetText(ical.PropVersion, "2.0")
-	cal.Props.SetText(ical.PropProductID, "-//Aerion//Calendar Extension//EN")
-	cal.Children = append(cal.Children, event.Component)
-
-	var buf bytes.Buffer
-	if err := ical.NewEncoder(&buf).Encode(cal); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
+	return event
 }
 
 // setDateValue stamps a DATE-only property for all-day events.

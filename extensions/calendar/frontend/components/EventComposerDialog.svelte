@@ -91,6 +91,13 @@
   let reminderChoice = $state('none')
   let reminderCustomMinutes = $state(15)
 
+  // Recurrence controls as loaded for an edit. While they're unchanged the
+  // backend keeps the event's own RRULE, which may carry parts (BYDAY,
+  // INTERVAL) these controls don't show.
+  let loadedRecurrence = ''
+  const recurrenceKey = () =>
+    [recurrenceFreq, recurrenceEnd, recurrenceUntilDate, recurrenceCount].join('|')
+
   // Phase C: attendees + organizer state. AttendeesSection binds these.
   let attendees = $state<backend.AttendeeInput[]>([])
   let organizer = $state<backend.OrganizerInput | null>(null)
@@ -359,9 +366,13 @@
     endDate = formatYMD(endInTz)
     endTime = formatHM(endInTz)
     parseRRule(ev.rruleText || '')
+    loadedRecurrence = recurrenceKey()
     transparency = ev.transparency || 'busy'
     visibility = ev.visibility || 'public'
-    reminderChoice = 'none'
+    const rm = ev.reminderMinutes
+    reminderChoice = rm == null ? 'none'
+      : ['0', '5', '15', '30', '60', '1440'].includes(String(rm)) ? String(rm) : 'custom'
+    if (reminderChoice === 'custom') reminderCustomMinutes = rm ?? 15
     // Attendees + organizer. backend.Attendee → backend.AttendeeInput
     // (shape-compatible; createFrom safely cherry-picks fields).
     attendees = (ev.attendees ?? []).map((a) =>
@@ -418,6 +429,7 @@
     recurrenceEnd = 'never'
     recurrenceUntilDate = ''
     recurrenceCount = 10
+    loadedRecurrence = ''
     reminderChoice = 'none'
     reminderCustomMinutes = 15
     attendees = []
@@ -589,7 +601,7 @@
 
   function buildRecurrenceSpec(): backend.RecurrenceSpec | undefined {
     if (!recurrenceFreq) return undefined
-    const spec = { freq: recurrenceFreq } as backend.RecurrenceSpec
+    const spec = { freq: recurrenceFreq, keep: recurrenceKey() === loadedRecurrence } as backend.RecurrenceSpec
     if (recurrenceEnd === 'date' && recurrenceUntilDate) {
       spec.untilUnix = buildUnix(recurrenceUntilDate, '23:59', true)
     }
