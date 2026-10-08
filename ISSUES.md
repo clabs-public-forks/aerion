@@ -8,8 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M7 medium** `internal/sync/fetch.go:577,830`: re-fetching a body inserts
-  the attachments again, so they show up twice. Unverified.
 - **M2-M4 medium** `internal/imap/pool.go`: the slot check-then-dial window
   can exceed MaxConnections, a waiter that is cancelled can leak a
   connection handed to it, and a dial that finishes after the caller has

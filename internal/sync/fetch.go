@@ -96,12 +96,10 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 		return nil, fmt.Errorf("failed to update message body: %w", err)
 	}
 
-	// Store attachments if present
-	if result.HasAttachments && e.attachmentStore != nil {
-		for _, att := range result.Attachments {
-			if err := e.attachmentStore.Create(att); err != nil {
-				e.log.Debug().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment metadata")
-			}
+	// Replace attachments so a re-fetch doesn't list them twice
+	if e.attachmentStore != nil {
+		if err := e.attachmentStore.ReplaceForMessages([]string{messageID}, result.Attachments); err != nil {
+			e.log.Debug().Err(err).Str("messageID", messageID).Msg("Failed to save attachment metadata")
 		}
 	}
 
@@ -573,8 +571,8 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 			} else {
 				e.log.Warn().Int("fetchedCount", result.fetchedCount).Msg("No body updates in result - bodies may be lost!")
 			}
-			if len(result.attachments) > 0 {
-				if err := e.attachmentStore.CreateBatch(result.attachments); err != nil {
+			if len(result.bodyUpdates) > 0 {
+				if err := e.attachmentStore.ReplaceForMessages(bodyUpdateIDs(result.bodyUpdates), result.attachments); err != nil {
 					e.log.Warn().Err(err).Msg("Failed to batch create attachments")
 					// Attachments failed but bodies were saved, don't count as failed
 				}
@@ -826,8 +824,8 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				fetched += result.fetchedCount
 			}
 		}
-		if len(result.attachments) > 0 {
-			if err := e.attachmentStore.CreateBatch(result.attachments); err != nil {
+		if len(result.bodyUpdates) > 0 {
+			if err := e.attachmentStore.ReplaceForMessages(bodyUpdateIDs(result.bodyUpdates), result.attachments); err != nil {
 				e.log.Warn().Err(err).Msg("Failed to batch create attachments (final)")
 			}
 		}
@@ -985,3 +983,11 @@ func (e *Engine) buildMessageFromStreamedData(accountID, folderID string, uid im
 	return m
 }
 
+// bodyUpdateIDs returns the message IDs of a batch of body updates.
+func bodyUpdateIDs(updates []message.BodyUpdate) []string {
+	ids := make([]string, len(updates))
+	for i, u := range updates {
+		ids[i] = u.MessageID
+	}
+	return ids
+}

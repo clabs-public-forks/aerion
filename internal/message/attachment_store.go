@@ -190,9 +190,12 @@ func (s *AttachmentStore) GetInlineByMessage(messageID string) (map[string]strin
 	return result, nil
 }
 
-// CreateBatch creates multiple attachment records in a single transaction
-func (s *AttachmentStore) CreateBatch(attachments []*Attachment) error {
-	if len(attachments) == 0 {
+// ReplaceForMessages replaces the attachment records of messageIDs with
+// attachments in a single transaction. A re-fetched body re-extracts its
+// attachments with new IDs, so inserting without deleting would list each
+// attachment again.
+func (s *AttachmentStore) ReplaceForMessages(messageIDs []string, attachments []*Attachment) error {
+	if len(messageIDs) == 0 && len(attachments) == 0 {
 		return nil
 	}
 
@@ -201,6 +204,12 @@ func (s *AttachmentStore) CreateBatch(attachments []*Attachment) error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	for _, id := range messageIDs {
+		if _, err := tx.Exec(`DELETE FROM attachments WHERE message_id = ?`, id); err != nil {
+			return fmt.Errorf("failed to delete old attachments: %w", err)
+		}
+	}
 
 	stmt, err := tx.Prepare(`
 		INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline, local_path, content)
