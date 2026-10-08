@@ -195,7 +195,7 @@
   onToggleFocus={() => calendarView.toggleEventFocus()}
 >
   {#snippet children()}
-    <EventDetail eventId={calendarView.selectedEventId} />
+    <EventDetail eventId={calendarView.selectedEventId} occurrence={calendarView.selectedOccurrence} />
   {/snippet}
 </DetailOverlay>
 

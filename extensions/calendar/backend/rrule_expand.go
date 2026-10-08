@@ -101,9 +101,11 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 					Event:             ev,
 					InstanceStartUnix: instUnix,
 					InstanceEndUnix:   instUnix + int64(masterDuration.Seconds()),
+					RecurrenceIDUnix:  instUnix,
 				})
 				continue
 			}
+			inst.RecurrenceIDUnix = instUnix
 			out = append(out, inst)
 			continue
 		}
@@ -111,6 +113,7 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 			Event:             ev,
 			InstanceStartUnix: instUnix,
 			InstanceEndUnix:   instUnix + int64(masterDuration.Seconds()),
+			RecurrenceIDUnix:  instUnix,
 		})
 	}
 

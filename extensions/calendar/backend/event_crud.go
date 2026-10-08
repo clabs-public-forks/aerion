@@ -97,6 +97,10 @@ type EventCreateInput = EventInput
 // EventUpdateInput is EventInput + target event ID.
 type EventUpdateInput struct {
 	EventID string `json:"eventId"`
+	// InstanceUnix is the original start (RECURRENCE-ID) of the occurrence
+	// being edited. Required for scope this and this-and-future, where
+	// DTStartUnix may already hold a moved start.
+	InstanceUnix int64 `json:"instanceUnix,omitempty"`
 	EventInput
 }
 
@@ -261,10 +265,11 @@ func (a *API) UpdateEvent(in EventUpdateInput, scope EditScope) error {
 	}
 
 	switch scope {
-	case EditScopeThis:
-		return a.updateInstance(*src, *cal, *master, in.EventInput, InstanceOpUpdate, EditScopeThis)
-	case EditScopeThisAndFuture:
-		return a.updateInstance(*src, *cal, *master, in.EventInput, InstanceOpUpdate, EditScopeThisAndFuture)
+	case EditScopeThis, EditScopeThisAndFuture:
+		if in.InstanceUnix == 0 {
+			return errors.New("calendar: instance time required for a single-occurrence edit")
+		}
+		return a.updateInstance(*src, *cal, *master, in.EventInput, in.InstanceUnix, InstanceOpUpdate, scope)
 	}
 	return fmt.Errorf("calendar: unknown edit scope %q", scope)
 }
@@ -278,13 +283,16 @@ func (a *API) UpdateEvent(in EventUpdateInput, scope EditScope) error {
 // localProvider's PushInstance is a no-op, so this same code path drives
 // local scope=this / scope=this-and-future too — replacing the previous
 // updateThis / updateThisAndFuture local-only helpers.
-func (a *API) updateInstance(src Source, cal Calendar, master Event, in EventInput, kind InstanceOpKind, op EditScope) error {
+//
+// instanceUnix is the original start of the targeted occurrence: the
+// RECURRENCE-ID for scope=this and the split point for this-and-future.
+func (a *API) updateInstance(src Source, cal Calendar, master Event, in EventInput, instanceUnix int64, kind InstanceOpKind, op EditScope) error {
 	provider := ProviderForSource(src, ProviderDeps{Store: a.store, Secrets: a.secrets, Auth: a.auth})
 	pushCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	result, err := provider.PushInstance(pushCtx, src, cal, PushInstancePayload{
 		Master:           master,
-		InstanceTimeUnix: in.DTStartUnix,
+		InstanceTimeUnix: instanceUnix,
 		Op:               op,
 		Kind:             kind,
 		In:               in,
@@ -295,13 +303,13 @@ func (a *API) updateInstance(src Source, cal Calendar, master Event, in EventInp
 
 	switch {
 	case op == EditScopeThis && kind == InstanceOpUpdate:
-		return a.persistThisUpdate(master, in, result)
+		return a.persistThisUpdate(master, in, instanceUnix, result)
 	case op == EditScopeThis && kind == InstanceOpDelete:
-		return a.persistThisDelete(master, in.DTStartUnix, result)
+		return a.persistThisDelete(master, instanceUnix, result)
 	case op == EditScopeThisAndFuture && kind == InstanceOpUpdate:
-		return a.persistThisAndFutureUpdateLocally(master, in, result)
+		return a.persistThisAndFutureUpdateLocally(master, in, instanceUnix, result)
 	case op == EditScopeThisAndFuture && kind == InstanceOpDelete:
-		return a.persistThisAndFutureDeleteLocally(master, in.DTStartUnix, result)
+		return a.persistThisAndFutureDeleteLocally(master, instanceUnix, result)
 	}
 	return fmt.Errorf("calendar: unsupported scope/kind combo %q/%q", op, kind)
 }
@@ -309,13 +317,13 @@ func (a *API) updateInstance(src Source, cal Calendar, master Event, in EventInp
 // persistThisUpdate writes the override row + updates the master's ETag
 // when the provider returned one (CalDAV — the master's resource was
 // rewritten to embed the override).
-func (a *API) persistThisUpdate(master Event, in EventInput, result PushInstanceResult) error {
-	overrideBlob, err := serializeVEVENTWithRecurrenceID(master.UID, in)
+func (a *API) persistThisUpdate(master Event, in EventInput, instanceUnix int64, result PushInstanceResult) error {
+	overrideBlob, err := serializeVEVENTWithRecurrenceID(master.UID, in, instanceUnix)
 	if err != nil {
 		return fmt.Errorf("serialize override: %w", err)
 	}
 	return a.store.WithTx(func(tx *sql.Tx) error {
-		if err := a.store.UpsertOverrideTx(tx, master.ID, in.DTStartUnix, overrideBlob); err != nil {
+		if err := a.store.UpsertOverrideTx(tx, master.ID, instanceUnix, overrideBlob); err != nil {
 			return err
 		}
 		if result.MasterNewETag != "" {
@@ -360,9 +368,7 @@ func (a *API) persistThisDelete(master Event, instanceUnix int64, result PushIns
 // a new events row for the future series. NewSeries identifiers come from
 // the provider (or are generated locally for local sources via the same
 // pattern as the legacy updateThisAndFuture).
-func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, result PushInstanceResult) error {
-	splitUnix := in.DTStartUnix
-
+func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, splitUnix int64, result PushInstanceResult) error {
 	// 1. Clamp master's RRULE locally.
 	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1)
 	clampedICS, err := reserializeMasterICS(master, clampedRRULE)
@@ -468,7 +474,10 @@ func (a *API) persistThisAndFutureDeleteLocally(master Event, splitUnix int64, r
 // CalDAV recurring + scope=this / this-and-future returns ErrScopeNotSupported
 // (same reasoning as UpdateEvent). CalDAV scope=All issues an HTTP DELETE with
 // If-Match for optimistic concurrency, then CASCADEs the local rows.
-func (a *API) DeleteEvent(eventID string, scope EditScope) error {
+//
+// instanceUnix is the original start of the occurrence the user picked; it
+// is required for scope this and this-and-future.
+func (a *API) DeleteEvent(eventID string, scope EditScope, instanceUnix int64) error {
 	if eventID == "" {
 		return errors.New("calendar: event ID required")
 	}
@@ -522,12 +531,9 @@ func (a *API) DeleteEvent(eventID string, scope EditScope) error {
 		})
 	}
 
-	// For recurring "this" / "this-and-future", the caller's intent is
-	// based on a specific instance. The bridge passes the original
-	// instance start via master.DTStartUnix as a placeholder; a future
-	// bridge update can thread a specific instance time through when the
-	// frontend selects an instance other than the master's first.
-	splitUnix := master.DTStartUnix
+	if instanceUnix == 0 {
+		return errors.New("calendar: instance time required for a single-occurrence delete")
+	}
 
 	// Push delete to remote first via PushInstance, then persist locally.
 	// Symmetric with UpdateEvent's scope=this / scope=this-and-future
@@ -536,16 +542,14 @@ func (a *API) DeleteEvent(eventID string, scope EditScope) error {
 		Summary:     master.Summary,
 		Description: master.Description,
 		Location:    master.Location,
-		DTStartUnix: splitUnix,
-		DTEndUnix:   master.DTEndUnix,
+		DTStartUnix: instanceUnix,
+		DTEndUnix:   instanceUnix + master.DTEndUnix - master.DTStartUnix,
 		IsAllDay:    master.IsAllDay,
 	}
 
 	switch scope {
-	case EditScopeThis:
-		return a.updateInstance(*src, *cal, *master, deleteIn, InstanceOpDelete, EditScopeThis)
-	case EditScopeThisAndFuture:
-		return a.updateInstance(*src, *cal, *master, deleteIn, InstanceOpDelete, EditScopeThisAndFuture)
+	case EditScopeThis, EditScopeThisAndFuture:
+		return a.updateInstance(*src, *cal, *master, deleteIn, instanceUnix, InstanceOpDelete, scope)
 	}
 	return fmt.Errorf("calendar: unknown edit scope %q", scope)
 }
@@ -946,7 +950,7 @@ func (a *API) extractAndUpsertAlarmsTx(tx *sql.Tx, ev Event) error {
 // caller-supplied uid (same as the master's per RFC 5545 §3.8.4.4) and
 // adds RECURRENCE-ID = DTStartUnix so the override binds to a specific
 // occurrence.
-func serializeVEVENTWithRecurrenceID(uid string, in EventInput) (string, error) {
+func serializeVEVENTWithRecurrenceID(uid string, in EventInput, recurrenceIDUnix int64) (string, error) {
 	// Overrides are single-instance, never recurring.
 	in.Recurrence = nil
 
@@ -963,7 +967,7 @@ func serializeVEVENTWithRecurrenceID(uid string, in EventInput) (string, error) 
 	}
 	ev := cal.Events()[0]
 	recIDProp := ical.NewProp(ical.PropRecurrenceID)
-	recIDProp.Value = formatICSDateTime(time.Unix(in.DTStartUnix, 0))
+	recIDProp.Value = formatICSDateTime(time.Unix(recurrenceIDUnix, 0))
 	ev.Props.Set(recIDProp)
 	var buf bytes.Buffer
 	if err := ical.NewEncoder(&buf).Encode(cal); err != nil {

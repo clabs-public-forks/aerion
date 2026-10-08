@@ -762,7 +762,7 @@ type Event struct {
 	RRuleText       string `json:"rruleText,omitempty"`
 	Transparency    string `json:"transparency,omitempty"` // "busy" (default) | "free"; iCal TRANSP
 	Visibility      string `json:"visibility,omitempty"`   // "public" (default) | "private" | "confidential"; iCal CLASS
-	ICSBlob         string `json:"-"` // not exposed to frontend; used by rrule_expand
+	ICSBlob         string `json:"-"`                      // not exposed to frontend; used by rrule_expand
 
 	// Attendees + Organizer. Populated by the ICS parser on read; written
 	// back into the JSON columns by UpsertEventTx. Types defined in
@@ -784,10 +784,13 @@ type Event struct {
 // events produce zero or more (depends on the window). RECURRENCE-ID
 // overrides replace the matching default-expanded instance.
 type EventInstance struct {
-	Event              // embed for field reuse; serialized flat in JSON
-	InstanceStartUnix  int64 `json:"instanceStartUnix"`
-	InstanceEndUnix    int64 `json:"instanceEndUnix"`
-	IsRecurrenceOverride bool `json:"isRecurrenceOverride,omitempty"`
+	Event                   // embed for field reuse; serialized flat in JSON
+	InstanceStartUnix int64 `json:"instanceStartUnix"`
+	InstanceEndUnix   int64 `json:"instanceEndUnix"`
+	// RecurrenceIDUnix is the occurrence's original start (its RECURRENCE-ID)
+	// for recurring events, even when an override moved it; 0 otherwise.
+	RecurrenceIDUnix     int64 `json:"recurrenceIdUnix,omitempty"`
+	IsRecurrenceOverride bool  `json:"isRecurrenceOverride,omitempty"`
 }
 
 // EventOverride is one RECURRENCE-ID exception to a master recurring event.

@@ -103,7 +103,7 @@
   function onActivate(id: string) {
     selectedRowId = id
     const row = rows.find(r => r.id === id)
-    if (row) calendarView.selectEvent(row.instance.id)
+    if (row) calendarView.selectEvent(row.instance.id, row.instance)
   }
 
   // Header label combines the existing `calendar.viewSwitcher.agenda` key with

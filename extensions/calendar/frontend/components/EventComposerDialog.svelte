@@ -24,6 +24,7 @@
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { calendarSources } from '$extensions/calendar/frontend/stores/calendarSources.svelte'
   import { calendarSettings } from '$extensions/calendar/frontend/stores/calendarSettings.svelte'
+  import type { SelectedOccurrence } from '$extensions/calendar/frontend/stores/calendarView.svelte'
   import { fromZonedTime, toZonedTime } from 'date-fns-tz'
   // @ts-ignore - wailsjs bindings
   import { Calendar_CreateEvent, Calendar_UpdateEvent } from '$wailsjs/go/app/App.js'
@@ -39,6 +40,9 @@
     open: boolean
     mode?: ComposerMode
     existing?: backend.Event | null
+    // Clicked occurrence of a recurring event; scope this and
+    // this-and-future edit it instead of the series start.
+    occurrence?: SelectedOccurrence | null
     scope?: 'this' | 'this-and-future' | 'all'
     defaultStart?: Date | null
     defaultCalendarId?: string
@@ -50,6 +54,7 @@
     open = $bindable(false),
     mode = 'create',
     existing = null,
+    occurrence = null,
     scope = 'all',
     defaultStart = null,
     defaultCalendarId = '',
@@ -336,8 +341,9 @@
     description = ev.description || ''
     descriptionHTML = ev.descriptionHTML || ''
     isAllDay = !!ev.isAllDay
-    const startInTz = toZonedTime(new Date(ev.dtstartUnix * 1000), tz)
-    const endInTz = toZonedTime(new Date(ev.dtendUnix * 1000), tz)
+    const single = scope !== 'all' && occurrence
+    const startInTz = toZonedTime(new Date((single ? occurrence.startUnix : ev.dtstartUnix) * 1000), tz)
+    const endInTz = toZonedTime(new Date((single ? occurrence.endUnix : ev.dtendUnix) * 1000), tz)
     // Wire DTEND is exclusive (next-day midnight) for all-day events per
     // RFC 5545 §3.6.1 — subtract a day so the picker shows the inclusive
     // last day. If a legacy/zero-duration record snuck in (DTEND == DTSTART),
@@ -559,7 +565,7 @@
     try {
       if (mode === 'edit' && existing) {
         await Calendar_UpdateEvent(
-          { eventId: existing.id, ...input } as backend.EventUpdateInput,
+          { eventId: existing.id, instanceUnix: occurrence?.recurrenceIdUnix, ...input } as backend.EventUpdateInput,
           scope,
         )
         toasts.success($_('calendar.composer.toastUpdated'))

@@ -10,6 +10,8 @@
 // at call time, so changes propagate to all dependent $derived values.
 
 import { toTzDate, fromTzDate } from '$extensions/calendar/frontend/lib/tzMath'
+// @ts-ignore - wailsjs bindings
+import type { backend } from '$wailsjs/go/models'
 
 export type ViewKind = 'month' | 'week' | 'day' | 'agenda'
 
@@ -19,6 +21,14 @@ const AGENDA_DAYS = 14
 let viewKind = $state<ViewKind>('month')
 let anchorDate = $state<Date>(startOfMonth(new Date()))
 let selectedEventId = $state<string | null>(null)
+// The clicked occurrence of a recurring event; null for one-off events and
+// deep links. recurrenceIdUnix is its original start (RECURRENCE-ID).
+export interface SelectedOccurrence {
+  recurrenceIdUnix: number
+  startUnix: number
+  endUnix: number
+}
+let selectedOccurrence = $state<SelectedOccurrence | null>(null)
 let eventFocusMode = $state<'off' | 'event'>('off')
 
 // Centralized create-mode composer state. Trigger sites (the "+ Event"
@@ -74,6 +84,7 @@ function setViewKind(k: ViewKind) {
   }
   viewKind = k
   selectedEventId = null
+  selectedOccurrence = null
   eventFocusMode = 'off'
 }
 
@@ -125,8 +136,11 @@ function goToday() {
   anchorDate = startOfDay(new Date())
 }
 
-function selectEvent(id: string | null) {
+function selectEvent(id: string | null, inst?: backend.EventInstance) {
   selectedEventId = id
+  selectedOccurrence = inst?.recurrenceIdUnix
+    ? { recurrenceIdUnix: inst.recurrenceIdUnix, startUnix: inst.instanceStartUnix, endUnix: inst.instanceEndUnix }
+    : null
   eventFocusMode = 'off'
 }
 
@@ -194,6 +208,7 @@ export const calendarView = {
   get viewKind() { return viewKind },
   get anchorDate() { return anchorDate },
   get selectedEventId() { return selectedEventId },
+  get selectedOccurrence() { return selectedOccurrence },
   get eventFocusMode() { return eventFocusMode },
   get visibleRange() { return visibleRange },
   // Getter+setter so consumers can `bind:open={calendarView.composerOpen}`.

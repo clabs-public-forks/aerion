@@ -100,11 +100,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K1 high** `event_crud.go:530`, `EventDetail.svelte:326`: delete with
-  scope this or this-and-future splits at the master start, not at the
-  clicked occurrence. Unverified.
-- **K2 high** `event_crud.go:287,966`: edit this or this-and-future uses the
-  new start as RECURRENCE-ID. Unverified.
 - **K3 high** `EventComposerDialog.svelte:358`, `event_crud.go:571,702`:
   editing resets the reminder, rebuilds RRULE from only FREQ, UNTIL and
   COUNT, and drops overrides and X-properties. Unverified.

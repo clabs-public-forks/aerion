@@ -314,15 +314,16 @@ func (b *CalendarBridge) Calendar_UpdateEvent(in EventUpdateInput, scope string)
 }
 
 // Calendar_DeleteEvent removes an event. Scope semantics mirror
-// Calendar_UpdateEvent.
-func (b *CalendarBridge) Calendar_DeleteEvent(eventID, scope string) error {
+// Calendar_UpdateEvent; instanceUnix is the picked occurrence's
+// recurrenceIdUnix and is ignored for scope "all".
+func (b *CalendarBridge) Calendar_DeleteEvent(eventID, scope string, instanceUnix int64) error {
 	if !b.gateEnabled() {
 		return errors.New("calendar: extension disabled")
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
 	}
-	if err := b.api.DeleteEvent(eventID, EditScope(scope)); err != nil {
+	if err := b.api.DeleteEvent(eventID, EditScope(scope), instanceUnix); err != nil {
 		return err
 	}
 	if b.alarms != nil {

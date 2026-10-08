@@ -8,7 +8,7 @@
   import { calendarSources } from '$extensions/calendar/frontend/stores/calendarSources.svelte'
   import { calendarSettings } from '$extensions/calendar/frontend/stores/calendarSettings.svelte'
   import { toTzDate } from '$extensions/calendar/frontend/lib/tzMath'
-  import { calendarView } from '$extensions/calendar/frontend/stores/calendarView.svelte'
+  import { calendarView, type SelectedOccurrence } from '$extensions/calendar/frontend/stores/calendarView.svelte'
   import { events } from '$extensions/calendar/frontend/stores/events.svelte'
   import { Button } from '$lib/components/ui/button'
   import Icon from '@iconify/svelte'
@@ -32,9 +32,10 @@
 
   interface Props {
     eventId: string | null
+    occurrence?: SelectedOccurrence | null
   }
 
-  let { eventId }: Props = $props()
+  let { eventId, occurrence = null }: Props = $props()
 
   let event = $state<backend.Event | null>(null)
   let loading = $state(false)
@@ -323,7 +324,7 @@
     if (!event) return
     deleting = true
     try {
-      await Calendar_DeleteEvent(event.id, composerScope)
+      await Calendar_DeleteEvent(event.id, composerScope, occurrence?.recurrenceIdUnix ?? 0)
       toasts.success($_('calendar.composer.toastDeleted'))
       // Refresh and close overlay.
       void events.fetchRange(
@@ -557,6 +558,7 @@
   bind:open={showComposer}
   mode="edit"
   existing={event}
+  {occurrence}
   scope={composerScope}
   onSaved={onComposerSaved}
 />

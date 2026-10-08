@@ -53,7 +53,7 @@ export function Calendar_CreateEvent(arg1:backend.EventInput):Promise<string>;
 
 export function Calendar_DeleteCalendar(arg1:string):Promise<void>;
 
-export function Calendar_DeleteEvent(arg1:string,arg2:string):Promise<void>;
+export function Calendar_DeleteEvent(arg1:string,arg2:string,arg3:number):Promise<void>;
 
 export function Calendar_DeleteSource(arg1:string):Promise<void>;
 

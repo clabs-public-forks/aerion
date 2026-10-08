@@ -70,8 +70,8 @@ export function Calendar_DeleteCalendar(arg1) {
   return window['go']['app']['App']['Calendar_DeleteCalendar'](arg1);
 }
 
-export function Calendar_DeleteEvent(arg1, arg2) {
-  return window['go']['app']['App']['Calendar_DeleteEvent'](arg1, arg2);
+export function Calendar_DeleteEvent(arg1, arg2, arg3) {
+  return window['go']['app']['App']['Calendar_DeleteEvent'](arg1, arg2, arg3);
 }
 
 export function Calendar_DeleteSource(arg1) {

@@ -1096,6 +1096,7 @@ export namespace backend {
 	    organizer?: Organizer;
 	    instanceStartUnix: number;
 	    instanceEndUnix: number;
+	    recurrenceIdUnix?: number;
 	    isRecurrenceOverride?: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -1125,6 +1126,7 @@ export namespace backend {
 	        this.organizer = this.convertValues(source["organizer"], Organizer);
 	        this.instanceStartUnix = source["instanceStartUnix"];
 	        this.instanceEndUnix = source["instanceEndUnix"];
+	        this.recurrenceIdUnix = source["recurrenceIdUnix"];
 	        this.isRecurrenceOverride = source["isRecurrenceOverride"];
 	    }
 	
@@ -1148,6 +1150,7 @@ export namespace backend {
 	}
 	export class EventUpdateInput {
 	    eventId: string;
+	    instanceUnix?: number;
 	    calendarId: string;
 	    summary: string;
 	    description?: string;
@@ -1172,6 +1175,7 @@ export namespace backend {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.eventId = source["eventId"];
+	        this.instanceUnix = source["instanceUnix"];
 	        this.calendarId = source["calendarId"];
 	        this.summary = source["summary"];
 	        this.description = source["description"];
