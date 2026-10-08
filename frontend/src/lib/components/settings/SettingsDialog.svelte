@@ -68,6 +68,13 @@
   let loading = $state(true)
   let saving = $state(false)
   let activeTab = $state('general')
+  let tabScrollEl = $state<HTMLDivElement | null>(null)
+
+  // All tabs share one scroll container; start each tab at the top.
+  $effect(() => {
+    void activeTab
+    if (tabScrollEl) tabScrollEl.scrollTop = 0
+  })
 
   // Live theme preview: apply the picker's current value to the document
   // immediately so the user sees what each theme looks like before saving.
@@ -319,7 +326,7 @@
           </Tabs.Trigger>
         </Tabs.List>
 
-        <div class="mt-4 h-[350px] overflow-y-auto pl-1 pr-3">
+        <div bind:this={tabScrollEl} class="mt-4 h-[350px] overflow-y-auto pl-1 pr-3">
           <Tabs.Content value="general" class="mt-0">
             <GeneralTab
               bind:markAsReadDelaySeconds
