@@ -85,7 +85,11 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 		return nil, fmt.Errorf("rrule_expand: build recurrence set: %w", err)
 	}
 
-	occurrences := occurrencesBetween(set, from, to)
+	// Start the walk one master duration early so a multi-day occurrence
+	// that began before the window but runs into it is included.
+	masterDuration := ev.DTEndUnix - ev.DTStartUnix
+	walkFrom := from.Add(-time.Duration(masterDuration) * time.Second)
+	occurrences := occurrencesBetween(set, walkFrom, to)
 
 	// Index overrides by their RECURRENCE-ID for O(1) lookup. Multiple
 	// overrides at the same instant shouldn't happen; if they do, the last
@@ -95,41 +99,49 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 		overrideByInstant[ov.RecurrenceIDUnix] = ov
 	}
 
-	// Compute the event's duration once so override-less instances can
-	// inherit it. Override instances supply their own DTSTART/DTEND.
-	masterDuration := time.Duration(ev.DTEndUnix-ev.DTStartUnix) * time.Second
-
 	out := make([]EventInstance, 0, len(occurrences))
+	add := func(inst EventInstance) {
+		if overlapsWindow(inst, from, to) {
+			out = append(out, inst)
+		}
+	}
 	for _, occ := range occurrences {
 		instUnix := occ.Unix()
-		if ov, ok := overrideByInstant[instUnix]; ok {
-			// Apply override: parse its ICS, extract DTSTART/DTEND/SUMMARY,
-			// build an EventInstance using overrides where present and
-			// master values where absent.
-			inst, err := applyOverride(ev, ov)
-			if errors.Is(err, errOverrideCancelled) {
-				continue // occurrence cancelled on the server
-			}
-			if err != nil {
-				// Skip malformed override; fall back to default expansion.
-				out = append(out, EventInstance{
-					Event:             ev,
-					InstanceStartUnix: instUnix,
-					InstanceEndUnix:   instUnix + int64(masterDuration.Seconds()),
-					RecurrenceIDUnix:  instUnix,
-				})
-				continue
-			}
-			inst.RecurrenceIDUnix = instUnix
-			out = append(out, inst)
+		ov, ok := overrideByInstant[instUnix]
+		delete(overrideByInstant, instUnix)
+		if !ok {
+			add(defaultInstance(ev, instUnix, masterDuration))
 			continue
 		}
-		out = append(out, EventInstance{
-			Event:             ev,
-			InstanceStartUnix: instUnix,
-			InstanceEndUnix:   instUnix + int64(masterDuration.Seconds()),
-			RecurrenceIDUnix:  instUnix,
-		})
+		// Apply override: parse its ICS, extract DTSTART/DTEND/SUMMARY,
+		// build an EventInstance using overrides where present and
+		// master values where absent.
+		inst, err := applyOverride(ev, ov)
+		if errors.Is(err, errOverrideCancelled) {
+			continue // occurrence cancelled on the server
+		}
+		if err != nil {
+			// Skip malformed override; fall back to default expansion.
+			add(defaultInstance(ev, instUnix, masterDuration))
+			continue
+		}
+		inst.RecurrenceIDUnix = instUnix
+		add(inst)
+	}
+
+	// An override can move its occurrence into the window from a slot
+	// outside the walked range. Unmatched overrides whose slot lies inside
+	// that range belong to excluded occurrences and stay hidden.
+	for rid, ov := range overrideByInstant {
+		if rid >= walkFrom.Unix() && rid <= to.Unix() {
+			continue
+		}
+		inst, err := applyOverride(ev, ov)
+		if err != nil {
+			continue
+		}
+		inst.RecurrenceIDUnix = rid
+		add(inst)
 	}
 
 	sort.Slice(out, func(i, j int) bool {
@@ -280,4 +292,23 @@ func occurrencesBetween(set *rrule.Set, from, to time.Time) []time.Time {
 		}
 	}
 	return out
+}
+
+// defaultInstance is the occurrence at instUnix with the master's duration.
+func defaultInstance(ev Event, instUnix, duration int64) EventInstance {
+	return EventInstance{
+		Event:             ev,
+		InstanceStartUnix: instUnix,
+		InstanceEndUnix:   instUnix + duration,
+		RecurrenceIDUnix:  instUnix,
+	}
+}
+
+// overlapsWindow reports whether inst starts in [from, to] or started
+// earlier and is still running at from.
+func overlapsWindow(inst EventInstance, from, to time.Time) bool {
+	if inst.InstanceStartUnix > to.Unix() {
+		return false
+	}
+	return inst.InstanceStartUnix >= from.Unix() || inst.InstanceEndUnix > from.Unix()
 }

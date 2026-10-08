@@ -64,8 +64,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K14 medium** `rrule_expand.go:61,77`: expansion misses multi-day
-  overlaps and moved overrides. Unverified.
 - **K15 low** `ical_convert.go`: all-day times are frozen to the timezone at
   parse time, and STATUS:CANCELLED is ignored. Unverified.
 - **K16 low** `bridge.go`: R16 says disabled bridge methods should return
