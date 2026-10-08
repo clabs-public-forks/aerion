@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	goImap "github.com/emersion/go-imap/v2"
@@ -22,7 +23,7 @@ import (
 // draftBodyPayload is used to serialize body fields for encrypted draft storage
 type draftBodyPayload struct {
 	BodyHTML    string            `json:"bodyHtml"`
-	BodyText   string            `json:"bodyText"`
+	BodyText    string            `json:"bodyText"`
 	Attachments []smtp.Attachment `json:"attachments,omitempty"`
 }
 
@@ -192,6 +193,7 @@ func (ops *draftOps) saveDraftToDB(accountID string, localDraft *draft.Draft, ms
 		localDraft.BodyHTML = enc.bodyHTML
 		localDraft.BodyText = enc.bodyText
 		localDraft.InReplyToID = msg.InReplyTo
+		localDraft.IdentityID = ops.identityIDForAddress(accountID, msg.From.Address)
 		localDraft.SignMessage = msg.SignMessage
 		localDraft.Encrypted = enc.encrypted
 		localDraft.EncryptedBody = enc.encryptedBody
@@ -219,6 +221,7 @@ func (ops *draftOps) saveDraftToDB(accountID string, localDraft *draft.Draft, ms
 		BodyHTML:         enc.bodyHTML,
 		BodyText:         enc.bodyText,
 		InReplyToID:      msg.InReplyTo,
+		IdentityID:       ops.identityIDForAddress(accountID, msg.From.Address),
 		SignMessage:      msg.SignMessage,
 		Encrypted:        enc.encrypted,
 		EncryptedBody:    enc.encryptedBody,
@@ -444,8 +447,9 @@ func (ops *draftOps) toComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	pgpEncryptMessage := false
 	var attachments []smtp.Attachment
 
-	// Determine the identity email for decryption
-	identityEmail := ops.getIdentityEmail(d)
+	// The draft's sender identity, used for decryption and to restore From
+	from := ops.draftSender(d)
+	identityEmail := from.Address
 
 	// S/MIME encrypted draft
 	if d.Encrypted && len(d.EncryptedBody) > 0 {
@@ -502,6 +506,7 @@ func (ops *draftOps) toComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	}
 
 	return &smtp.ComposeMessage{
+		From:              from,
 		To:                parseAddressList(d.ToList),
 		Cc:                parseAddressList(d.CcList),
 		Bcc:               parseAddressList(d.BccList),
@@ -518,25 +523,48 @@ func (ops *draftOps) toComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	}
 }
 
-// getIdentityEmail returns the email address for the draft's identity.
-// Falls back to the account email if the identity cannot be resolved.
-func (ops *draftOps) getIdentityEmail(d *draft.Draft) string {
-	if d.IdentityID != "" {
-		identities, err := ops.accountStore.GetIdentities(d.AccountID)
-		if err == nil {
-			for _, id := range identities {
-				if id.ID == d.IdentityID {
-					return id.Email
-				}
-			}
+// identityIDForAddress returns the ID of the account identity whose email
+// matches address (case-insensitive), or "" when none does.
+func (ops *draftOps) identityIDForAddress(accountID, address string) string {
+	if address == "" {
+		return ""
+	}
+	identities, err := ops.accountStore.GetIdentities(accountID)
+	if err != nil {
+		return ""
+	}
+	for _, id := range identities {
+		if strings.EqualFold(id.Email, address) {
+			return id.ID
 		}
 	}
-	// Fall back to account email
+	return ""
+}
+
+// draftSender returns the From address for the draft's identity. Falls back
+// to the account's default identity, then the account email, if the draft's
+// identity cannot be resolved.
+func (ops *draftOps) draftSender(d *draft.Draft) smtp.Address {
+	identities, err := ops.accountStore.GetIdentities(d.AccountID)
+	if err == nil {
+		var fallback *account.Identity
+		for _, id := range identities {
+			if d.IdentityID != "" && id.ID == d.IdentityID {
+				return smtp.Address{Name: id.Name, Address: id.Email}
+			}
+			if id.IsDefault && fallback == nil {
+				fallback = id
+			}
+		}
+		if fallback != nil {
+			return smtp.Address{Name: fallback.Name, Address: fallback.Email}
+		}
+	}
 	acc, err := ops.accountStore.Get(d.AccountID)
 	if err == nil && acc != nil {
-		return acc.Email
+		return smtp.Address{Address: acc.Email}
 	}
-	return ""
+	return smtp.Address{}
 }
 
 // ============================================================================
