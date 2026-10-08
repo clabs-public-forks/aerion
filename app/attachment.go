@@ -249,13 +249,18 @@ func (a *App) openFile(path string) error {
 	return cmd.Start()
 }
 
-// validateOpenPath checks that the path is under an allowed root directory
+// validateOpenPath checks that the path, with symlinks resolved, is under the
+// attachment cache or ~/Downloads, where attachments are saved. The rest of
+// the data dir (databases, keys, config) is never opened.
 func (a *App) validateOpenPath(path string) error {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
 	}
-	absPath = filepath.Clean(absPath)
+	realPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -265,12 +270,14 @@ func (a *App) validateOpenPath(path string) error {
 	allowedRoots := []string{
 		a.paths.AttachmentsPath(),
 		filepath.Join(homeDir, "Downloads"),
-		a.paths.Data,
 	}
 
 	for _, root := range allowedRoots {
-		cleanRoot := filepath.Clean(root) + string(filepath.Separator)
-		if strings.HasPrefix(absPath, cleanRoot) || absPath == filepath.Clean(root) {
+		realRoot, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		if realPath == realRoot || strings.HasPrefix(realPath, realRoot+string(filepath.Separator)) {
 			return nil
 		}
 	}
