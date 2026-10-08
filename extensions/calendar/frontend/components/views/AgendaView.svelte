@@ -35,6 +35,11 @@
 
   let selectedRowId = $state<string | null>(null)
 
+  // The calendar name only shows when the pane itself is wide enough; a
+  // viewport breakpoint would still show it in a narrow pane and squeeze titles.
+  const SHOW_CALENDAR_MIN_PX = 640
+  let paneWidth = $state(0)
+
   // Locale-aware AND tz-aware formatters: locale via $locale, timezone
   // via the user's chosen display timezone.
   const dateFmt = $derived(new Intl.DateTimeFormat($locale || undefined, {
@@ -126,7 +131,7 @@
   }
 </script>
 
-<div class="flex-1 flex flex-col min-h-0 bg-background">
+<div class="flex-1 flex flex-col min-h-0 bg-background" bind:clientWidth={paneWidth}>
   <ListHeader label={headerLabel} showSidebarToggle={false} />
 
   <ListPane
@@ -160,9 +165,11 @@
         <span class="flex-1 min-w-0 truncate text-sm text-foreground">
           {item.instance.summary || $_('calendar.detail.noTitle')}
         </span>
-        <span class="shrink-0 hidden md:inline truncate max-w-[40%] text-xs text-muted-foreground">
-          {calendarLabel(item.instance)}
-        </span>
+        {#if paneWidth >= SHOW_CALENDAR_MIN_PX}
+          <span class="shrink-0 truncate max-w-[40%] text-xs text-muted-foreground">
+            {calendarLabel(item.instance)}
+          </span>
+        {/if}
       </ListRow>
     {/snippet}
 
