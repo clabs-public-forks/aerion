@@ -1017,11 +1017,6 @@
     loadConversations()
   }
 
-  // Calculate total unread count
-  const unreadCount = $derived(
-    conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
-  )
-
   // Reference to the list container for scrolling
   let listContainerRef = $state<HTMLDivElement | null>(null)
 
@@ -1445,9 +1440,6 @@
         </div>
       {:else}
         <h2 class="font-semibold text-foreground truncate">{folderName}</h2>
-        <span class="text-sm text-muted-foreground whitespace-nowrap">
-          {$_('messageList.unread', { values: { count: unreadCount } })}
-        </span>
       {/if}
     </div>
     <div class="flex items-center gap-1 flex-shrink-0">

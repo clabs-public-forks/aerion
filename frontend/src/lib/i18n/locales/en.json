@@ -105,6 +105,8 @@
     "deletePermanently": "Delete Permanently",
     "markAsSpam": "Mark as Spam",
     "markAsNotSpam": "Mark as NOT Spam",
+    "spam": "Spam",
+    "notSpam": "Not Spam",
     "star": "Star",
     "removeStar": "Remove star",
     "markAsRead": "Mark as read",

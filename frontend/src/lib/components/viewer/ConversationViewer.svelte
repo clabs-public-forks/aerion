@@ -20,6 +20,7 @@
   import { getShowViewerCircles, getDarkMailContent } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
   import ComposeButton from '$lib/components/common/ComposeButton.svelte'
+  import ToolbarButton from '$lib/components/common/ToolbarButton.svelte'
 
   interface Props {
     threadId?: string | null
@@ -1334,40 +1335,23 @@
           <div class="w-px h-5 bg-border mx-1"></div>
         {/if}
         {@render composeButton()}
-
-        <div class="w-px h-5 bg-border mx-1"></div>
-
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.archive')}
-          onclick={handleArchive}
-        >
-          <Icon icon="mdi:archive-outline" class="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
+        <ToolbarButton icon="mdi:reply" label={$_('viewer.reply')} onclick={handleReply} />
+        <ToolbarButton icon="mdi:archive-outline" label={$_('viewer.archive')} onclick={handleArchive} />
+        <ToolbarButton
+          icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'}
+          label={$_('viewer.delete')}
           title={$_(isTrashFolder ? 'viewer.deletePermanently' : 'viewer.delete')}
           onclick={handleDelete}
-        >
-          <Icon icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'} class="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
+        />
+        <ToolbarButton
+          icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'}
+          label={$_(isSpamFolder ? 'viewer.notSpam' : 'viewer.spam')}
           title={$_(isSpamFolder ? 'viewer.markAsNotSpam' : 'viewer.markAsSpam')}
           onclick={handleSpam}
-        >
-          <Icon icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'} class="w-5 h-5 text-muted-foreground" />
-        </button>
+        />
 
         <div class="w-px h-5 bg-border mx-1"></div>
 
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.reply')}
-          onclick={handleReply}
-        >
-          <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
-        </button>
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
           title={$_('viewer.replyAll')}
