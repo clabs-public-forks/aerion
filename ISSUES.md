@@ -53,8 +53,6 @@ has not yet been confirmed against the code.
 
 ### Contacts
 
-- **C10 medium** `internal/carddav/client.go:511-560`: CardDAV PHOTO data is
-  stored uncapped and unvalidated. Unverified.
 - **C11 medium** `ContactEditDialog.svelte:197-215`: a 412 conflict reports
   success and closes the dialog, losing the edits. Unverified.
 - **C12 medium** contacts backend: EXT_RULES R1, R2, R5 and R6 (see A4).

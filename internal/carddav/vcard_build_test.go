@@ -171,7 +171,7 @@ func TestParseVCard_InlinePhoto(t *testing.T) {
 		"BEGIN:VCARD",
 		"VERSION:3.0",
 		"FN:Photo Person",
-		"PHOTO;ENCODING=b;TYPE=JPEG:VEVTVERBVEE=",
+		"PHOTO;ENCODING=b;TYPE=JPEG:/9j/4AAQ",
 		"END:VCARD",
 		"",
 	}, "\r\n")
@@ -184,8 +184,8 @@ func TestParseVCard_InlinePhoto(t *testing.T) {
 	if rec == nil {
 		t.Fatal("parseVCard returned nil")
 	}
-	if rec.PhotoData != "VEVTVERBVEE=" {
-		t.Errorf("PhotoData = %q, want VEVTVERBVEE=", rec.PhotoData)
+	if rec.PhotoData != "/9j/4AAQ" {
+		t.Errorf("PhotoData = %q, want /9j/4AAQ", rec.PhotoData)
 	}
 	if rec.PhotoMediaType != "image/jpeg" {
 		t.Errorf("PhotoMediaType = %q, want image/jpeg", rec.PhotoMediaType)

@@ -3,6 +3,7 @@ package carddav
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -549,6 +550,10 @@ func parseVCard(obj carddav.AddressObject) *ParsedRecord {
 		}
 	}
 
+	if rec.PhotoData != "" {
+		rec.PhotoData, rec.PhotoMediaType = sanitizeInlinePhoto(rec.PhotoData)
+	}
+
 	// Re-encode the card for vcard_raw round-trip preservation.
 	var buf bytes.Buffer
 	if err := vcard.NewEncoder(&buf).Encode(card); err == nil {
@@ -556,6 +561,39 @@ func parseVCard(obj carddav.AddressObject) *ParsedRecord {
 	}
 
 	return rec
+}
+
+// maxInlinePhotoBytes caps a decoded inline PHOTO. Photos are stored in the
+// contacts table and sent to the frontend with every contact read, so a
+// server can't be allowed to push arbitrarily large blobs.
+const maxInlinePhotoBytes = 1 << 20
+
+// inlinePhotoTypes are the image formats an inline photo may be.
+var inlinePhotoTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+}
+
+// sanitizeInlinePhoto validates base64 photo data from a server: it must be
+// at most maxInlinePhotoBytes once decoded and sniff as an allowed image
+// format. Returns the normalized data and the sniffed media type (the
+// card's declared type isn't trusted), or empty strings to drop the photo.
+func sanitizeInlinePhoto(data string) (string, string) {
+	data = strings.Join(strings.Fields(data), "")
+	if len(data) > base64.StdEncoding.EncodedLen(maxInlinePhotoBytes) {
+		return "", ""
+	}
+	raw, err := base64.StdEncoding.DecodeString(data)
+	if err != nil || len(raw) == 0 {
+		return "", ""
+	}
+	mediaType := http.DetectContentType(raw)
+	if !inlinePhotoTypes[mediaType] {
+		return "", ""
+	}
+	return data, mediaType
 }
 
 // firstFieldType returns the first TYPE parameter on a Field (lowercased so
