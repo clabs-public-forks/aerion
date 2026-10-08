@@ -53,9 +53,6 @@ has not yet been confirmed against the code.
 
 ### Contacts
 
-- **C3/C4 medium** `internal/carddav/vcard_build.go`: editing drops a
-  PHOTO URI, N prefix/suffix/middle names, PREF, extra TYPEs and
-  X-ABLabel. Unverified.
 - **C5 medium** `internal/carddav/store.go:854-900,1010-1035`: an empty etag
   makes PUT and DELETE unconditional. Unverified.
 - **C9 medium** `extensions/contacts/backend/imaging/imaging.go:55-75`:
