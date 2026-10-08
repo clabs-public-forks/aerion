@@ -21,6 +21,8 @@
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
   import ComposeButton from '$lib/components/common/ComposeButton.svelte'
   import ToolbarButton from '$lib/components/common/ToolbarButton.svelte'
+  import { getInitials } from '$lib/utils/initials'
+  import { getLayoutMode } from '$lib/stores/layout.svelte'
 
   interface Props {
     threadId?: string | null
@@ -511,10 +513,15 @@
       error = $_('viewer.failedToLoad')
     } finally {
       loading = false
-      // Scroll to bottom to show the latest message
+      // Scroll the latest message's header to the top. A single message
+      // stays at the top so the subject and sender remain visible.
       await tick()
       if (contentContainerRef) {
-        contentContainerRef.scrollTop = contentContainerRef.scrollHeight
+        const msgs = contentContainerRef.querySelectorAll<HTMLElement>('[data-message-id]')
+        const latest = msgs.length > 1 ? msgs[msgs.length - 1] : null
+        contentContainerRef.scrollTop = latest
+          ? latest.getBoundingClientRect().top - contentContainerRef.getBoundingClientRect().top + contentContainerRef.scrollTop
+          : 0
       }
     }
   }
@@ -687,15 +694,6 @@
   function formatDate(dateStr: any): string {
     const date = new Date(dateStr)
     return `${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-  }
-
-  function getInitials(name: string): string {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
   }
 
   function getAvatarColor(email: string): string {
@@ -1111,6 +1109,9 @@
   // Computed: is this the Spam folder?
   const isSpamFolder = $derived(folderType === 'spam')
 
+  // Narrow layout: icon-only toolbar buttons so the toolbar fits in fewer rows
+  const isNarrow = $derived(getLayoutMode() === 'narrow')
+
   // Computed: messages visible in the viewer.
   // In message-focus mode, narrow to the single targeted message.
   // Otherwise show the whole thread.
@@ -1321,8 +1322,8 @@
   {:else if conversation}
     <div class="conversation-viewer-content flex flex-col h-full">
     <!-- Header with Actions (wraps on narrow widths instead of clipping) -->
-    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border">
-      <div class="flex flex-wrap items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border">
+      <div class="contents">
         {#if showBackButton}
           <button
             class="p-2 rounded-md hover:bg-muted transition-colors mr-1"
@@ -1335,17 +1336,19 @@
           <div class="w-px h-5 bg-border mx-1"></div>
         {/if}
         {@render composeButton()}
-        <ToolbarButton icon="mdi:reply" label={$_('viewer.reply')} onclick={handleReply} />
-        <ToolbarButton icon="mdi:archive-outline" label={$_('viewer.archive')} onclick={handleArchive} />
+        <ToolbarButton icon="mdi:reply" label={$_('viewer.reply')} compact={isNarrow} onclick={handleReply} />
+        <ToolbarButton icon="mdi:archive-outline" label={$_('viewer.archive')} compact={isNarrow} onclick={handleArchive} />
         <ToolbarButton
           icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'}
           label={$_('viewer.delete')}
+          compact={isNarrow}
           title={$_(isTrashFolder ? 'viewer.deletePermanently' : 'viewer.delete')}
           onclick={handleDelete}
         />
         <ToolbarButton
           icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'}
           label={$_(isSpamFolder ? 'viewer.notSpam' : 'viewer.spam')}
+          compact={isNarrow}
           title={$_(isSpamFolder ? 'viewer.markAsNotSpam' : 'viewer.markAsSpam')}
           onclick={handleSpam}
         />
