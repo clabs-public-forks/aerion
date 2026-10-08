@@ -15,6 +15,7 @@
   import Icon from '@iconify/svelte'
   import ConversationRow from './ConversationRow.svelte'
   import ResponsiveSidebarToggle from '$lib/components/kit/ResponsiveSidebarToggle.svelte'
+  import ComposeButton from '$lib/components/common/ComposeButton.svelte'
   import { DropdownMenu } from 'bits-ui'
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
@@ -1403,8 +1404,8 @@
 
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
   <!-- Header -->
-  <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-    <div class="flex items-center gap-2">
+  <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
+    <div class="flex items-center gap-2 min-w-0">
       <ResponsiveSidebarToggle />
       {#if showSearch}
         <!-- Search input -->
@@ -1443,22 +1444,15 @@
           {/if}
         </div>
       {:else}
-        <h2 class="font-semibold text-foreground">{folderName}</h2>
-        <span class="text-sm text-muted-foreground">
+        <h2 class="font-semibold text-foreground truncate">{folderName}</h2>
+        <span class="text-sm text-muted-foreground whitespace-nowrap">
           {$_('messageList.unread', { values: { count: unreadCount } })}
         </span>
       {/if}
     </div>
-    <div class="flex items-center gap-1">
+    <div class="flex items-center gap-1 flex-shrink-0">
       {#if onCompose}
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('sidebar.compose')}
-          aria-label={$_('sidebar.compose')}
-          onclick={onCompose}
-        >
-          <Icon icon="mdi:pencil" class="w-5 h-5 text-primary" />
-        </button>
+        <div class="mr-1"><ComposeButton onclick={onCompose} /></div>
       {/if}
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors disabled:opacity-50"

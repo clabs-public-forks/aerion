@@ -19,6 +19,7 @@
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
   import { getShowViewerCircles, getDarkMailContent } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
+  import ComposeButton from '$lib/components/common/ComposeButton.svelte'
 
   interface Props {
     threadId?: string | null
@@ -1284,14 +1285,7 @@
 
 {#snippet composeButton()}
   {#if onCompose}
-    <button
-      class="p-2 rounded-md hover:bg-muted transition-colors"
-      title={$_('sidebar.compose')}
-      aria-label={$_('sidebar.compose')}
-      onclick={onCompose}
-    >
-      <Icon icon="mdi:pencil" class="w-5 h-5 text-primary" />
-    </button>
+    <ComposeButton onclick={onCompose} />
   {/if}
 {/snippet}
 
