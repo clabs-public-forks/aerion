@@ -82,3 +82,66 @@ func TestGetConnectionDropsIdleDeadConnections(t *testing.T) {
 		t.Fatalf("pool still tracks %d connections, want 0", n)
 	}
 }
+
+func TestAbandonWaitPassesOnWhatItWasHanded(t *testing.T) {
+	tests := []struct {
+		name     string
+		queued   bool // still in the waiter list when it gives up
+		handed   func(p *Pool) *PooledConnection
+		wantNext bool // next waiter is woken
+		wantConn int  // connections still tracked afterwards
+	}{
+		{name: "still queued", queued: true, wantConn: 1},
+		{name: "handed a freed slot", handed: func(*Pool) *PooledConnection { return nil }, wantNext: true, wantConn: 1},
+		{name: "handed a connection", handed: func(p *Pool) *PooledConnection { return p.connections["acct"][0] }, wantNext: true, wantConn: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newTestPool(1)
+			addDeadConn(p, "acct", true)
+			waiter := make(chan *PooledConnection, 1)
+			next := make(chan *PooledConnection, 1)
+			p.waiters["acct"] = []chan *PooledConnection{waiter, next}
+			if !tt.queued {
+				p.waiters["acct"] = p.waiters["acct"][1:]
+				waiter <- tt.handed(p)
+			}
+
+			p.abandonWait("acct", waiter)
+
+			woken := len(next) == 1
+			if woken != tt.wantNext {
+				t.Fatalf("next waiter woken = %v, want %v", woken, tt.wantNext)
+			}
+			if n := len(p.connections["acct"]); n != tt.wantConn {
+				t.Fatalf("pool tracks %d connections, want %d", n, tt.wantConn)
+			}
+			for _, w := range p.waiters["acct"] {
+				if w == waiter {
+					t.Fatal("abandoned waiter is still queued")
+				}
+			}
+		})
+	}
+}
+
+func TestDialsInFlightCountTowardLimit(t *testing.T) {
+	p := newTestPool(1)
+	p.dialing["acct"] = 1
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := p.GetConnection(ctx, "acct"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("GetConnection error = %v, want to wait for the in-flight dial", err)
+	}
+}
+
+func TestFailedDialFreesSlot(t *testing.T) {
+	p := newTestPool(1)
+	if _, err := p.GetConnection(context.Background(), "acct"); err == nil {
+		t.Fatal("GetConnection succeeded without credentials")
+	}
+	if n := p.dialing["acct"]; n != 0 {
+		t.Fatalf("dialing = %d after failed dial, want 0", n)
+	}
+}

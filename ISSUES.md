@@ -8,10 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M2-M4 medium** `internal/imap/pool.go`: the slot check-then-dial window
-  can exceed MaxConnections, a waiter that is cancelled can leak a
-  connection handed to it, and a dial that finishes after the caller has
-  gone is orphaned. Unverified.
 - **M6 medium** `internal/message/store.go:1041`: retention deletes by Date
   header but the server SINCE uses INTERNALDATE, so messages with a zero
   Date loop between delete and re-fetch. Unverified.
