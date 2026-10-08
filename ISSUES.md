@@ -72,8 +72,6 @@ has not yet been confirmed against the code.
 
 ### Frontend
 
-- **F1 medium** `Composer.svelte:1229-1266,1506`: Ctrl+Enter has no
-  `sending` guard, so the message can be sent twice. Unverified.
 - **F2 medium** `Composer.svelte:623-632,1344-1360`: a save that starts while
   another is running is dropped, and Save & Close closes even when the save
   failed. Unverified.

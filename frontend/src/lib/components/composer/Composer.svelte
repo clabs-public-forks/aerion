@@ -621,7 +621,7 @@
 
   // Actually save the draft
   async function saveDraft() {
-    if (discarding) return
+    if (discarding || sending) return
     if (!hasContent()) return
 
     // If a save is already in flight, skip — next edit will trigger a fresh save
@@ -1227,6 +1227,7 @@
   }
 
   async function handleSend() {
+    if (sending || poppingOut) return
     if (toRecipients.length === 0) {
       addToast({
         type: 'error',
@@ -1254,18 +1255,20 @@
 
   // Actually send the message (called directly or after confirmation)
   async function doSend() {
+    // Claim the send before any await so a second Ctrl+Enter or click can't
+    // start another one.
+    if (sending) return
+    sending = true
+
     // Cancel any pending draft save
     if (saveTimeoutId) {
       clearTimeout(saveTimeoutId)
       saveTimeoutId = null
     }
 
-    // Wait for any in-flight draft save to complete before sending
-    await savingComplete
-
-    sending = true
-
     try {
+      // Wait for any in-flight draft save to complete before sending
+      await savingComplete
       const message = buildMessage()
       await api.sendMessage(activeAccountId, message)
 
