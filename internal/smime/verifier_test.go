@@ -27,6 +27,12 @@ var testSerial int64
 // parent is nil. CA certificates get no email address.
 func newTestCert(t *testing.T, cn, email string, isCA bool, parent *testCert) *testCert {
 	t.Helper()
+	return newTestCertValid(t, cn, email, isCA, parent, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+}
+
+// newTestCertValid is newTestCert with an explicit validity period.
+func newTestCertValid(t *testing.T, cn, email string, isCA bool, parent *testCert, notBefore, notAfter time.Time) *testCert {
+	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -35,8 +41,8 @@ func newTestCert(t *testing.T, cn, email string, isCA bool, parent *testCert) *t
 	tmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(testSerial),
 		Subject:               pkix.Name{CommonName: cn},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(time.Hour),
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
 		BasicConstraintsValid: true,
 		IsCA:                  isCA,
 	}
@@ -66,6 +72,12 @@ func newTestCert(t *testing.T, cn, email string, isCA bool, parent *testCert) *t
 // certificates are embedded before the signer's certificate.
 func signTestMessage(t *testing.T, signer *testCert, extra ...*x509.Certificate) *pkcs7.PKCS7 {
 	t.Helper()
+	return signTestMessageWith(t, signer, pkcs7.SignerInfoConfig{}, extra...)
+}
+
+// signTestMessageWith is signTestMessage with a custom signer config.
+func signTestMessageWith(t *testing.T, signer *testCert, config pkcs7.SignerInfoConfig, extra ...*x509.Certificate) *pkcs7.PKCS7 {
+	t.Helper()
 	sd, err := pkcs7.NewSignedData([]byte("hello"))
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +86,7 @@ func signTestMessage(t *testing.T, signer *testCert, extra ...*x509.Certificate)
 	for _, c := range extra {
 		sd.AddCertificate(c)
 	}
-	if err := sd.AddSigner(signer.cert, signer.key, pkcs7.SignerInfoConfig{}); err != nil {
+	if err := sd.AddSigner(signer.cert, signer.key, config); err != nil {
 		t.Fatal(err)
 	}
 	der, err := sd.Finish()
@@ -239,5 +251,24 @@ func TestUntrustedSignerCertNotUsedForEncryption(t *testing.T) {
 	}
 	if pems, _ := store.GetSenderCertPEMs([]string{"bob@example.com"}); pems["bob@example.com"] == "" {
 		t.Fatal("imported cert should be usable for encryption")
+	}
+}
+
+func TestVerifyPKCS7ChecksChainAtCurrentTime(t *testing.T) {
+	ca := newTestCertValid(t, "Trusted CA", "", true, nil, time.Now().AddDate(-1, 0, 0), time.Now().AddDate(1, 0, 0))
+	expired := newTestCertValid(t, "Alice", "alice@example.com", false, ca, time.Now().Add(-48*time.Hour), time.Now().Add(-24*time.Hour))
+	backdated := time.Now().Add(-36 * time.Hour).UTC()
+
+	p7 := signTestMessageWith(t, expired, pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{{Type: pkcs7.OIDAttributeSigningTime, Value: backdated}},
+	})
+	var claimed time.Time
+	if err := p7.UnmarshalSignedAttribute(pkcs7.OIDAttributeSigningTime, &claimed); err != nil || !claimed.Equal(backdated.Truncate(time.Second)) {
+		t.Fatalf("test message claims signing time %v (%v), want the backdated %v", claimed, err, backdated)
+	}
+
+	v, _ := newTestVerifier(t, ca.cert)
+	if result := v.verifyPKCS7(p7); result.Status != StatusExpiredCert {
+		t.Fatalf("status = %q (%s), want %q for a signature claiming a time inside an expired cert's validity", result.Status, result.ErrorMessage, StatusExpiredCert)
 	}
 }

@@ -327,7 +327,9 @@ func (v *Verifier) verifySigners(p7 *pkcs7.PKCS7, signers []*x509.Certificate, s
 
 // verifyChain verifies the signer certificate chains to a trusted root for
 // email protection, using embedded certificates as intermediates. The chain
-// is evaluated at the signed signing time when present, otherwise now.
+// is evaluated now: the signingTime attribute is chosen by the signer, so
+// trusting it would let a holder of an expired certificate's key backdate
+// new signatures into the certificate's validity period.
 func (v *Verifier) verifyChain(p7 *pkcs7.PKCS7, signer *x509.Certificate) error {
 	roots := v.roots
 	if roots == nil {
@@ -344,17 +346,10 @@ func (v *Verifier) verifyChain(p7 *pkcs7.PKCS7, signer *x509.Certificate) error 
 		}
 	}
 
-	at := time.Now()
-	var signingTime time.Time
-	if len(p7.Signers) == 1 && p7.UnmarshalSignedAttribute(pkcs7.OIDAttributeSigningTime, &signingTime) == nil {
-		at = signingTime
-	}
-
 	_, err := signer.Verify(x509.VerifyOptions{
 		Roots:         roots,
 		Intermediates: intermediates,
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection},
-		CurrentTime:   at,
 	})
 	return err
 }
