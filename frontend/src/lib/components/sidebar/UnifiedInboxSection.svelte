@@ -110,7 +110,7 @@
     <div class="ml-4 mt-0.5 space-y-0.5">
       {#each accounts as acc (acc.account.id)}
         {#if acc.inbox}
-          <FolderContextMenu folderId={acc.inbox.id}>
+          <FolderContextMenu accountId={acc.account.id} folderId={acc.inbox.id}>
             <button
               class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors {isAccountInboxSelected(acc.account.id, acc.inbox.id)
                 ? 'bg-primary/10 text-primary'

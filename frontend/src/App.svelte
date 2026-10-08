@@ -1582,7 +1582,6 @@
         bind:this={sidebarRef}
         onFolderSelect={handleFolderSelect}
         onUnifiedFolderSelect={handleUnifiedFolderSelect}
-        onCompose={handleCompose}
         onUnifiedInboxSelect={handleUnifiedInboxSelect}
         onMessagesMoved={() => messageListRef?.handleActionComplete(false)}
         selectedAccountId={selectedAccountId}
@@ -1637,6 +1636,7 @@
         onConversationSelect={handleConversationSelect}
         onReply={handleReply}
         onRowActionComplete={() => viewerRef?.refreshFlags()}
+        onCompose={viewerIsOverlay ? handleCompose : undefined}
         isFocused={getFocusedPane() === 'messageList'}
         isFlashing={isPaneFlashing('messageList')}
       />
@@ -1667,6 +1667,7 @@
         folderType={selectedFolderType}
         accountId={selectedConversationAccountId}
         onReply={handleReply}
+        onCompose={handleCompose}
         onComposeToAddress={handleComposeToAddress}
         onEditDraft={handleEditDraft}
         onActionComplete={(autoSelectNext) => messageListRef?.handleActionComplete(autoSelectNext)}

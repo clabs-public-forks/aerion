@@ -110,7 +110,6 @@
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onUnifiedFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onUnifiedInboxSelect?: () => void
-    onCompose?: () => void
     onMessagesMoved?: () => void
     selectedAccountId?: string | null
     selectedFolderId?: string | null
@@ -125,7 +124,6 @@
     onFolderSelect,
     onUnifiedFolderSelect,
     onUnifiedInboxSelect,
-    onCompose,
     onMessagesMoved,
     selectedAccountId = null,
     selectedFolderId = null,
@@ -535,28 +533,19 @@
 </script>
 
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
-  <!-- Header with Compose Button -->
-  <div class="px-4 py-3 border-b border-border">
-    <div class="flex items-center gap-2">
+  <!-- Header: close button for the narrow-layout overlay -->
+  {#if showBackButton}
+    <div class="flex items-center justify-end px-4 py-3 border-b border-border">
       <button
-        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-        onclick={onCompose}
+        class="p-2 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+        title={$_('responsive.back')}
+        aria-label={$_('aria.closeSidebar')}
+        onclick={onBack}
       >
-        <Icon icon="mdi:pencil" class="w-4 h-4" />
-        <span>{$_('sidebar.compose')}</span>
+        <Icon icon="mdi:close" class="w-5 h-5 text-muted-foreground" />
       </button>
-      {#if showBackButton}
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors flex-shrink-0"
-          title={$_('responsive.back')}
-          aria-label={$_('aria.closeSidebar')}
-          onclick={onBack}
-        >
-          <Icon icon="mdi:close" class="w-5 h-5 text-muted-foreground" />
-        </button>
-      {/if}
     </div>
-  </div>
+  {/if}
 
   <!-- Account List -->
   <div class="flex-1 overflow-y-auto scrollbar-thin py-2" bind:this={scrollContainer}>

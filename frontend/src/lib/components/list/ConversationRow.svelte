@@ -617,14 +617,14 @@
       <!-- Subject (with highlighting if in search mode) -->
       {#if highlightedSubject}
         <p
-          class="truncate {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
+          class="line-clamp-2 break-words {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
         >
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {@html highlightedSubject}
         </p>
       {:else}
         <p
-          class="truncate {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
+          class="line-clamp-2 break-words {densityClasses.text[density]} {hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}"
         >
           {conversation.subject || $_('viewer.noSubject')}
         </p>

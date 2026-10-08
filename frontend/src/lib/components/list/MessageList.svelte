@@ -19,7 +19,7 @@
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs bindings
-  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, EmptyTrash, EmptySpam, Undo, IMAPSearchFolder, FetchServerMessage } from '../../../../wailsjs/go/app/App'
+  import { GetConversations, GetConversationCount, SyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, EmptyTrash, EmptySpam, Undo, IMAPSearchFolder, FetchServerMessage } from '../../../../wailsjs/go/app/App'
   import { toasts } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
@@ -41,6 +41,8 @@
     onConversationSelect?: (threadId: string, folderId: string, accountId: string) => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     onRowActionComplete?: () => void
+    /** Shown as a list-header Compose button when set (viewer is a hidden overlay). */
+    onCompose?: () => void
     isFocused?: boolean
     isFlashing?: boolean
   }
@@ -53,6 +55,7 @@
     onConversationSelect,
     onReply,
     onRowActionComplete,
+    onCompose,
     isFocused: _isFocused = false,
     isFlashing = false,
   }: Props = $props()
@@ -69,13 +72,6 @@
   // Derived: check if this folder is currently syncing (from account store's progress tracking)
   const syncing = $derived(
     !!(accountId && folderId && accountStore.syncProgress[accountId]?.[folderId] !== undefined)
-  )
-
-  // Derived: get sync progress for this folder (if syncing)
-  const syncProgress = $derived(
-    accountId && folderId
-      ? accountStore.syncProgress[accountId]?.[folderId]
-      : null
   )
 
   // Multi-select state
@@ -554,19 +550,22 @@
     await syncFolder()
   }
 
-  // Force re-sync folder (clears bodies & attachments, then re-fetches)
-  async function forceSyncFolder() {
-    if (isUnifiedView || !accountId || !folderId) return
+  // Header sync button: busy while any account or this folder is syncing
+  const syncBusy = $derived(accountStore.isAnySyncing || syncing)
 
-    error = null
-
+  // Header sync button: sync all accounts, or cancel whatever is running
+  async function toggleSyncAll() {
     try {
-      await ForceSyncFolder(accountId, folderId)
-      offset = 0
-      await loadConversations()
+      if (!syncBusy) {
+        await accountStore.syncAllComplete()
+        return
+      }
+      await Promise.all([
+        syncing && cancelFolderSync(),
+        accountStore.isAnySyncing && accountStore.cancelAllSyncs(),
+      ])
     } catch (err) {
-      console.error('Failed to force re-sync folder:', err)
-      error = $_('viewer.failedToLoadMessages')
+      console.error('Sync all failed:', err)
     }
   }
 
@@ -1451,62 +1450,28 @@
       {/if}
     </div>
     <div class="flex items-center gap-1">
-      {#if syncing}
-        <!-- While syncing, show spinning icon that cancels on click -->
+      {#if onCompose}
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={syncProgress ? `${$_('sidebar.syncing')} ${syncProgress.phase}: ${syncProgress.percentage}% - ${$_('sidebar.clickToCancel')}` : `${$_('sidebar.syncing')} ${$_('sidebar.clickToCancel')}`}
-          onclick={cancelFolderSync}
+          title={$_('sidebar.compose')}
+          aria-label={$_('sidebar.compose')}
+          onclick={onCompose}
         >
-          <Icon
-            icon="mdi:refresh"
-            class="w-5 h-5 text-muted-foreground animate-spin"
-          />
+          <Icon icon="mdi:pencil" class="w-5 h-5 text-primary" />
         </button>
-      {:else}
-        <!-- Dropdown menu for sync options -->
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger
-            class="p-2 rounded-md hover:bg-muted transition-colors disabled:opacity-50"
-            disabled={loading || isUnifiedView}
-          >
-            <Icon
-              icon="mdi:refresh"
-              class="w-5 h-5 text-muted-foreground"
-            />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              side="bottom"
-              align="end"
-              sideOffset={4}
-              class={cn(
-                'z-50 min-w-[180px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md',
-                'data-[state=open]:animate-in data-[state=closed]:animate-out',
-                'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-                'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-                'data-[side=bottom]:slide-in-from-top-2'
-              )}
-            >
-              <DropdownMenu.Item
-                onSelect={syncFolder}
-                class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
-              >
-                <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
-                {$_('messageList.syncFolder')}
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator class="-mx-1 my-1 h-px bg-border" />
-              <DropdownMenu.Item
-                onSelect={forceSyncFolder}
-                class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
-              >
-                <Icon icon="mdi:refresh-auto" class="w-4 h-4 mr-2" />
-                {$_('messageList.forceResync')}
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
       {/if}
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+        title={syncBusy ? `${$_('sidebar.syncing')} ${$_('sidebar.clickToCancel')}` : $_('sidebar.syncAllAccounts')}
+        aria-label={$_('sidebar.syncAllAccounts')}
+        disabled={loading && !syncBusy}
+        onclick={toggleSyncAll}
+      >
+        <Icon
+          icon="mdi:refresh"
+          class="w-5 h-5 text-muted-foreground {syncBusy ? 'animate-spin' : ''}"
+        />
+      </button>
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors {showSearch ? 'bg-muted' : ''}"
         title={showSearch ? $_('common.close') : $_('common.search')}

@@ -4,10 +4,13 @@
   import {
     ContextMenuContent,
     ContextMenuItem,
+    ContextMenuSeparator,
   } from '$lib/components/ui/context-menu'
   import {
     MarkAllFolderMessagesAsRead,
     MarkAllFolderMessagesAsUnread,
+    SyncFolder,
+    ForceSyncFolder,
     Undo,
   } from '../../../../wailsjs/go/app/App'
   import { toasts } from '$lib/stores/toast'
@@ -15,11 +18,13 @@
   import { _ } from '$lib/i18n'
 
   interface Props {
+    accountId: string
     folderId: string
     children?: Snippet
   }
 
   let {
+    accountId,
     folderId,
     children,
   }: Props = $props()
@@ -53,6 +58,16 @@
       toasts.error($_('toast.failedToMarkAllAsUnread'))
     }
   }
+
+  // Sync results reach the message list via the folder:synced event
+  async function handleSyncFolder(force: boolean) {
+    try {
+      await (force ? ForceSyncFolder : SyncFolder)(accountId, folderId)
+    } catch (err) {
+      console.error('Folder sync failed:', err)
+      toasts.error($_('toast.syncFailed'))
+    }
+  }
 </script>
 
 <ContextMenuPrimitive.Root>
@@ -70,6 +85,16 @@
     <ContextMenuItem onSelect={handleMarkAllUnread}>
       <Icon icon="mdi:email-outline" class="mr-2 h-4 w-4" />
       {$_('contextMenu.markAllAsUnread')}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem onSelect={() => handleSyncFolder(false)}>
+      <Icon icon="mdi:refresh" class="mr-2 h-4 w-4" />
+      {$_('messageList.syncFolder')}
+    </ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem onSelect={() => handleSyncFolder(true)}>
+      <Icon icon="mdi:refresh-auto" class="mr-2 h-4 w-4" />
+      {$_('messageList.forceResync')}
     </ContextMenuItem>
   </ContextMenuContent>
 </ContextMenuPrimitive.Root>

@@ -26,6 +26,7 @@
     folderType?: string | null
     accountId?: string | null
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string, imagesLoaded?: boolean) => void
+    onCompose?: () => void
     onComposeToAddress?: (toAddress: string) => void
     onEditDraft?: (draftId: string) => void
     onActionComplete?: (autoSelectNext?: boolean) => void
@@ -47,6 +48,7 @@
     folderType = null,
     accountId = null,
     onReply,
+    onCompose,
     onComposeToAddress,
     onEditDraft,
     onActionComplete,
@@ -1280,10 +1282,26 @@
 
 </script>
 
+{#snippet composeButton()}
+  {#if onCompose}
+    <button
+      class="p-2 rounded-md hover:bg-muted transition-colors"
+      title={$_('sidebar.compose')}
+      aria-label={$_('sidebar.compose')}
+      onclick={onCompose}
+    >
+      <Icon icon="mdi:pencil" class="w-5 h-5 text-primary" />
+    </button>
+  {/if}
+{/snippet}
+
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
   {#if !threadId}
-    <!-- No conversation selected -->
-    <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
+    <!-- No conversation selected: keep Compose reachable -->
+    <div class="flex items-center px-4 py-3 border-b border-border">
+      {@render composeButton()}
+    </div>
+    <div class="flex flex-col items-center justify-center flex-1 text-muted-foreground">
       <Icon icon="mdi:email-open-outline" class="w-16 h-16 mb-4" />
       <p class="text-lg">{$_('viewer.selectConversation')}</p>
     </div>
@@ -1321,27 +1339,7 @@
           </button>
           <div class="w-px h-5 bg-border mx-1"></div>
         {/if}
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.reply')}
-          onclick={handleReply}
-        >
-          <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.replyAll')}
-          onclick={handleReplyAll}
-        >
-          <Icon icon="mdi:reply-all" class="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.forward')}
-          onclick={handleForward}
-        >
-          <Icon icon="mdi:share" class="w-5 h-5 text-muted-foreground" />
-        </button>
+        {@render composeButton()}
 
         <div class="w-px h-5 bg-border mx-1"></div>
 
@@ -1365,6 +1363,30 @@
           onclick={handleSpam}
         >
           <Icon icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'} class="w-5 h-5 text-muted-foreground" />
+        </button>
+
+        <div class="w-px h-5 bg-border mx-1"></div>
+
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors"
+          title={$_('viewer.reply')}
+          onclick={handleReply}
+        >
+          <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
+        </button>
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors"
+          title={$_('viewer.replyAll')}
+          onclick={handleReplyAll}
+        >
+          <Icon icon="mdi:reply-all" class="w-5 h-5 text-muted-foreground" />
+        </button>
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors"
+          title={$_('viewer.forward')}
+          onclick={handleForward}
+        >
+          <Icon icon="mdi:share" class="w-5 h-5 text-muted-foreground" />
         </button>
 
         <div class="w-px h-5 bg-border mx-1"></div>

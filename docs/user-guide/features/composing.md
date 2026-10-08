@@ -8,7 +8,7 @@ Aerion includes a full-featured email composer with rich text editing capabiliti
 
 ## Starting a New Message
 
-- Click the **Compose** button in the toolbar
+- Click the **Compose** (pencil) button at the left of the conversation viewer toolbar (or at the top of the message list in narrow windows)
 - Press `Ctrl+N` from anywhere in the app
 - Click **Reply**, **Reply All**, or **Forward** on a message
 - Press:

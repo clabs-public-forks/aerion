@@ -148,19 +148,18 @@ Aerion also holds IDLE connections for push e-mail. When new e-mail arrive, it t
 
 ### Manual Sync
 
-Select the folder you want to sync, click the sync icon, select **Sync Folder** or press `Ctrl + Shift + S`. Clicking the sync button again or pressing `Ctrl + Shift + S` again will stop the sync.
+Right-click the folder in the sidebar and select **Sync Folder**, or select the folder and press `Ctrl + Shift + S`. Pressing `Ctrl + Shift + S` again will stop the sync.
 
 ### Sync All Accounts
 
-Use the sync button in the bottom left corner of the app or press `Ctrl + Shift + A` to sync all accounts at once. Clicking it or press `Ctrl + Shift + A` again while a sync is in progress will stop the sync.
+Click the sync icon at the top of the message list, use the sync button in the bottom left corner of the app, or press `Ctrl + Shift + A` to sync all accounts at once. Clicking it or pressing `Ctrl + Shift + A` again while a sync is in progress will stop the sync.
 
 ### Force Re-sync
 
 If messages appear to be missing or out of date:
 
-1. Select the folder that seems to be out of sync
-2. Click the Sync icon
-3. Click **Force Re-sync**
+1. Right-click the folder that seems to be out of sync in the sidebar
+2. Click **Force Re-sync**
 
 This will re-download messages from the server.
 

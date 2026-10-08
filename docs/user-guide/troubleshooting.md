@@ -42,8 +42,8 @@ If emails you expect to see aren't showing up:
    - Go to **Settings > Accounts > Edit** to change this
 2. **Check the folder** - Ensure you're looking in the correct folder
 3. **Wait for sync** - Large mailboxes can take time to sync initially
-4. **Sync Folder** - Select the folder, click the sync icon, and choose **Sync Folder**
-5. **Force Re-sync** - If that doesn't help, click the sync icon and choose **Force Re-sync**
+4. **Sync Folder** - Right-click the folder in the sidebar and choose **Sync Folder**
+5. **Force Re-sync** - If that doesn't help, right-click the folder and choose **Force Re-sync**
 
 ### Slow initial sync
 
@@ -51,7 +51,7 @@ First-time sync of large mailboxes can take several minutes. The sync progress i
 
 ### Sync appears stuck
 
-If a sync seems to be stuck or unresponsive, click the sync button in the bottom left corner to stop it, then click again to restart the sync.
+If a sync seems to be stuck or unresponsive, click the sync icon at the top of the message list (or the sync button in the bottom left corner) to stop it, then click again to restart the sync.
 
 ### Sent messages not appearing in Sent folder
 
@@ -62,7 +62,7 @@ Some servers handle sent mail differently:
 
 ### Folders not appearing
 
-1. Select the folder, click the sync icon, and choose **Force Re-sync**
+1. Right-click the folder in the sidebar and choose **Force Re-sync**
 2. Check if the folder exists in your provider's web interface
 3. Some folders may be hidden by your email provider
 
