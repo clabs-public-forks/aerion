@@ -70,6 +70,17 @@ func (ops *composeOps) getValidOAuthToken(ctx context.Context, accountID string)
 		return tokens, nil
 	}
 
+	// Share the slot's refresh lock with the extension auth broker, then
+	// re-read: a concurrent holder may already have rotated the refresh token.
+	defer ops.credStore.LockOAuthRefresh(accountID, oauth2.ClientConfigIDForProvider(tokens.Provider))()
+	tokens, err = ops.credStore.GetOAuthTokens(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OAuth tokens: %w", err)
+	}
+	if !tokens.IsExpiringSoon(5 * time.Minute) {
+		return tokens, nil
+	}
+
 	log.Debug().
 		Str("account_id", accountID).
 		Time("expires_at", tokens.ExpiresAt).

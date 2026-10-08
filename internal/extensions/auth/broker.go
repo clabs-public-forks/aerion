@@ -3,7 +3,6 @@ package auth
 import (
 	"fmt"
 	"net/http"
-	"sync"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
@@ -21,13 +20,7 @@ type Broker struct {
 	// honors the same trusted-certificate store as IMAP/SMTP. Nil falls back to
 	// http.DefaultTransport.
 	baseTransport http.RoundTripper
-	// refreshLocks holds one *sync.Mutex per slotKey, shared by every client
-	// vended for that slot so they refresh only once.
-	refreshLocks sync.Map
 }
-
-// slotKey identifies one account's tokens under one client config.
-type slotKey struct{ accountID, clientConfigID string }
 
 // NewBroker constructs a Broker bound to the given credential store and
 // OAuth manager. credStore and oauthManager are required; baseTransport is the
@@ -226,7 +219,6 @@ func (b *Broker) SMTPClient(accountID string) (coreapi.SMTPClient, error) {
 // newClient returns an HTTP client that authenticates as accountID using the
 // tokens in the given slot, refreshing them as needed.
 func (b *Broker) newClient(accountID, clientConfigID string) *http.Client {
-	mu, _ := b.refreshLocks.LoadOrStore(slotKey{accountID, clientConfigID}, &sync.Mutex{})
 	return &http.Client{
 		Transport: &bearerRefreshTransport{
 			base:           b.baseTransport,
@@ -234,7 +226,6 @@ func (b *Broker) newClient(accountID, clientConfigID string) *http.Client {
 			oauthManager:   b.oauthManager,
 			accountID:      accountID,
 			clientConfigID: clientConfigID,
-			mu:             mu.(*sync.Mutex),
 		},
 	}
 }

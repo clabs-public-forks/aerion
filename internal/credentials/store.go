@@ -4,6 +4,7 @@ package credentials
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 
 	"github.com/hkdb/aerion/internal/crypto"
 	"github.com/hkdb/aerion/internal/logging"
@@ -19,6 +20,9 @@ type Store struct {
 	encryptor      *crypto.Encryptor
 	keyringEnabled bool
 	log            zerolog.Logger
+
+	// refreshLocks holds one *sync.Mutex per refreshKey; see LockOAuthRefresh.
+	refreshLocks sync.Map
 }
 
 // NewStore creates a new credential store

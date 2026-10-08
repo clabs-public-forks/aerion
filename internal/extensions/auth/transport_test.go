@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
@@ -212,6 +213,69 @@ func TestTransport_ConcurrentUnauthorizedRefreshOnce(t *testing.T) {
 	wg.Wait()
 	if got := refreshes.Load(); got != 1 {
 		t.Fatalf("token endpoint hit %d times, want 1", got)
+	}
+}
+
+// A mail-slot refresh by IMAP/SMTP auth holds the credential store's slot
+// lock. A 401 arriving meanwhile must wait for it and use the rotated token
+// rather than spend the refresh token a second time.
+func TestTransport_WaitsForMailPathRefresh(t *testing.T) {
+	broker, credStore, db := newTestBroker(t)
+	insertTestAccount(t, db, "acct")
+	sawStale := make(chan struct{}, 1)
+	broker.baseTransport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Header.Get("Authorization") == "Bearer rotated-token" {
+			return respond(r, http.StatusOK), nil
+		}
+		sawStale <- struct{}{}
+		return respond(r, http.StatusUnauthorized), nil
+	})
+	var refreshes atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		refreshes.Add(1)
+		tokenResponse(http.StatusOK, `{"access_token":"fresh-token","expires_in":3600}`)(w, r)
+	}))
+	t.Cleanup(tokenSrv.Close)
+	if err := credStore.SetOAuthTokens("acct", &credentials.OAuthTokens{
+		Provider: "custom", AccessToken: "stale-token", RefreshToken: "refresh-token",
+	}); err != nil {
+		t.Fatalf("set tokens: %v", err)
+	}
+	if err := credStore.SetCustomOAuthProvider("acct", credentials.CustomOAuthProvider{
+		AuthURL: tokenSrv.URL + "/auth", TokenURL: tokenSrv.URL, ClientID: "client-id",
+	}); err != nil {
+		t.Fatalf("set custom provider: %v", err)
+	}
+	client, err := broker.HTTPClientForExtension("calendar", coreapi.Manifest{}, "acct",
+		[]coreapi.AuthScope{{Resource: "https://example.com/calendar"}})
+	if err != nil {
+		t.Fatalf("HTTPClientForExtension: %v", err)
+	}
+
+	unlock := credStore.LockOAuthRefresh("acct", "custom-mail")
+	result := make(chan int, 1)
+	go func() {
+		resp, err := client.Get("https://api.test/")
+		if err != nil {
+			t.Error(err)
+			result <- 0
+			return
+		}
+		resp.Body.Close()
+		result <- resp.StatusCode
+	}()
+	<-sawStale
+	time.Sleep(50 * time.Millisecond) // let the transport reach the lock
+	if err := credStore.UpdateOAuthTokensForClientConfig("acct", "custom-mail", "rotated-token", "rotated-refresh", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("rotate tokens: %v", err)
+	}
+	unlock()
+
+	if got := <-result; got != http.StatusOK {
+		t.Fatalf("status %d, want 200", got)
+	}
+	if got := refreshes.Load(); got != 0 {
+		t.Fatalf("token endpoint hit %d times, want 0", got)
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
@@ -22,18 +21,15 @@ var maxBufferedBody int64 = 10 << 20
 
 // bearerRefreshTransport is an http.RoundTripper that injects the current
 // access token on each request and transparently refreshes it on 401
-// responses. It serializes refreshes per (accountID, clientConfigID) so that
-// N concurrent requests with the same expired token cause exactly one refresh.
+// responses. Refreshes take the credential store's per-(accountID,
+// clientConfigID) lock, so N concurrent requests with the same expired token —
+// or a request racing the mail IMAP/SMTP refresh — cause exactly one refresh.
 type bearerRefreshTransport struct {
 	base           http.RoundTripper
 	credStore      *credentials.Store
 	oauthManager   *oauth2.Manager
 	accountID      string
 	clientConfigID string
-
-	// mu guards token refresh. The broker shares one per (accountID,
-	// clientConfigID) across every client it vends for that slot.
-	mu *sync.Mutex
 }
 
 // RoundTrip implements http.RoundTripper.
@@ -89,8 +85,7 @@ func (t *bearerRefreshTransport) RoundTrip(req *http.Request) (*http.Response, e
 // freshToken returns an access token to retry with after sent got a 401. It
 // refreshes under the slot lock unless another request already replaced sent.
 func (t *bearerRefreshTransport) freshToken(sent string) (string, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	defer t.credStore.LockOAuthRefresh(t.accountID, t.clientConfigID)()
 
 	tokens, err := t.credStore.GetOAuthTokensForClientConfig(t.accountID, t.clientConfigID)
 	if err != nil {
