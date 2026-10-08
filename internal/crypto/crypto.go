@@ -2,15 +2,19 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -32,6 +36,10 @@ const (
 // Encryptor provides AES-256-GCM encryption/decryption
 type Encryptor struct {
 	key []byte
+	// fallback is the key re-derived from current machine data when it
+	// differs from the stored key. Older builds encrypted with the derived
+	// key, so values saved after a hostname or user change need it.
+	fallback []byte
 }
 
 // NewEncryptor creates a new Encryptor using a device-specific key
@@ -39,31 +47,44 @@ type Encryptor struct {
 func NewEncryptor(dataDir string) (*Encryptor, error) {
 	keyPath := filepath.Join(dataDir, keyFileName)
 
-	key, err := loadOrCreateKey(keyPath)
+	key, fallback, err := loadOrCreateKey(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load or create key: %w", err)
 	}
 
-	return &Encryptor{key: key}, nil
+	return &Encryptor{key: key, fallback: fallback}, nil
 }
 
-// loadOrCreateKey loads the encryption key from disk, or creates a new one
-func loadOrCreateKey(keyPath string) ([]byte, error) {
-	// Try to read existing key
+// loadOrCreateKey loads the encryption key from disk, or creates a new one.
+// It also returns the key re-derived from the stored salt when that differs
+// from the stored key (nil otherwise). An existing key file is never
+// overwritten: losing it makes every stored secret unreadable, so a damaged
+// one is moved aside for recovery before a new key is created.
+func loadOrCreateKey(keyPath string) (key, fallback []byte, err error) {
 	data, err := os.ReadFile(keyPath)
-	if err == nil && len(data) == keySize+saltSize {
-		// Key file exists, derive key from stored salt and machine-specific data
-		salt := data[:saltSize]
-		return deriveKey(salt), nil
+	switch {
+	case err == nil && len(data) == saltSize+keySize:
+		key = data[saltSize:]
+		if derived := deriveKey(data[:saltSize]); !bytes.Equal(derived, key) {
+			fallback = derived
+		}
+		return key, fallback, nil
+	case err == nil:
+		aside := fmt.Sprintf("%s.bad-%d", keyPath, time.Now().Unix())
+		if rerr := os.Rename(keyPath, aside); rerr != nil {
+			return nil, nil, fmt.Errorf("key file has unexpected size %d and could not be moved aside: %w", len(data), rerr)
+		}
+	case !errors.Is(err, fs.ErrNotExist):
+		return nil, nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 
 	// Generate new key
 	salt := make([]byte, saltSize)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
-		return nil, fmt.Errorf("failed to generate salt: %w", err)
+		return nil, nil, fmt.Errorf("failed to generate salt: %w", err)
 	}
 
-	key := deriveKey(salt)
+	key = deriveKey(salt)
 
 	// Store salt (we can regenerate key from salt + machine data)
 	keyData := make([]byte, saltSize+keySize)
@@ -72,15 +93,23 @@ func loadOrCreateKey(keyPath string) ([]byte, error) {
 
 	// Create directory if needed
 	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
-		return nil, fmt.Errorf("failed to create key directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to create key directory: %w", err)
 	}
 
 	// Write key file with restricted permissions
-	if err := os.WriteFile(keyPath, keyData, 0600); err != nil {
-		return nil, fmt.Errorf("failed to write key file: %w", err)
+	f, err := os.OpenFile(keyPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create key file: %w", err)
+	}
+	if _, err := f.Write(keyData); err != nil {
+		f.Close()
+		return nil, nil, fmt.Errorf("failed to write key file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return nil, nil, fmt.Errorf("failed to write key file: %w", err)
 	}
 
-	return key, nil
+	return key, nil, nil
 }
 
 // deriveKey derives an encryption key from salt and machine-specific data
@@ -142,7 +171,18 @@ func (e *Encryptor) Decrypt(ciphertext string) (string, error) {
 		return "", fmt.Errorf("failed to decode ciphertext: %w", err)
 	}
 
-	block, err := aes.NewCipher(e.key)
+	plaintext, err := open(e.key, data)
+	if err != nil && e.fallback != nil {
+		if p, ferr := open(e.fallback, data); ferr == nil {
+			return p, nil
+		}
+	}
+	return plaintext, err
+}
+
+// open decrypts data (nonce prepended) with AES-256-GCM under key.
+func open(key, data []byte) (string, error) {
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
