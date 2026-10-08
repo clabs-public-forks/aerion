@@ -19,6 +19,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -398,5 +399,178 @@ func TestPendingQueue_DrainAll_SkipsLocalSources(t *testing.T) {
 	// on the google source (no pending rows = empty drain).
 	if err := queue.DrainAll(context.Background()); err != nil {
 		t.Errorf("DrainAll: %v", err)
+	}
+}
+
+// --- Drain: sequential writes to the same event --------------------------
+
+// fakeGoogleETagServer emulates Google's optimistic concurrency: POST
+// creates the event, PATCH requires If-Match to equal the current ETag
+// (else 412). Every successful write bumps the ETag.
+type fakeGoogleETagServer struct {
+	mu      sync.Mutex
+	version int
+	methods []string
+}
+
+func (f *fakeGoogleETagServer) etag() string { return fmt.Sprintf(`"v%d"`, f.version) }
+
+func (f *fakeGoogleETagServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.methods = append(f.methods, r.Method)
+	if r.Method == http.MethodPatch && r.Header.Get("If-Match") != f.etag() {
+		w.WriteHeader(http.StatusPreconditionFailed)
+		return
+	}
+	f.version++
+	_ = json.NewEncoder(w).Encode(googleEvent{ID: "server-event-id", ICalUID: "evt@aerion-google", ETag: f.etag()})
+}
+
+func conflictCount(bus *recordingEventBus) int {
+	n := 0
+	for _, e := range bus.events() {
+		if e.Name == "calendar:write-conflict" {
+			n++
+		}
+	}
+	return n
+}
+
+func TestPendingQueue_Drain_SequentialWritesAdvanceTransportState(t *testing.T) {
+	const uid = "evt@aerion-google"
+	tests := []struct {
+		name          string
+		startVersion  int // server ETag version before draining
+		ops           []PendingOp
+		wantMethods   []string
+		wantConflicts int
+	}{
+		{
+			name: "create then edit",
+			ops: []PendingOp{
+				{Op: PendingOpCreate},
+				{Op: PendingOpUpdate, Scope: EditScopeAll},
+			},
+			wantMethods: []string{http.MethodPost, http.MethodPatch},
+		},
+		{
+			name:         "two edits",
+			startVersion: 1,
+			ops: []PendingOp{
+				{Op: PendingOpUpdate, Scope: EditScopeAll, ProviderEventID: "server-event-id", ETag: `"v1"`},
+				{Op: PendingOpUpdate, Scope: EditScopeAll, ProviderEventID: "server-event-id", ETag: `"v1"`},
+			},
+			wantMethods: []string{http.MethodPatch, http.MethodPatch},
+		},
+		{
+			name:         "remote change while offline still conflicts",
+			startVersion: 2,
+			ops: []PendingOp{
+				{Op: PendingOpUpdate, Scope: EditScopeAll, ProviderEventID: "server-event-id", ETag: `"v1"`},
+				{Op: PendingOpUpdate, Scope: EditScopeAll, ProviderEventID: "server-event-id", ETag: `"v1"`},
+			},
+			wantMethods:   []string{http.MethodPatch, http.MethodPatch},
+			wantConflicts: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newTestStore(t)
+			bus := &recordingEventBus{}
+			fake := &fakeGoogleETagServer{version: tt.startVersion}
+			srv := httptest.NewServer(fake)
+			defer srv.Close()
+
+			queue := NewPendingQueue(store, fakeSecrets{password: "x"}, fakeAuth{target: srv.URL}, bus)
+			srcID, calID := seedGoogleSource(t, store, "primary")
+			for _, op := range tt.ops {
+				op.SourceID, op.CalendarID, op.CalendarURL = srcID, calID, "primary"
+				op.UID, op.ICSBlob = uid, minimalGoogleICS(t, uid)
+				if _, err := queue.Enqueue(op); err != nil {
+					t.Fatalf("Enqueue: %v", err)
+				}
+			}
+
+			if err := queue.Drain(context.Background(), srcID); err != nil {
+				t.Fatalf("Drain: %v", err)
+			}
+			if fmt.Sprint(fake.methods) != fmt.Sprint(tt.wantMethods) {
+				t.Errorf("server methods = %v, want %v", fake.methods, tt.wantMethods)
+			}
+			if got := conflictCount(bus); got != tt.wantConflicts {
+				t.Errorf("conflicts = %d, want %d", got, tt.wantConflicts)
+			}
+			if row, _ := queue.nextPending(srcID); row != nil {
+				t.Errorf("expected queue empty, got row %+v", row)
+			}
+		})
+	}
+}
+
+func TestPendingQueue_Drain_CalDAVCreateThenEditUpdatesResource(t *testing.T) {
+	const uid = "evt@aerion"
+	var mu sync.Mutex
+	var reqs []recordedRequest
+	srv := newFakeCalDAVServer(t, func(req recordedRequest, w http.ResponseWriter) {
+		mu.Lock()
+		defer mu.Unlock()
+		reqs = append(reqs, req)
+		w.Header().Set("ETag", fmt.Sprintf(`"v%d"`, len(reqs)))
+		w.WriteHeader(http.StatusCreated)
+	})
+	defer srv.Close()
+
+	store := newTestStore(t)
+	queue := NewPendingQueue(store, fakeSecrets{password: "x"}, fakeAuth{}, &recordingEventBus{})
+	now := time.Now().Unix()
+	if err := store.WithTx(func(tx *sql.Tx) error {
+		if err := store.CreateSourceTx(tx, Source{
+			ID: "src-c1", Type: SourceTypeCalDAV, Name: "DAV", URL: srv.URL,
+			Username: "user", Enabled: true, Writable: true, CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		if err := store.CreateCalendarTx(tx, Calendar{
+			ID: "cal-c1", SourceID: "src-c1", URL: "/cal/", DisplayName: "Personal", Visible: true, CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		return store.UpsertEventTx(tx, Event{
+			ID: "evt-row-1", CalendarID: "cal-c1", UID: uid,
+			DTStartUnix: now, DTEndUnix: now + 3600, ICSBlob: minimalICSBlob(t, uid),
+		})
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	for _, op := range []PendingOpKind{PendingOpCreate, PendingOpUpdate} {
+		if _, err := queue.Enqueue(PendingOp{
+			SourceID: "src-c1", CalendarID: "cal-c1", EventID: "evt-row-1", Op: op,
+			CalendarURL: "/cal/", UID: uid, ICSBlob: minimalICSBlob(t, uid),
+		}); err != nil {
+			t.Fatalf("Enqueue: %v", err)
+		}
+	}
+	if err := queue.Drain(context.Background(), "src-c1"); err != nil {
+		t.Fatalf("Drain: %v", err)
+	}
+
+	if len(reqs) != 2 {
+		t.Fatalf("requests = %d, want 2", len(reqs))
+	}
+	if reqs[0].ifNoneMatch != "*" {
+		t.Errorf("create If-None-Match = %q, want *", reqs[0].ifNoneMatch)
+	}
+	if reqs[1].ifNoneMatch != "" || reqs[1].ifMatch != `"v1"` || reqs[1].path != reqs[0].path {
+		t.Errorf("edit = %+v, want If-Match \"v1\" on %s", reqs[1], reqs[0].path)
+	}
+	ev, err := store.GetEvent("evt-row-1")
+	if err != nil {
+		t.Fatalf("GetEvent: %v", err)
+	}
+	if ev.ETag != `"v2"` || ev.Href != "/cal/"+uid+".ics" {
+		t.Errorf("event etag/href = %q/%q, want \"v2\"//cal/%s.ics", ev.ETag, ev.Href, uid)
 	}
 }

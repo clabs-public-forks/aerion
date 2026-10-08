@@ -18,12 +18,15 @@ package backend
 //     since those call SyncAllSources → SyncSource → syncSourceInner →
 //     Drain.
 //
-// Order: rows for a given source replay in created_unix ASC order.
+// Order: rows for a given source replay in insertion order.
 //
-// Multi-edit collapse (e.g., 3 sequential offline edits to the same
-// event) is NOT implemented in Chunk 5 — the queue stores each edit
-// separately and replays them in order. Worst case: 1-2 spurious
-// conflict toasts; end state matches the latest edit.
+// Sequential offline writes to the same event (create then edit, or
+// several edits) are stored separately and replayed in order. Each was
+// enqueued against the same pre-offline transport state, so after a row
+// succeeds, later rows still holding that state are advanced to the
+// server's new ETag / ProviderEventID / Href. A remote change made while
+// offline still conflicts on the first row, and on the later rows since
+// they are not advanced.
 
 import (
 	"context"
@@ -58,11 +61,11 @@ const pendingMaxAttempts = 3
 // re-reading the events row at drain time — important because
 // soft-committed deletes have no events row to read.
 type PendingOp struct {
-	SourceID    string
-	CalendarID  string
-	EventID     string // local events.id; empty when no row (rare)
-	Op          PendingOpKind
-	Scope       EditScope // applies to update/delete; empty for create
+	SourceID   string
+	CalendarID string
+	EventID    string // local events.id; empty when no row (rare)
+	Op         PendingOpKind
+	Scope      EditScope // applies to update/delete; empty for create
 
 	// CalendarURL holds the URL/ID the provider uses to address the
 	// calendar (CalDAV path, Google calendarId, Microsoft Graph id).
@@ -90,6 +93,7 @@ type PendingOp struct {
 
 // pendingRow mirrors a row in the pending_writes table for read-back.
 type pendingRow struct {
+	Seq             int64 // SQLite rowid; insertion order
 	ID              string
 	SourceID        string
 	CalendarID      string
@@ -255,19 +259,19 @@ func (q *PendingQueue) DrainAll(ctx context.Context) error {
 // don't permanently block the queue.
 func (q *PendingQueue) nextPending(sourceID string) (*pendingRow, error) {
 	rowRes := q.store.DB().QueryRow(`
-		SELECT id, source_id, calendar_id, COALESCE(event_id, ''), op,
+		SELECT rowid, id, source_id, calendar_id, COALESCE(event_id, ''), op,
 		       COALESCE(scope, ''), payload_json, attempt,
 		       COALESCE(last_attempt_unix, 0), COALESCE(last_error, ''),
 		       created_unix
 		FROM pending_writes
 		WHERE source_id = ? AND attempt < ?
-		ORDER BY created_unix ASC
+		ORDER BY created_unix ASC, rowid ASC
 		LIMIT 1`, sourceID, pendingMaxAttempts)
 
 	var row pendingRow
 	var payloadJSON string
 	err := rowRes.Scan(
-		&row.ID, &row.SourceID, &row.CalendarID, &row.EventID, &row.Op,
+		&row.Seq, &row.ID, &row.SourceID, &row.CalendarID, &row.EventID, &row.Op,
 		&row.Scope, &payloadJSON, &row.Attempt,
 		&row.LastAttemptUnix, &row.LastError,
 		&row.CreatedUnix,
@@ -331,8 +335,18 @@ func (q *PendingQueue) processRow(ctx context.Context, row pendingRow) {
 		result, presErr := provider.PushEvent(pushCtx, *src, cal, ev)
 		perr = presErr
 		if perr == nil {
-			// Persist returned ETag + ProviderEventID onto the events row.
-			_ = q.updateEventTransportFields(row.CalendarID, ev.UID, result.ETag, result.ProviderEventID)
+			next := ev
+			next.ETag = result.ETag
+			if result.ProviderEventID != "" {
+				next.ProviderEventID = result.ProviderEventID
+			}
+			// CalDAV creates synthesize the href; record it so later
+			// writes update the resource instead of re-creating it.
+			if next.Href == "" && src.Type == SourceTypeCalDAV {
+				next.Href = joinHref(cal.URL, ev.UID+".ics")
+			}
+			_ = q.updateEventTransportFields(row.CalendarID, next)
+			_ = q.advanceDependentRows(row, next)
 		}
 	case PendingOpDelete:
 		perr = provider.DeleteRemote(pushCtx, *src, cal, ev)
@@ -385,11 +399,61 @@ func (q *PendingQueue) bumpAttempt(id, lastError string) error {
 	return err
 }
 
-func (q *PendingQueue) updateEventTransportFields(calendarID, uid, etag, providerEventID string) error {
+func (q *PendingQueue) updateEventTransportFields(calendarID string, ev Event) error {
 	_, err := q.store.DB().Exec(`
 		UPDATE events
-		SET etag = ?, provider_event_id = CASE WHEN ? = '' THEN provider_event_id ELSE ? END
+		SET etag = ?,
+		    provider_event_id = CASE WHEN ? = '' THEN provider_event_id ELSE ? END,
+		    href = CASE WHEN ? = '' THEN href ELSE ? END
 		WHERE calendar_id = ? AND uid = ?`,
-		etag, providerEventID, providerEventID, calendarID, uid)
+		ev.ETag, ev.ProviderEventID, ev.ProviderEventID, ev.Href, ev.Href, calendarID, ev.UID)
 	return err
+}
+
+// advanceDependentRows rewrites the transport state of later queued rows
+// for the same event after row succeeded. Only rows still carrying the
+// state row was replayed with are advanced, so rows enqueued against a
+// different server state keep their own optimistic-concurrency check.
+func (q *PendingQueue) advanceDependentRows(row pendingRow, next Event) error {
+	rows, err := q.store.DB().Query(`
+		SELECT id, payload_json FROM pending_writes
+		WHERE source_id = ? AND calendar_id = ?
+		  AND (created_unix > ? OR (created_unix = ? AND rowid > ?))`,
+		row.SourceID, row.CalendarID, row.CreatedUnix, row.CreatedUnix, row.Seq)
+	if err != nil {
+		return fmt.Errorf("query dependent pending_writes: %w", err)
+	}
+	updates := map[string]string{}
+	for rows.Next() {
+		var id, payloadJSON string
+		if err := rows.Scan(&id, &payloadJSON); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan dependent pending_writes: %w", err)
+		}
+		var p pendingPayload
+		if err := json.Unmarshal([]byte(payloadJSON), &p); err != nil {
+			continue
+		}
+		prev := row.Payload
+		if p.UID != prev.UID || p.ETag != prev.ETag ||
+			p.ProviderEventID != prev.ProviderEventID || p.Href != prev.Href {
+			continue
+		}
+		p.ETag, p.ProviderEventID, p.Href = next.ETag, next.ProviderEventID, next.Href
+		b, err := json.Marshal(p)
+		if err != nil {
+			continue
+		}
+		updates[id] = string(b)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate dependent pending_writes: %w", err)
+	}
+	for id, payloadJSON := range updates {
+		if _, err := q.store.DB().Exec(`UPDATE pending_writes SET payload_json = ? WHERE id = ?`, payloadJSON, id); err != nil {
+			return fmt.Errorf("advance pending_writes %s: %w", id, err)
+		}
+	}
+	return nil
 }

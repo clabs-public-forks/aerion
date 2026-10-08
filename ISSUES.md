@@ -18,10 +18,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `extensions/calendar/backend/provider_caldav_compose.go` `setRecurrenceID` formats all-day dates in UTC, while parsing and `setDateValue` use `configuredTZ()`. Midnight October 7 in Tokyo becomes October 6 UTC, targeting the wrong occurrence. Use the configured timezone for DATE serialization and fix `recurrenceIDMatches`, which compares UTC midnight against locally anchored timestamps.
 
-### [P1] Sequential offline calendar writes retain stale transport state
-
-`extensions/calendar/backend/pending_writes.go` replays each saved ETag and provider ID unchanged. Two offline edits retain the same ETag: the first succeeds, the second conflicts and is discarded, losing the latest edit. An offline create followed by an edit can create a duplicate because the provider ID remains empty. Advance dependent queued operations after success or coalesce them while preserving conflict detection.
-
 ### [P2] One offline calendar drain exhausts the retry budget
 
 `extensions/calendar/backend/pending_writes.go` `Drain` immediately selects the same failed row until all three attempts are exhausted. Sync invokes drain even after failures, so one offline sync can strand pending writes permanently; restored connectivity does not retry exhausted rows and no recovery UI exists. Defer transport retries across drain cycles and retain a recovery path.
