@@ -16,6 +16,13 @@ _Aerion_ is a cross-platform email client created by [hkdb/aerion](https://githu
 - Independence - No dependency on Gnome Online Accounts or other system services
 - Search That Works - Basic search that actually finds your emails
 
+## Fork Differences
+
+This personal focus has the follow major changes from the upstream Aerion repo:
+
+- Collapsible panes
+- Several bug fixes
+
 ## Installation
 
 - [Installation Guide](docs/user-guide/getting-started/installation/index.md)
