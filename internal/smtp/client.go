@@ -170,15 +170,19 @@ func (c *Client) Connect() error {
 
 	// Upgrade to TLS if using STARTTLS
 	if c.config.Security == SecurityStartTLS {
-		if ok, _ := c.client.Extension("STARTTLS"); ok {
-			if err := c.client.StartTLS(tlsConfig); err != nil {
-				c.client.Close()
-				return fmt.Errorf("failed to upgrade to TLS: %w", err)
-			}
-			c.log.Debug().Msg("Upgraded connection to TLS via STARTTLS")
-		} else {
-			c.log.Warn().Msg("STARTTLS not supported by server")
+		// Never fall back to plaintext: credentials would be sent unencrypted
+		// if STARTTLS is unsupported or stripped by an attacker.
+		if ok, _ := c.client.Extension("STARTTLS"); !ok {
+			c.client.Close()
+			c.client = nil
+			return fmt.Errorf("server does not support STARTTLS; refusing to continue without TLS")
 		}
+		if err := c.client.StartTLS(tlsConfig); err != nil {
+			c.client.Close()
+			c.client = nil
+			return fmt.Errorf("failed to upgrade to TLS: %w", err)
+		}
+		c.log.Debug().Msg("Upgraded connection to TLS via STARTTLS")
 	}
 
 	c.log.Info().

@@ -18,10 +18,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `extensions/calendar/backend/provider_caldav_compose.go` `setRecurrenceID` formats all-day dates in UTC, while parsing and `setDateValue` use `configuredTZ()`. Midnight October 7 in Tokyo becomes October 6 UTC, targeting the wrong occurrence. Use the configured timezone for DATE serialization and fix `recurrenceIDMatches`, which compares UTC midnight against locally anchored timestamps.
 
-### [P1] SMTP silently falls back from STARTTLS to plaintext
-
-`internal/smtp/client.go` `Connect` only warns when requested STARTTLS is unavailable, then succeeds. LOGIN and XOAUTH2 do not enforce TLS, exposing passwords or bearer tokens if STARTTLS is stripped or unsupported. Fail connection setup when configured STARTTLS cannot be negotiated.
-
 ### [P1] S/MIME trusted status lacks certificate-chain verification
 
 `internal/smime/verifier.go` `verifyPKCS7` calls `p7.Verify()`, which disables certificate-chain verification in the installed library. A valid signature from a leaf issued by an attacker's untrusted CA receives normal signed status because the leaf is not self-signed. Verify against trusted roots before reporting a trusted signature.

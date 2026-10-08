@@ -213,3 +213,31 @@ func TestForcedMechanismFailsWithoutFallback(t *testing.T) {
 		})
 	}
 }
+
+// TestStartTLSRequiredWhenConfigured verifies that a STARTTLS connection
+// fails instead of continuing in plaintext when the server does not offer
+// STARTTLS (e.g. stripped by an attacker).
+func TestStartTLSRequiredWhenConfigured(t *testing.T) {
+	ln := fakeSMTPServer(t, "PLAIN LOGIN", false, make(chan string, 1))
+	defer ln.Close()
+
+	addr := ln.Addr().(*net.TCPAddr)
+	config := DefaultConfig()
+	config.Host = "127.0.0.1"
+	config.Port = addr.Port
+	config.Security = SecurityStartTLS
+	config.Username = "user"
+	config.Password = "pass"
+	config.ConnectTimeout = 5 * time.Second
+	config.ReadTimeout = 5 * time.Second
+	config.WriteTimeout = 5 * time.Second
+
+	client := NewClient(config)
+	if err := client.Connect(); err == nil {
+		client.Close()
+		t.Fatal("expected Connect to fail when STARTTLS is not advertised")
+	}
+	if err := client.Login(); err == nil {
+		t.Fatal("expected Login to fail after refused connection")
+	}
+}

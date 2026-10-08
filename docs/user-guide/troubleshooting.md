@@ -31,6 +31,7 @@ For Gmail and Outlook accounts:
 - Ensure you're using the correct security setting (SSL/TLS vs STARTTLS)
 - Check that the server hostname matches the certificate
 - For self-hosted servers, ensure the certificate is valid
+- With STARTTLS selected, sending fails if the server doesn't offer STARTTLS; Aerion won't fall back to an unencrypted connection. Use SSL/TLS if the server supports it
 
 ## Sync Problems
 
