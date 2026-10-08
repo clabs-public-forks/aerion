@@ -85,7 +85,7 @@ func composeThisUpdate(cal *ical.Calendar, payload PushInstancePayload, masterId
 	masterUID := payload.Master.UID
 
 	// Build the new override VEVENT carrying RECURRENCE-ID.
-	overrideEv := buildOverrideVEVENT(masterUID, payload.InstanceTimeUnix, payload.In)
+	overrideEv := buildOverrideVEVENT(masterUID, payload.InstanceTimeUnix, payload.In, payload.Master.IsAllDay)
 
 	// Find an existing override with matching RECURRENCE-ID — replace it
 	// in place. Otherwise append.
@@ -119,7 +119,7 @@ func composeThisDelete(cal *ical.Calendar, payload PushInstancePayload, masterId
 
 	// Add EXDATE to master.
 	master := cal.Children[reindexMaster(cal, masterIdx)]
-	addExdateProp(master.Props, payload.InstanceTimeUnix)
+	master.Props.Add(newRecurProp(ical.PropExceptionDates, payload.InstanceTimeUnix, payload.Master.IsAllDay))
 
 	blob, err := encodeICS(cal)
 	if err != nil {
@@ -143,7 +143,7 @@ func composeThisAndFuture(cal *ical.Calendar, payload PushInstancePayload) (comp
 	if rruleProp == nil {
 		return composedVCalendar{}, fmt.Errorf("composeVCalendar: master has no RRULE")
 	}
-	clampedRRULE := clampRRuleUntil(rruleProp.Value, splitUnix-1)
+	clampedRRULE := clampRRuleUntil(rruleProp.Value, splitUnix-1, payload.Master.IsAllDay)
 	setRRuleText(masterComp.Props, clampedRRULE)
 
 	// Drop overrides at or past the split point.
@@ -208,8 +208,9 @@ func reindexMaster(cal *ical.Calendar, _ int) int {
 
 // buildOverrideVEVENT constructs a VEVENT with RECURRENCE-ID + the
 // modified fields from `in`. UID matches the master so rrule_expand /
-// CalDAV clients can pair them.
-func buildOverrideVEVENT(masterUID string, instanceTimeUnix int64, in EventInput) *ical.Event {
+// CalDAV clients can pair them. masterAllDay types the RECURRENCE-ID to
+// match the master's DTSTART.
+func buildOverrideVEVENT(masterUID string, instanceTimeUnix int64, in EventInput, masterAllDay bool) *ical.Event {
 	ev := ical.NewEvent()
 	ev.Props.SetText(ical.PropUID, masterUID)
 	ev.Props.SetDateTime(ical.PropDateTimeStamp, time.Now().UTC())
@@ -234,8 +235,8 @@ func buildOverrideVEVENT(masterUID string, instanceTimeUnix int64, in EventInput
 	setEventStartEnd(ev, in)
 
 	// RECURRENCE-ID matches the ORIGINAL instance time (instanceTimeUnix),
-	// not the new DTSTART. Format as DATE for all-day or UTC DATE-TIME.
-	setRecurrenceID(ev, instanceTimeUnix, in.IsAllDay)
+	// not the new DTSTART.
+	ev.Props.Set(newRecurProp(ical.PropRecurrenceID, instanceTimeUnix, masterAllDay))
 
 	if in.Reminder != nil {
 		alarm := &ical.Component{Name: ical.CompAlarm, Props: ical.Props{}}
@@ -248,24 +249,6 @@ func buildOverrideVEVENT(masterUID string, instanceTimeUnix int64, in EventInput
 	}
 
 	return ev
-}
-
-// setRecurrenceID stamps a RECURRENCE-ID property on the override VEVENT
-// at instanceTimeUnix.
-func setRecurrenceID(ev *ical.Event, instanceTimeUnix int64, isAllDay bool) {
-	t := time.Unix(instanceTimeUnix, 0)
-	prop := ical.NewProp(ical.PropRecurrenceID)
-	if isAllDay {
-		// All-day instances are anchored to midnight in the configured
-		// display tz (see buildOverride / setDateValue), so the calendar
-		// date must be read in that same zone.
-		prop.Params.Set(ical.ParamValue, string(ical.ValueDate))
-		prop.Value = t.In(configuredTZ()).Format("20060102")
-		ev.Props.Set(prop)
-		return
-	}
-	prop.Value = t.UTC().Format("20060102T150405Z")
-	ev.Props.Set(prop)
 }
 
 // recurrenceIDMatches checks whether the override's RECURRENCE-ID
@@ -371,21 +354,6 @@ func parseRecurrenceIDUnix(prop *ical.Prop) (int64, bool) {
 		return 0, false
 	}
 	return t.Unix(), true
-}
-
-// addExdateProp adds an EXDATE property to the master VEVENT's props at
-// the given unix time. Coalesces with any existing EXDATE values.
-func addExdateProp(props ical.Props, instanceTimeUnix int64) {
-	t := time.Unix(instanceTimeUnix, 0).UTC()
-	exdate := t.Format("20060102T150405Z")
-	existing := props.Get(ical.PropExceptionDates)
-	if existing != nil {
-		existing.Value = existing.Value + "," + exdate
-		return
-	}
-	prop := ical.NewProp(ical.PropExceptionDates)
-	prop.Value = exdate
-	props.Add(prop)
 }
 
 // encodeICS is provided by sync.go (package-private). composeVCalendar

@@ -25,7 +25,7 @@ func TestMergeRRule(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := mergeRRule(tt.old, tt.spec); got != tt.want {
+			if got := mergeRRule(tt.old, tt.spec, false); got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
@@ -74,7 +74,7 @@ func TestMergeVEVENT(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			in := base
 			tt.edit(&in)
-			in.Recurrence = &RecurrenceSpec{rule: mergeRRule(master.RRuleText, in.Recurrence)}
+			in.Recurrence = &RecurrenceSpec{rule: mergeRRule(master.RRuleText, in.Recurrence, in.IsAllDay)}
 			blob, keep, err := mergeVEVENT(master, in)
 			if err != nil {
 				t.Fatal(err)

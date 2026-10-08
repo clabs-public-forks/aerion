@@ -646,7 +646,7 @@ func (p googleProvider) pushThis(ctx context.Context, client *http.Client, cal C
 // new event for the future series.
 func (p googleProvider) pushThisAndFuture(ctx context.Context, client *http.Client, cal Calendar, payload PushInstancePayload) (PushInstanceResult, error) {
 	// PATCH master with clamped RRULE.
-	clampedRRULE := clampRRuleUntil(payload.Master.RRuleText, payload.InstanceTimeUnix-1)
+	clampedRRULE := clampRRuleUntil(payload.Master.RRuleText, payload.InstanceTimeUnix-1, payload.Master.IsAllDay)
 	masterPatch := googleEvent{
 		Recurrence: []string{"RRULE:" + clampedRRULE},
 	}

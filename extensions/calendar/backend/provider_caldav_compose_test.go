@@ -39,7 +39,7 @@ func buildSeedMasterICS(t *testing.T, uid string, rrule string, instanceTimeUnix
 			Summary:     "Old override",
 			DTStartUnix: ot,
 			DTEndUnix:   ot + 1800,
-		})
+		}, false)
 		cal.Children = append(cal.Children, ov.Component)
 	}
 	out, err := encodeICS(cal)
@@ -258,7 +258,7 @@ func TestRecurrenceIDMatches_RoundTrip(t *testing.T) {
 		DTStartUnix: instanceTime,
 		DTEndUnix:   instanceTime + 1800,
 	}
-	ev := buildOverrideVEVENT("uid@a", instanceTime, in)
+	ev := buildOverrideVEVENT("uid@a", instanceTime, in, false)
 	ridProp := ev.Props.Get("RECURRENCE-ID")
 	if ridProp == nil {
 		t.Fatalf("override missing RECURRENCE-ID")
@@ -286,7 +286,7 @@ func TestRecurrenceIDMatches_AllDayUsesConfiguredTimezone(t *testing.T) {
 		IsAllDay:    true,
 		DTStartUnix: instanceTime,
 		DTEndUnix:   instanceTime + 86400,
-	})
+	}, true)
 	ridProp := ev.Props.Get("RECURRENCE-ID")
 	if ridProp == nil {
 		t.Fatalf("override missing RECURRENCE-ID")

@@ -19,8 +19,8 @@ var composerProps = []string{
 // mergeRRule returns the RRULE for a whole-series edit. The composer only
 // shows FREQ, UNTIL and COUNT, so the other parts of the existing rule
 // (INTERVAL, BYDAY, WKST, ...) are kept while the frequency is unchanged.
-// spec.Keep returns the existing rule as is.
-func mergeRRule(old string, spec *RecurrenceSpec) string {
+// spec.Keep returns the existing rule as is. allDay writes UNTIL as a DATE.
+func mergeRRule(old string, spec *RecurrenceSpec, allDay bool) string {
 	if spec == nil {
 		return ""
 	}
@@ -39,12 +39,12 @@ func mergeRRule(old string, spec *RecurrenceSpec) string {
 		}
 	}
 	if !sameFreq {
-		return rruleText(spec)
+		return rruleText(spec, allDay)
 	}
 	if spec.Keep {
 		return old
 	}
-	fresh := strings.Split(rruleText(spec), ";")
+	fresh := strings.Split(rruleText(spec, allDay), ";")
 	return strings.Join(append(append(fresh[:1:1], kept...), fresh[1:]...), ";")
 }
 
@@ -82,7 +82,7 @@ func sameReminder(existing *int, in *ReminderSpec) bool {
 // still match; keepExceptions reports that. A blob that can't be decoded is
 // replaced by a fresh one.
 func mergeVEVENT(master Event, in EventInput) (blob string, keepExceptions bool, err error) {
-	rrule := rruleText(in.Recurrence)
+	rrule := rruleText(in.Recurrence, in.IsAllDay)
 	fresh := newVEVENT(master.UID, in, rrule)
 	cal, derr := ical.NewDecoder(strings.NewReader(master.ICSBlob)).Decode()
 	masterIdx := -1

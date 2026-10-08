@@ -303,7 +303,7 @@ func (p microsoftProvider) applyMasterExceptions(ctx context.Context, client *ht
 		if !ok {
 			continue
 		}
-		if nb, e := addEXDATE(ev.ICSBlob, occUnix); e == nil {
+		if nb, e := addEXDATE(ev.ICSBlob, occUnix, ev.IsAllDay); e == nil {
 			ev.ICSBlob = nb
 		}
 	}

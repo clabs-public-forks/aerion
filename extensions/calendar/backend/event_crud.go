@@ -155,7 +155,7 @@ func (a *API) CreateEvent(in EventInput) (string, error) {
 		DTEndUnix:    in.DTEndUnix,
 		IsAllDay:     in.IsAllDay,
 		TZName:       in.TZName,
-		RRuleText:    rruleText(in.Recurrence),
+		RRuleText:    rruleText(in.Recurrence, in.IsAllDay),
 		Transparency: normTransparency(in.Transparency),
 		Visibility:   normVisibility(in.Visibility),
 		ICSBlob:      icsBlob,
@@ -266,7 +266,7 @@ func (a *API) UpdateEvent(in EventUpdateInput, scope EditScope) error {
 	}
 	if r := in.Recurrence; r != nil {
 		resolved := *r
-		resolved.rule = mergeRRule(master.RRuleText, r)
+		resolved.rule = mergeRRule(master.RRuleText, r, in.IsAllDay)
 		in.Recurrence = &resolved
 	}
 
@@ -354,7 +354,7 @@ func (a *API) updateInstance(src Source, cal Calendar, master Event, in EventInp
 // when the provider returned one (CalDAV — the master's resource was
 // rewritten to embed the override).
 func (a *API) persistThisUpdate(master Event, in EventInput, instanceUnix int64, result PushInstanceResult) error {
-	overrideBlob, err := serializeVEVENTWithRecurrenceID(master.UID, in, instanceUnix)
+	overrideBlob, err := serializeVEVENTWithRecurrenceID(master.UID, in, instanceUnix, master.IsAllDay)
 	if err != nil {
 		return fmt.Errorf("serialize override: %w", err)
 	}
@@ -377,7 +377,7 @@ func (a *API) persistThisUpdate(master Event, in EventInput, instanceUnix int64,
 // persistThisDelete adds EXDATE to the master + drops any existing
 // matching override row.
 func (a *API) persistThisDelete(master Event, instanceUnix int64, result PushInstanceResult) error {
-	updatedICS, err := addEXDATE(master.ICSBlob, instanceUnix)
+	updatedICS, err := addEXDATE(master.ICSBlob, instanceUnix, master.IsAllDay)
 	if err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func (a *API) persistThisDelete(master Event, instanceUnix int64, result PushIns
 // pattern as the legacy updateThisAndFuture).
 func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, splitUnix int64, result PushInstanceResult) error {
 	// 1. Clamp master's RRULE locally.
-	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1)
+	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1, master.IsAllDay)
 	clampedICS, err := reserializeMasterICS(master, clampedRRULE)
 	if err != nil {
 		return err
@@ -451,7 +451,7 @@ func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, spl
 		DTStartUnix:     in.DTStartUnix,
 		DTEndUnix:       in.DTEndUnix,
 		IsAllDay:        in.IsAllDay,
-		RRuleText:       rruleText(in.Recurrence),
+		RRuleText:       rruleText(in.Recurrence, in.IsAllDay),
 		Transparency:    normTransparency(in.Transparency),
 		Visibility:      normVisibility(in.Visibility),
 		ICSBlob:         newICS,
@@ -480,7 +480,7 @@ func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, spl
 // persistThisAndFutureDeleteLocally clamps the master locally + drops
 // future overrides. No new series row.
 func (a *API) persistThisAndFutureDeleteLocally(master Event, splitUnix int64, result PushInstanceResult) error {
-	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1)
+	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1, master.IsAllDay)
 	clampedICS, err := reserializeMasterICS(master, clampedRRULE)
 	if err != nil {
 		return err
@@ -612,7 +612,7 @@ func (a *API) updateAllAndPush(src Source, cal Calendar, master Event, in EventI
 	ev.DTEndUnix = in.DTEndUnix
 	ev.IsAllDay = in.IsAllDay
 	ev.TZName = in.TZName
-	ev.RRuleText = rruleText(in.Recurrence)
+	ev.RRuleText = rruleText(in.Recurrence, in.IsAllDay)
 	ev.Transparency = normTransparency(in.Transparency)
 	ev.Visibility = normVisibility(in.Visibility)
 	ev.ICSBlob = icsBlob
@@ -746,7 +746,7 @@ func (a *API) lookupCalendarAndSource(calendarID string) (*Calendar, *Source, er
 	return nil, nil, fmt.Errorf("calendar: calendar %q not found", calendarID)
 }
 
-func rruleText(spec *RecurrenceSpec) string {
+func rruleText(spec *RecurrenceSpec, allDay bool) string {
 	if spec == nil {
 		return ""
 	}
@@ -755,7 +755,7 @@ func rruleText(spec *RecurrenceSpec) string {
 	}
 	parts := []string{"FREQ=" + spec.Freq}
 	if spec.UntilUnix > 0 {
-		parts = append(parts, "UNTIL="+formatICSDateTime(time.Unix(spec.UntilUnix, 0)))
+		parts = append(parts, "UNTIL="+formatRecurValue(spec.UntilUnix, allDay))
 	}
 	if spec.Count > 0 {
 		parts = append(parts, fmt.Sprintf("COUNT=%d", spec.Count))
@@ -887,7 +887,7 @@ func serializeVEVENT(uid string, in EventInput) (string, error) {
 	cal := ical.NewCalendar()
 	cal.Props.SetText(ical.PropVersion, "2.0")
 	cal.Props.SetText(ical.PropProductID, "-//Aerion//Calendar Extension//EN")
-	cal.Children = append(cal.Children, newVEVENT(uid, in, rruleText(in.Recurrence)).Component)
+	cal.Children = append(cal.Children, newVEVENT(uid, in, rruleText(in.Recurrence, in.IsAllDay)).Component)
 	return encodeICS(cal)
 }
 
@@ -956,6 +956,28 @@ func formatICSDateTime(t time.Time) string {
 	return t.UTC().Format("20060102T150405Z")
 }
 
+// formatRecurValue formats an UNTIL, EXDATE or RECURRENCE-ID value. RFC 5545
+// requires these to share DTSTART's value type, so an all-day series gets a
+// DATE in the display tz (matching setDateValue) and a timed one a UTC
+// date-time.
+func formatRecurValue(unix int64, allDay bool) string {
+	if allDay {
+		return time.Unix(unix, 0).In(configuredTZ()).Format("20060102")
+	}
+	return formatICSDateTime(time.Unix(unix, 0))
+}
+
+// newRecurProp builds an EXDATE or RECURRENCE-ID property whose value type
+// matches the series' DTSTART.
+func newRecurProp(name string, unix int64, allDay bool) *ical.Prop {
+	prop := ical.NewProp(name)
+	prop.Value = formatRecurValue(unix, allDay)
+	if allDay {
+		prop.Params.Set(ical.ParamValue, "DATE")
+	}
+	return prop
+}
+
 // setRRuleText writes the RRULE value WITHOUT the TEXT-type semicolon escape
 // go-ical applies by default via SetText. The RRULE property uses RECUR type
 // per RFC 5545 §3.3.10 — semicolons are part-separators, not escaped.
@@ -981,9 +1003,10 @@ func (a *API) extractAndUpsertAlarmsTx(tx *sql.Tx, ev Event) error {
 
 // serializeVEVENTWithRecurrenceID is like serializeVEVENT but uses the
 // caller-supplied uid (same as the master's per RFC 5545 §3.8.4.4) and
-// adds RECURRENCE-ID = DTStartUnix so the override binds to a specific
-// occurrence.
-func serializeVEVENTWithRecurrenceID(uid string, in EventInput, recurrenceIDUnix int64) (string, error) {
+// adds RECURRENCE-ID = recurrenceIDUnix so the override binds to a specific
+// occurrence. masterAllDay sets the RECURRENCE-ID value type to match the
+// master's DTSTART.
+func serializeVEVENTWithRecurrenceID(uid string, in EventInput, recurrenceIDUnix int64, masterAllDay bool) (string, error) {
 	// Overrides are single-instance, never recurring.
 	in.Recurrence = nil
 
@@ -999,9 +1022,7 @@ func serializeVEVENTWithRecurrenceID(uid string, in EventInput, recurrenceIDUnix
 		return "", errors.New("calendar: re-encoded event has no VEVENT")
 	}
 	ev := cal.Events()[0]
-	recIDProp := ical.NewProp(ical.PropRecurrenceID)
-	recIDProp.Value = formatICSDateTime(time.Unix(recurrenceIDUnix, 0))
-	ev.Props.Set(recIDProp)
+	ev.Props.Set(newRecurProp(ical.PropRecurrenceID, recurrenceIDUnix, masterAllDay))
 	var buf bytes.Buffer
 	if err := ical.NewEncoder(&buf).Encode(cal); err != nil {
 		return "", err
@@ -1032,8 +1053,9 @@ func reserializeMasterICS(master Event, newRRULE string) (string, error) {
 	return buf.String(), nil
 }
 
-// addEXDATE injects an EXDATE property onto the master's VEVENT.
-func addEXDATE(icsBlob string, instanceUnix int64) (string, error) {
+// addEXDATE adds an EXDATE property to the master's VEVENT, typed to match
+// an all-day or timed DTSTART.
+func addEXDATE(icsBlob string, instanceUnix int64, allDay bool) (string, error) {
 	cal, err := ical.NewDecoder(strings.NewReader(icsBlob)).Decode()
 	if err != nil {
 		return "", err
@@ -1042,17 +1064,7 @@ func addEXDATE(icsBlob string, instanceUnix int64) (string, error) {
 		return "", errors.New("calendar: master ICS has no VEVENT")
 	}
 	ev := cal.Events()[0]
-	exdateStr := formatICSDateTime(time.Unix(instanceUnix, 0))
-
-	existing := ev.Props.Get(ical.PropExceptionDates)
-	if existing != nil {
-		existing.Value = existing.Value + "," + exdateStr
-	}
-	if existing == nil {
-		p := ical.NewProp(ical.PropExceptionDates)
-		p.Value = exdateStr
-		ev.Props.Set(p)
-	}
+	ev.Props.Add(newRecurProp(ical.PropExceptionDates, instanceUnix, allDay))
 	var buf bytes.Buffer
 	if err := ical.NewEncoder(&buf).Encode(cal); err != nil {
 		return "", err
@@ -1061,8 +1073,8 @@ func addEXDATE(icsBlob string, instanceUnix int64) (string, error) {
 }
 
 // clampRRuleUntil returns the RRULE text with an UNTIL=<unix> clause added,
-// replacing any existing UNTIL or COUNT.
-func clampRRuleUntil(rrule string, untilUnix int64) string {
+// replacing any existing UNTIL or COUNT. allDay writes UNTIL as a DATE.
+func clampRRuleUntil(rrule string, untilUnix int64, allDay bool) string {
 	if rrule == "" {
 		return ""
 	}
@@ -1076,6 +1088,6 @@ func clampRRuleUntil(rrule string, untilUnix int64) string {
 		}
 		out = append(out, p)
 	}
-	out = append(out, "UNTIL="+formatICSDateTime(time.Unix(untilUnix, 0)))
+	out = append(out, "UNTIL="+formatRecurValue(untilUnix, allDay))
 	return strings.Join(out, ";")
 }

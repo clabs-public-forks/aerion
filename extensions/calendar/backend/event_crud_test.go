@@ -171,7 +171,7 @@ func TestRRuleText(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := rruleText(c.spec)
+			got := rruleText(c.spec, false)
 			if got != c.want {
 				t.Errorf("got %q want %q", got, c.want)
 			}
@@ -209,7 +209,7 @@ func TestClampRRuleUntil(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := clampRRuleUntil(c.input, until)
+			got := clampRRuleUntil(c.input, until, false)
 			if got != c.want {
 				t.Errorf("got %q want %q", got, c.want)
 			}

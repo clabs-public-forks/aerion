@@ -64,8 +64,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K12 medium** `event_crud.go:708,966,1008,1042`: all-day UNTIL, EXDATE and
-  RECURRENCE-ID are written as UTC date-times. Unverified.
 - **K13 medium** `rrule_expand.go:77`: FREQ=SECONDLY has no expansion cap.
   Unverified.
 - **K14 medium** `rrule_expand.go:61,77`: expansion misses multi-day
