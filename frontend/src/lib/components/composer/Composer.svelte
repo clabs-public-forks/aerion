@@ -936,7 +936,7 @@
       identity.signaturePlacement || 'above'
     )
 
-    editor.commands.setContent(newContent)
+    editor.commands.setContent(newContent, { emitUpdate: false })
   }
 
   // Update security bar visibility based on the selected identity's email
@@ -1042,7 +1042,7 @@
 
     // Remove old signature and apply new one
     const content = removeSignatureFromContent(editor.getHTML())
-    editor.commands.setContent(content)
+    editor.commands.setContent(content, { emitUpdate: false })
 
     appendSignatureForIdentity(newIdentity)
     scheduleDraftSave()
@@ -1150,7 +1150,7 @@
     // Set editor content (with restored data URLs for inline images)
     // Strip email-client paragraph styles so TipTap doesn't double-space empty lines
     if (editor && htmlBody) {
-      editor.commands.setContent(stripParagraphStyles(htmlBody))
+      editor.commands.setContent(stripParagraphStyles(htmlBody), { emitUpdate: false })
       // Move cursor to beginning (before the quoted content)
       editor.commands.focus('start')
     }
@@ -1477,7 +1477,7 @@
     } else {
       html = plainTextToHtml(plainTextContent)
     }
-    editor?.commands.setContent(stripParagraphStyles(html))
+    editor?.commands.setContent(stripParagraphStyles(html), { emitUpdate: false })
     isPlainTextMode = false
     editor?.commands.focus('start')
     scheduleDraftSave()

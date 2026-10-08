@@ -3,18 +3,11 @@
  */
 import { Editor, Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link'
-import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
-import TextStyle from '@tiptap/extension-text-style'
-import Color from '@tiptap/extension-color'
+import { TextStyle, Color, FontSize } from '@tiptap/extension-text-style'
 import TextAlign from '@tiptap/extension-text-align'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
-import FontSize from 'tiptap-extension-font-size'
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
 import { parseFileUris } from './composerUtils'
 import { get } from 'svelte/store'
 import { _ } from 'svelte-i18n'
@@ -195,9 +188,11 @@ export function createComposerEditor(
   return new Editor({
     element,
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: { openOnClick: false },
+        trailingNode: false,
+      }),
       Spellcheck,
-      Underline,
       ExtendedTextStyle,
       ExtendedColor,
       FontSize,
@@ -210,9 +205,6 @@ export function createComposerEditor(
       TableRow,
       ExtendedTableCell,
       ExtendedTableHeader,
-      Link.configure({
-        openOnClick: false,
-      }),
       ComposerImage.configure({
         inline: true,
         allowBase64: true,

@@ -3,18 +3,11 @@
   import Icon from '@iconify/svelte'
   import { Editor, Extension } from '@tiptap/core'
   import StarterKit from '@tiptap/starter-kit'
-  import Link from '@tiptap/extension-link'
-  import Underline from '@tiptap/extension-underline'
   import Placeholder from '@tiptap/extension-placeholder'
   import Image from '@tiptap/extension-image'
-  import TextStyle from '@tiptap/extension-text-style'
-  import Color from '@tiptap/extension-color'
+  import { TextStyle, Color, FontSize } from '@tiptap/extension-text-style'
   import TextAlign from '@tiptap/extension-text-align'
-  import Table from '@tiptap/extension-table'
-  import TableRow from '@tiptap/extension-table-row'
-  import TableCell from '@tiptap/extension-table-cell'
-  import TableHeader from '@tiptap/extension-table-header'
-  import FontSize from 'tiptap-extension-font-size'
+  import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
   import { _ } from '$lib/i18n'
 
   // Extended TextStyle to also handle legacy <font> tags
@@ -234,9 +227,15 @@
         StarterKit.configure({
           // Disable heading for signatures - keep it simple
           heading: false,
+          link: {
+            openOnClick: false,
+            HTMLAttributes: {
+              class: 'text-primary underline',
+            },
+          },
+          trailingNode: false,
         }),
         LineBreakOnEnter,  // Make Enter insert <br> instead of new paragraph
-        Underline,
         ExtendedTextStyle,  // Required for Color extension (extended for better paste support)
         ExtendedColor,      // Text color support (extended for font tags and inline styles)
         FontSize,           // Font size support
@@ -253,12 +252,6 @@
         TableRow,
         ExtendedTableCell,
         ExtendedTableHeader,
-        Link.configure({
-          openOnClick: false,
-          HTMLAttributes: {
-            class: 'text-primary underline',
-          },
-        }),
         Image.configure({
           inline: true,
           allowBase64: true,
@@ -333,7 +326,7 @@
   $effect(() => {
     if (editor && !rawHtmlMode && value !== editor.getHTML()) {
       isUpdatingFromProp = true
-      editor.commands.setContent(value)
+      editor.commands.setContent(value, { emitUpdate: false })
       isUpdatingFromProp = false
     }
   })
@@ -512,7 +505,7 @@
     }
     // Switching back to WYSIWYG mode
     isUpdatingFromProp = true
-    editor?.commands.setContent(rawHtmlContent)
+    editor?.commands.setContent(rawHtmlContent, { emitUpdate: false })
     isUpdatingFromProp = false
     rawHtmlMode = false
     onchange?.(editor?.getHTML() || '')
