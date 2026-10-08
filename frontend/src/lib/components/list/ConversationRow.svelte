@@ -12,6 +12,7 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
   import { formatRelativeDate } from '$lib/utils/date'
+  import { getInitials } from '$lib/utils/initials'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
@@ -210,18 +211,9 @@
     }
   })
 
-  function getInitials(conv: message.Conversation): string {
-    if (!conv.participants || conv.participants.length === 0) {
-      return '?'
-    }
-    const first = conv.participants[0]
-    const name = first.name || first.email
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
+  function getConversationInitials(conv: message.Conversation): string {
+    const first = conv.participants?.[0]
+    return getInitials(first?.name || first?.email)
   }
 
   function getAvatarColor(conv: message.Conversation): string {
@@ -542,7 +534,7 @@
             conversation
           )}"
         >
-          {getInitials(conversation)}
+          {getConversationInitials(conversation)}
         </div>
       {/if}
     {/if}

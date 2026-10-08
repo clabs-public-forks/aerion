@@ -5,6 +5,8 @@
   // matches mail automatically (and stays matched even though the JS is
   // duplicated — see project_extension_sdk_pattern memory for rationale).
 
+  import { getInitials } from '$lib/utils/initials'
+
   interface Props {
     /** Email address used as the color-hash seed. */
     email: string
@@ -41,21 +43,6 @@
     return `avatar-${(Math.abs(hash) % 14) + 1}`
   }
 
-  // Ported verbatim from mail's getInitials in ConversationRow.svelte:158-170.
-  // Split-on-single-space (not whitespace regex), map to first char, join +
-  // uppercase + slice(0,2). Kept identical so an extension's contact and a
-  // mail sender with the same display name render the same letters.
-  function initials(displayName: string | undefined, fallbackEmail: string): string {
-    if (!displayName && !fallbackEmail) return '?'
-    const name = displayName || fallbackEmail
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
   // Density → pixel size table. Tuned to match mail UI's density visual weight.
   const DENSITY_SIZE: Record<NonNullable<Props['density']>, number> = {
     micro: 24,
@@ -67,7 +54,8 @@
   const px = $derived(size ?? DENSITY_SIZE[density])
   const fontPx = $derived(Math.round(px * 0.4))
   const cls = $derived(colorClass(email || ''))
-  const text = $derived(initials(name, email))
+  // Shared with mail so a contact and a sender with the same name match.
+  const text = $derived(getInitials(name || email))
 </script>
 
 <div
