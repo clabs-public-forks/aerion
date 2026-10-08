@@ -270,3 +270,40 @@ func TestRecurrenceIDMatches_RoundTrip(t *testing.T) {
 		t.Errorf("recurrenceIDMatches should NOT match a different time")
 	}
 }
+
+func TestRecurrenceIDMatches_AllDayUsesConfiguredTimezone(t *testing.T) {
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Skipf("tz data unavailable: %v", err)
+	}
+	SetConfiguredTimezone("Asia/Tokyo")
+	t.Cleanup(func() { SetConfiguredTimezone("") })
+
+	// Midnight Oct 7 in Tokyo is Oct 6 in UTC.
+	instanceTime := time.Date(2026, 10, 7, 0, 0, 0, 0, tokyo).Unix()
+	ev := buildOverrideVEVENT("uid@a", instanceTime, EventInput{
+		Summary:     "All day",
+		IsAllDay:    true,
+		DTStartUnix: instanceTime,
+		DTEndUnix:   instanceTime + 86400,
+	})
+	ridProp := ev.Props.Get("RECURRENCE-ID")
+	if ridProp == nil {
+		t.Fatalf("override missing RECURRENCE-ID")
+	}
+	if ridProp.Value != "20261007" {
+		t.Errorf("RECURRENCE-ID = %q, want 20261007", ridProp.Value)
+	}
+	if !recurrenceIDMatches(ridProp, instanceTime) {
+		t.Errorf("recurrenceIDMatches should match the Tokyo-anchored instance")
+	}
+
+	// A synced override must match the instance time buildOverride stored.
+	override, err := buildOverride(ev)
+	if err != nil {
+		t.Fatalf("buildOverride: %v", err)
+	}
+	if override.RecurrenceIDUnix != instanceTime {
+		t.Errorf("RecurrenceIDUnix = %d, want %d", override.RecurrenceIDUnix, instanceTime)
+	}
+}

@@ -253,31 +253,36 @@ func buildOverrideVEVENT(masterUID string, instanceTimeUnix int64, in EventInput
 // setRecurrenceID stamps a RECURRENCE-ID property on the override VEVENT
 // at instanceTimeUnix.
 func setRecurrenceID(ev *ical.Event, instanceTimeUnix int64, isAllDay bool) {
-	t := time.Unix(instanceTimeUnix, 0).UTC()
+	t := time.Unix(instanceTimeUnix, 0)
 	prop := ical.NewProp(ical.PropRecurrenceID)
 	if isAllDay {
+		// All-day instances are anchored to midnight in the configured
+		// display tz (see buildOverride / setDateValue), so the calendar
+		// date must be read in that same zone.
 		prop.Params.Set(ical.ParamValue, string(ical.ValueDate))
-		prop.Value = t.Format("20060102")
+		prop.Value = t.In(configuredTZ()).Format("20060102")
 		ev.Props.Set(prop)
 		return
 	}
-	prop.Value = t.Format("20060102T150405Z")
+	prop.Value = t.UTC().Format("20060102T150405Z")
 	ev.Props.Set(prop)
 }
 
 // recurrenceIDMatches checks whether the override's RECURRENCE-ID
-// property refers to instanceTimeUnix (UTC second precision).
+// property refers to instanceTimeUnix (second precision). Tz-less values
+// (DATE and floating DATE-TIME) are interpreted in the configured display tz,
+// matching how buildOverride stored the instance time.
 func recurrenceIDMatches(prop *ical.Prop, instanceTimeUnix int64) bool {
 	if prop.Params.Get(ical.ParamValue) == string(ical.ValueDate) {
-		parsed, err := time.Parse("20060102", prop.Value)
+		parsed, err := time.ParseInLocation("20060102", prop.Value, configuredTZ())
 		if err != nil {
 			return false
 		}
 		return parsed.Unix() == instanceTimeUnix
 	}
-	// DATE-TIME — UTC or with TZID.
+	// DATE-TIME — UTC, with TZID, or floating.
 	tzName := prop.Params.Get(ical.ParamTimezoneID)
-	loc := time.UTC
+	loc := configuredTZ()
 	if tzName != "" {
 		if l, lerr := time.LoadLocation(tzName); lerr == nil {
 			loc = l

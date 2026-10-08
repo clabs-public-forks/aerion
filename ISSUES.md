@@ -14,10 +14,6 @@ Before the dev manifest was restricted to packaging inputs, local Flatpak builds
 
 `app/compose.go` (`getValidOAuthToken` → `refreshOAuthToken`) refreshes mail-slot tokens outside the extension broker's per-slot lock in `internal/extensions/auth`. With providers that rotate refresh tokens (Microsoft, custom OIDC), an extension refresh and an IMAP/SMTP refresh can race and one can send an already-used refresh token. Fix by moving a single-flight "refresh unless the token already changed" into `credentials.Store` or `oauth2.Manager` and calling it from both.
 
-### [P2] All-day RECURRENCE-ID formatted in UTC
-
-`extensions/calendar/backend/provider_caldav_compose.go` `setRecurrenceID` formats all-day dates in UTC, while parsing and `setDateValue` use `configuredTZ()`. Midnight October 7 in Tokyo becomes October 6 UTC, targeting the wrong occurrence. Use the configured timezone for DATE serialization and fix `recurrenceIDMatches`, which compares UTC midnight against locally anchored timestamps.
-
 ### [P2] One offline calendar drain exhausts the retry budget
 
 `extensions/calendar/backend/pending_writes.go` `Drain` immediately selects the same failed row until all three attempts are exhausted. Sync invokes drain even after failures, so one offline sync can strand pending writes permanently; restored connectivity does not retry exhausted rows and no recovery UI exists. Defer transport retries across drain cycles and retain a recovery path.
