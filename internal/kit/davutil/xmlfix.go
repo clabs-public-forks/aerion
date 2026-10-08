@@ -97,8 +97,9 @@ func NewWebDAVClient(base http.RoundTripper, timeout time.Duration) *http.Client
 		base = defaultBaseTransport()
 	}
 	return &http.Client{
-		Timeout:   timeout,
-		Transport: NewXMLFixTransport(&redirectTransport{base: base}),
+		Timeout:       timeout,
+		Transport:     NewXMLFixTransport(&redirectTransport{base: base}),
+		CheckRedirect: checkSameSiteRedirect,
 	}
 }
 

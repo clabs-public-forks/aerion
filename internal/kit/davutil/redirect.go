@@ -1,8 +1,14 @@
 package davutil
 
 import (
+	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"strings"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // redirectTransport preserves the request method across same-host redirects
@@ -92,3 +98,40 @@ func (t *redirectTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	// back (a persistent redirect loop surfaces as the redirect response).
 	return base.RoundTrip(current)
 }
+
+// checkSameSiteRedirect is the http.Client CheckRedirect for WebDAV clients.
+// Credentials are injected by the transport, below the client, so the
+// stdlib's Authorization stripping on cross-host redirects never applies.
+// Refuse any hop that downgrades https to http or leaves the original
+// request's registrable domain (eTLD+1), so credentials only go to the site
+// the user configured. Subdomain hops (caldav.icloud.com to
+// p01-caldav.icloud.com) stay allowed.
+func checkSameSiteRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	orig := via[0].URL
+	if orig.Scheme == "https" && req.URL.Scheme != "https" {
+		return fmt.Errorf("refusing redirect from https to %s", req.URL.Scheme)
+	}
+	if !sameSite(orig.Hostname(), req.URL.Hostname()) {
+		return fmt.Errorf("refusing cross-site redirect from %s to %s", orig.Hostname(), req.URL.Hostname())
+	}
+	return nil
+}
+
+// sameSite reports whether two hostnames share a registrable domain. IP
+// addresses and names without a public suffix must match exactly.
+func sameSite(a, b string) bool {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	if a == b {
+		return true
+	}
+	if net.ParseIP(a) != nil || net.ParseIP(b) != nil {
+		return false
+	}
+	siteA, errA := publicsuffix.EffectiveTLDPlusOne(a)
+	siteB, errB := publicsuffix.EffectiveTLDPlusOne(b)
+	return errA == nil && errB == nil && siteA == siteB
+}
+

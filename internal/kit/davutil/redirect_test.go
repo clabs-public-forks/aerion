@@ -158,3 +158,30 @@ func TestRedirectTransport_WithDigestAuth(t *testing.T) {
 		t.Fatalf("status = %d, want 200 after redirect + digest handshake", resp.StatusCode)
 	}
 }
+
+func TestCheckSameSiteRedirect(t *testing.T) {
+	tests := []struct {
+		name, from, to string
+		wantErr        bool
+	}{
+		{"same host", "https://dav.example.com/a", "https://dav.example.com/b", false},
+		{"subdomain hop", "https://caldav.icloud.com/", "https://p01-caldav.icloud.com/x", false},
+		{"other site", "https://dav.example.com/", "https://attacker.example.net/", true},
+		{"public suffix siblings", "https://a.github.io/", "https://b.github.io/", true},
+		{"https downgrade", "https://dav.example.com/", "http://dav.example.com/", true},
+		{"http to https", "http://dav.example.com/", "https://dav.example.com/", false},
+		{"same ip", "http://192.168.1.5:5232/", "http://192.168.1.5:5232/x", false},
+		{"other ip", "http://192.168.1.5/", "http://192.168.1.6/", true},
+		{"localhost", "http://localhost:5232/", "http://localhost:5232/x", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			orig, _ := http.NewRequest("PROPFIND", tt.from, nil)
+			next, _ := http.NewRequest("GET", tt.to, nil)
+			err := checkSameSiteRedirect(next, []*http.Request{orig})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
