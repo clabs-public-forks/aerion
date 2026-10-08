@@ -40,7 +40,7 @@
     body,
     emptyState,
     emptyIcon = 'mdi:tray-arrow-down',
-    emptyText = 'Nothing selected.',
+    emptyText,
   }: Props = $props()
 
   const flashing = $derived(isPaneFlashing(focusSlot))
@@ -86,7 +86,7 @@
         {@render emptyState()}
       {:else}
         <Icon icon={emptyIcon} width="48" height="48" />
-        <p class="text-lg">{emptyText}</p>
+        <p class="text-lg">{emptyText ?? $_('kit.nothingSelected')}</p>
       {/if}
     </div>
   {:else}

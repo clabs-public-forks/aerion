@@ -37,6 +37,7 @@
 
   import { onMount } from 'svelte'
   import Icon from '@iconify/svelte'
+  import { _ } from 'svelte-i18n'
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
@@ -66,7 +67,7 @@
   function currentChoiceLabel(): string {
     const match = choices?.choices.find(c => c.id === mode)
     if (match) return match.label
-    return 'Custom'
+    return $_('kit.oauth.custom')
   }
 
   // Status badge driven by the currently-selected mode rather than two
@@ -145,11 +146,11 @@
     }
 
     if (!id) {
-      toasts.error('Client ID is required')
+      toasts.error($_('kit.oauth.clientIdRequired'))
       return
     }
     if (secretRequired && !secret) {
-      toasts.error('Client Secret is required')
+      toasts.error($_('kit.oauth.clientSecretRequired'))
       return
     }
     saving = true
@@ -169,7 +170,7 @@
       await refresh()
     } catch (err) {
       console.error('Failed to save OAuth creds:', err)
-      toasts.error('Failed to save credentials')
+      toasts.error($_('kit.oauth.saveFailed'))
     } finally {
       saving = false
     }
@@ -192,7 +193,7 @@
       await refresh()
     } catch (err) {
       console.error('Failed to clear saved Custom credentials:', err)
-      toasts.error('Failed to clear saved credentials')
+      toasts.error($_('kit.oauth.clearFailed'))
     }
   }
 </script>
@@ -205,11 +206,11 @@
         {#if loading}
           <Icon icon="mdi:loading" class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         {:else if statusBadgeKind() === 'custom'}
-          <span class="text-xs px-2 py-0.5 rounded bg-primary/15 text-primary">Custom</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-primary/15 text-primary">{$_('kit.oauth.custom')}</span>
         {:else if statusBadgeKind() === 'aerion'}
-          <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">Aerion</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">{$_('kit.oauth.aerion')}</span>
         {:else}
-          <span class="text-xs px-2 py-0.5 rounded bg-destructive/15 text-destructive">Not configured</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-destructive/15 text-destructive">{$_('kit.oauth.notConfigured')}</span>
         {/if}
         {#if choices?.clientIdFingerprint}
           <code class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{choices.clientIdFingerprint}</code>
@@ -220,10 +221,10 @@
   </div>
 
   <div class="mt-3 flex items-center gap-2">
-    <Label class="text-xs text-muted-foreground">Client ID/Secret:</Label>
+    <Label class="text-xs text-muted-foreground">{$_('kit.oauth.credentialsSource')}</Label>
     <Select.Root value={mode} onValueChange={setMode}>
       <Select.Trigger class="h-8 w-[220px] text-sm">
-        <Select.Value placeholder="Custom">
+        <Select.Value placeholder={$_('kit.oauth.custom')}>
           {currentChoiceLabel()}
         </Select.Value>
       </Select.Trigger>
@@ -238,24 +239,24 @@
   {#if mode === 'custom'}
     <div class="mt-4 space-y-3">
       <div>
-        <Label for={`${configID}-client-id`}>Client ID</Label>
+        <Label for={`${configID}-client-id`}>{$_('kit.oauth.clientId')}</Label>
         <Input
           id={`${configID}-client-id`}
           type="text"
           bind:value={clientID}
-          placeholder={choices?.hasUserOverride ? 'Leave empty to keep current' : 'Paste Client ID'}
+          placeholder={choices?.hasUserOverride ? $_('kit.oauth.keepCurrent') : $_('kit.oauth.pasteClientId')}
           disabled={saving}
           autocomplete="off"
         />
       </div>
       {#if secretRequired}
         <div>
-          <Label for={`${configID}-client-secret`}>Client Secret</Label>
+          <Label for={`${configID}-client-secret`}>{$_('kit.oauth.clientSecret')}</Label>
           <Input
             id={`${configID}-client-secret`}
             type="password"
             bind:value={clientSecret}
-            placeholder={choices?.hasUserOverride ? 'Leave empty to keep current' : 'Paste Client Secret'}
+            placeholder={choices?.hasUserOverride ? $_('kit.oauth.keepCurrent') : $_('kit.oauth.pasteClientSecret')}
             disabled={saving}
             autocomplete="new-password"
           />
@@ -268,7 +269,7 @@
                it's visually separated from Save on the right. -->
           <Button size="sm" variant="outline" class="mr-auto border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" onclick={clearSavedCustom} disabled={saving}>
             <Icon icon="mdi:delete-outline" class="w-4 h-4 mr-1" />
-            Clear saved Custom credentials
+            {$_('kit.oauth.clearCustom')}
           </Button>
         {:else}
           <!-- Keep Save right-aligned in the no-override case too. -->
@@ -278,7 +279,7 @@
           {#if saving}
             <Icon icon="mdi:loading" class="w-4 h-4 mr-1 animate-spin" />
           {/if}
-          Save
+          {$_('common.save')}
         </Button>
       </div>
     </div>
@@ -288,7 +289,7 @@
          user knows their data wasn't wiped by the switch and can route
          back to it cheaply. -->
     <p class="mt-3 text-xs text-muted-foreground">
-      You also have a saved Custom override — switch to Custom to use it.
+      {$_('kit.oauth.savedOverrideHint')}
     </p>
   {/if}
 </div>

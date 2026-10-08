@@ -81,7 +81,7 @@
 <aside
   bind:this={containerRef}
   role="navigation"
-  aria-label={label ?? title ?? 'Sidebar'}
+  aria-label={label ?? title ?? $_('kit.sidebar')}
   tabindex={focusable ? 0 : undefined}
   class="{resizable ? '' : 'w-60'} flex-shrink-0 flex flex-col pt-3 border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {isSidebarHidden() ? 'hidden' : ''} {extraClass}"
   style:width={resizable ? `${width}px` : undefined}

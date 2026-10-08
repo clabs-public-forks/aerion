@@ -9,6 +9,7 @@
   // HTML before it ever reaches a viewer; this editor only authors content.
 
   import { onMount } from 'svelte'
+  import { _ } from 'svelte-i18n'
   import { Editor } from '@tiptap/core'
   import StarterKit from '@tiptap/starter-kit'
   import Underline from '@tiptap/extension-underline'
@@ -103,7 +104,7 @@
       editor.chain().focus().unsetLink().run()
       return
     }
-    const url = window.prompt('URL')
+    const url = window.prompt($_('kit.editor.linkPrompt'))
     if (!url) return
     editor.chain().focus().setLink({ href: url }).run()
   }
@@ -111,14 +112,14 @@
 
 <div class="rte border border-border rounded bg-background focus-within:ring-2 focus-within:ring-primary/50">
   <div class="rte-toolbar flex items-center gap-0.5 border-b border-border px-1 py-0.5" class:opacity-50={disabled}>
-    <button type="button" class="rte-btn" class:active={isActive('bold')} {disabled} onclick={toggleBold} aria-label="Bold"><b>B</b></button>
-    <button type="button" class="rte-btn" class:active={isActive('italic')} {disabled} onclick={toggleItalic} aria-label="Italic"><i>I</i></button>
-    <button type="button" class="rte-btn" class:active={isActive('underline')} {disabled} onclick={toggleUnderline} aria-label="Underline"><u>U</u></button>
+    <button type="button" class="rte-btn" class:active={isActive('bold')} {disabled} onclick={toggleBold} aria-label={$_('kit.editor.bold')}><b>B</b></button>
+    <button type="button" class="rte-btn" class:active={isActive('italic')} {disabled} onclick={toggleItalic} aria-label={$_('kit.editor.italic')}><i>I</i></button>
+    <button type="button" class="rte-btn" class:active={isActive('underline')} {disabled} onclick={toggleUnderline} aria-label={$_('kit.editor.underline')}><u>U</u></button>
     <span class="rte-sep"></span>
-    <button type="button" class="rte-btn" class:active={isActive('bulletList')} {disabled} onclick={toggleBullet} aria-label="Bullet list">&bull;</button>
-    <button type="button" class="rte-btn" class:active={isActive('orderedList')} {disabled} onclick={toggleOrdered} aria-label="Numbered list">1.</button>
+    <button type="button" class="rte-btn" class:active={isActive('bulletList')} {disabled} onclick={toggleBullet} aria-label={$_('kit.editor.bulletList')}>&bull;</button>
+    <button type="button" class="rte-btn" class:active={isActive('orderedList')} {disabled} onclick={toggleOrdered} aria-label={$_('kit.editor.numberedList')}>1.</button>
     <span class="rte-sep"></span>
-    <button type="button" class="rte-btn" class:active={isActive('link')} {disabled} onclick={toggleLink} aria-label="Link">&#128279;</button>
+    <button type="button" class="rte-btn" class:active={isActive('link')} {disabled} onclick={toggleLink} aria-label={$_('kit.editor.link')}>&#128279;</button>
   </div>
   <div bind:this={element} class="rte-editor text-sm text-foreground max-h-60 overflow-y-auto"></div>
 </div>

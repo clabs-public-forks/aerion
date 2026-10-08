@@ -1006,5 +1006,57 @@
       "successToast": "Write access enabled for {name}",
       "failureToast": "Failed to enable write access: {message}"
     }
+  },
+  "kit": {
+    "enterFocus": "Enter focus mode",
+    "exitFocus": "Exit focus",
+    "nothingSelected": "Nothing selected.",
+    "sidebar": "Sidebar",
+    "list": "List",
+    "noItems": "No items.",
+    "editor": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "bulletList": "Bullet list",
+      "numberedList": "Numbered list",
+      "link": "Link",
+      "linkPrompt": "URL"
+    },
+    "type": {
+      "placeholder": "Type",
+      "custom": "Custom…",
+      "customPlaceholder": "Custom type",
+      "backToStandard": "Back to standard types",
+      "cancelCustom": "Cancel custom type",
+      "home": "Home",
+      "work": "Work",
+      "internet": "Internet",
+      "other": "Other",
+      "cell": "Cell",
+      "fax": "Fax",
+      "pager": "Pager",
+      "video": "Video",
+      "voice": "Voice",
+      "postal": "Postal",
+      "personal": "Personal"
+    },
+    "oauth": {
+      "custom": "Custom",
+      "aerion": "Aerion",
+      "notConfigured": "Not configured",
+      "credentialsSource": "Client ID/Secret:",
+      "clientId": "Client ID",
+      "clientSecret": "Client Secret",
+      "keepCurrent": "Leave empty to keep current",
+      "pasteClientId": "Paste Client ID",
+      "pasteClientSecret": "Paste Client Secret",
+      "clearCustom": "Clear saved Custom credentials",
+      "savedOverrideHint": "You also have a saved Custom override — switch to Custom to use it.",
+      "clientIdRequired": "Client ID is required",
+      "clientSecretRequired": "Client Secret is required",
+      "saveFailed": "Failed to save credentials",
+      "clearFailed": "Failed to clear saved credentials"
+    }
   }
 }

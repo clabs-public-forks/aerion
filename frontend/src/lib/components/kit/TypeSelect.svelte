@@ -12,43 +12,44 @@
   per dialog section.
 -->
 <script lang="ts" module>
+  // `label` is an i18n key.
   export type TypeOption = { value: string; label: string }
 
   export const EMAIL_TYPES: TypeOption[] = [
-    { value: 'HOME', label: 'Home' },
-    { value: 'WORK', label: 'Work' },
-    { value: 'INTERNET', label: 'Internet' },
-    { value: 'OTHER', label: 'Other' },
+    { value: 'HOME', label: 'kit.type.home' },
+    { value: 'WORK', label: 'kit.type.work' },
+    { value: 'INTERNET', label: 'kit.type.internet' },
+    { value: 'OTHER', label: 'kit.type.other' },
   ]
 
   export const PHONE_TYPES: TypeOption[] = [
-    { value: 'HOME', label: 'Home' },
-    { value: 'WORK', label: 'Work' },
-    { value: 'CELL', label: 'Cell' },
-    { value: 'FAX', label: 'Fax' },
-    { value: 'PAGER', label: 'Pager' },
-    { value: 'VIDEO', label: 'Video' },
-    { value: 'VOICE', label: 'Voice' },
-    { value: 'OTHER', label: 'Other' },
+    { value: 'HOME', label: 'kit.type.home' },
+    { value: 'WORK', label: 'kit.type.work' },
+    { value: 'CELL', label: 'kit.type.cell' },
+    { value: 'FAX', label: 'kit.type.fax' },
+    { value: 'PAGER', label: 'kit.type.pager' },
+    { value: 'VIDEO', label: 'kit.type.video' },
+    { value: 'VOICE', label: 'kit.type.voice' },
+    { value: 'OTHER', label: 'kit.type.other' },
   ]
 
   export const ADDRESS_TYPES: TypeOption[] = [
-    { value: 'HOME', label: 'Home' },
-    { value: 'WORK', label: 'Work' },
-    { value: 'POSTAL', label: 'Postal' },
-    { value: 'OTHER', label: 'Other' },
+    { value: 'HOME', label: 'kit.type.home' },
+    { value: 'WORK', label: 'kit.type.work' },
+    { value: 'POSTAL', label: 'kit.type.postal' },
+    { value: 'OTHER', label: 'kit.type.other' },
   ]
 
   export const URL_TYPES: TypeOption[] = [
-    { value: 'HOME', label: 'Home' },
-    { value: 'WORK', label: 'Work' },
-    { value: 'OTHER', label: 'Other' },
+    { value: 'HOME', label: 'kit.type.home' },
+    { value: 'WORK', label: 'kit.type.work' },
+    { value: 'OTHER', label: 'kit.type.other' },
   ]
 
   export const IMPP_TYPES: TypeOption[] = [
-    { value: 'PERSONAL', label: 'Personal' },
-    { value: 'WORK', label: 'Work' },
-    { value: 'OTHER', label: 'Other' },
+    { value: 'PERSONAL', label: 'kit.type.personal' },
+    { value: 'WORK', label: 'kit.type.work' },
+    { value: 'OTHER', label: 'kit.type.other' },
   ]
 
   // Sentinel value used to signal "user wants to type a custom TYPE." Picked
@@ -58,6 +59,7 @@
 
 <script lang="ts">
   import * as Select from '$lib/components/ui/select'
+  import { _ } from 'svelte-i18n'
 
   interface Props {
     value: string
@@ -66,7 +68,7 @@
     placeholder?: string
   }
 
-  let { value, onValueChange, options, placeholder = 'Type' }: Props = $props()
+  let { value, onValueChange, options, placeholder }: Props = $props()
 
   // Custom-mode tracking. `customMode` becomes true when the user picks the
   // sentinel option (or when an existing value isn't in the curated list).
@@ -81,7 +83,7 @@
   })
 
   const labelForValue = $derived(
-    options.find((o) => o.value === value)?.label ?? (customMode ? 'Custom…' : placeholder),
+    $_(options.find((o) => o.value === value)?.label ?? (customMode ? 'kit.type.custom' : 'kit.type.placeholder')),
   )
 
   function handleSelectChange(v: string) {
@@ -110,7 +112,7 @@
     <input
       type="text"
       class="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      placeholder="Custom type"
+      placeholder={$_('kit.type.customPlaceholder')}
       bind:value
       oninput={handleInputChange}
     />
@@ -118,8 +120,8 @@
       type="button"
       class="text-xs text-muted-foreground hover:text-foreground px-1"
       onclick={exitCustomMode}
-      title="Back to standard types"
-      aria-label="Cancel custom type"
+      title={$_('kit.type.backToStandard')}
+      aria-label={$_('kit.type.cancelCustom')}
     >
       ✕
     </button>
@@ -127,13 +129,13 @@
 {:else}
   <Select.Root value={value} onValueChange={handleSelectChange}>
     <Select.Trigger>
-      <Select.Value placeholder={placeholder}>{labelForValue}</Select.Value>
+      <Select.Value placeholder={placeholder ?? $_('kit.type.placeholder')}>{labelForValue}</Select.Value>
     </Select.Trigger>
     <Select.Content>
       {#each options as opt (opt.value)}
-        <Select.Item value={opt.value} label={opt.label} />
+        <Select.Item value={opt.value} label={$_(opt.label)} />
       {/each}
-      <Select.Item value={CUSTOM_TYPE_SENTINEL} label="Custom…" />
+      <Select.Item value={CUSTOM_TYPE_SENTINEL} label={$_('kit.type.custom')} />
     </Select.Content>
   </Select.Root>
 {/if}

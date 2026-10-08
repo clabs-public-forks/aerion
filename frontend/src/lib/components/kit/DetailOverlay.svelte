@@ -27,6 +27,7 @@
   import { fly } from 'svelte/transition'
   import { cubicOut } from 'svelte/easing'
   import Icon from '@iconify/svelte'
+  import { _ } from 'svelte-i18n'
   import { isResponsive } from '$lib/stores/layout.svelte'
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
 
@@ -99,8 +100,8 @@
           type="button"
           class="p-1 rounded hover:bg-muted/40"
           onclick={() => onClose?.()}
-          aria-label="Back"
-          title="Back"
+          aria-label={$_('common.back')}
+          title={$_('common.back')}
         >
           <Icon icon="mdi:arrow-left" class="w-5 h-5 text-muted-foreground" />
         </button>
@@ -112,8 +113,8 @@
         type="button"
         class="p-1 rounded hover:bg-muted/40"
         onclick={() => onToggleFocus?.()}
-        aria-label={focused ? 'Exit focus' : 'Enter focus mode'}
-        title={focused ? 'Exit focus' : 'Enter focus mode'}
+        aria-label={$_(focused ? 'kit.exitFocus' : 'kit.enterFocus')}
+        title={$_(focused ? 'kit.exitFocus' : 'kit.enterFocus')}
       >
         <Icon
           icon={focused ? 'mdi:fullscreen-exit' : 'mdi:fullscreen'}
@@ -124,8 +125,8 @@
         type="button"
         class="p-1 rounded hover:bg-muted/40"
         onclick={() => onClose?.()}
-        aria-label="Close"
-        title="Close"
+        aria-label={$_('common.close')}
+        title={$_('common.close')}
       >
         <Icon icon="mdi:close" class="w-5 h-5 text-muted-foreground" />
       </button>

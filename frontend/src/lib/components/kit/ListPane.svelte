@@ -14,6 +14,7 @@
   // here. This lets Alt+H/L cycle uniformly across mail and extension panes.
 
   import { onMount, type Snippet } from 'svelte'
+  import { _ } from 'svelte-i18n'
   import { KEY } from '$lib/keyboard/shortcuts'
   import { setFocusedPane, getFocusedPane, isPaneFlashing, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
 
@@ -288,7 +289,7 @@
 <div
   bind:this={containerRef}
   role="listbox"
-  aria-label={label ?? 'List'}
+  aria-label={label ?? $_('kit.list')}
   tabindex="0"
   class="flex-1 min-w-0 min-h-0 flex flex-col outline-none {flashing ? 'pane-focus-flash' : ''}"
   onkeydown={handleKeyDown}
@@ -306,7 +307,7 @@
       {#if empty}
         {@render empty()}
       {:else}
-        <p class="m-4 text-sm text-muted-foreground">No items.</p>
+        <p class="m-4 text-sm text-muted-foreground">{$_('kit.noItems')}</p>
       {/if}
     {:else}
       {#each items as item (item.id)}
