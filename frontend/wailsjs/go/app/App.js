@@ -670,6 +670,10 @@ export function GetShowMessageListProfilePics() {
   return window['go']['app']['App']['GetShowMessageListProfilePics']();
 }
 
+export function GetShowMessagePreview() {
+  return window['go']['app']['App']['GetShowMessagePreview']();
+}
+
 export function GetShowTitleBar() {
   return window['go']['app']['App']['GetShowTitleBar']();
 }
@@ -1208,6 +1212,10 @@ export function SetShowMessageListCircles(arg1) {
 
 export function SetShowMessageListProfilePics(arg1) {
   return window['go']['app']['App']['SetShowMessageListProfilePics'](arg1);
+}
+
+export function SetShowMessagePreview(arg1) {
+  return window['go']['app']['App']['SetShowMessagePreview'](arg1);
 }
 
 export function SetShowTitleBar(arg1) {

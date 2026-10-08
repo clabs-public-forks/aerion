@@ -86,6 +86,12 @@ Reserve a fixed checkbox column in the message list instead of revealing it on h
 
 By default, inside the message list column, the area where the checkbox on the left of the message is located is covered by the message and on mouseover, the message will shift to the right and show that area. In mobile layout, swiping to the right will auto select the message which solves the problem of not being able to do mouse over on a mobile device. If you prefer the original design where the checkbox area is always shown with the checkboxes always visiable in mobile layout, toggle this setting on.
 
+### Show message preview
+
+Show a line of the message body below the subject in the message list.
+
+Disabled by default, so each message in the list shows only the sender and subject. Search results always show the matching preview text, regardless of this setting, so you can see why a message matched.
+
 ### Show colored circles in message list
 
 Show colored circles with sender initials in the message list.

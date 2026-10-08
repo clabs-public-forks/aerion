@@ -20,7 +20,7 @@
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import Avatar from '$lib/components/kit/Avatar.svelte'
   import { toasts } from '$lib/stores/toast'
-  import { getAccentBarUnread, getAccentUnreadStyle, getShowMessageListCircles, getShowMessageListProfilePics, getAlwaysShowMessageCheckbox } from '$lib/stores/settings.svelte'
+  import { getAccentBarUnread, getAccentUnreadStyle, getShowMessageListCircles, getShowMessageListProfilePics, getAlwaysShowMessageCheckbox, getShowMessagePreview } from '$lib/stores/settings.svelte'
   import { getLayoutMode } from '$lib/stores/layout.svelte'
   import { contactPhotos } from '$lib/stores/contactPhotos.svelte'
 
@@ -630,12 +630,16 @@
         </p>
       {/if}
 
-      <!-- Snippet (with highlighting if in search mode) -->
+      <!-- Snippet (with highlighting if in search mode). Search results
+           always show it so the match is visible; otherwise it follows
+           the "Show message preview" setting. -->
       {#if highlightedSnippet}
         <p class="truncate {densityClasses.text[density]} text-muted-foreground">
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {@html highlightedSnippet}
         </p>
+      {:else if !getShowMessagePreview()}
+        <!-- Preview hidden: sender and subject only -->
       {:else if conversation.snippet}
         <p class="truncate {densityClasses.text[density]} text-muted-foreground">
           {conversation.snippet}

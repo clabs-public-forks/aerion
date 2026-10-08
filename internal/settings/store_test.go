@@ -330,6 +330,20 @@ func TestSetGetBoolSettings(t *testing.T) {
 			value:  false,
 			defVal: false,
 		},
+		{
+			name:   "ShowMessagePreview_true",
+			set:    (*Store).SetShowMessagePreview,
+			get:    (*Store).GetShowMessagePreview,
+			value:  true,
+			defVal: false,
+		},
+		{
+			name:   "ShowMessagePreview_false",
+			set:    (*Store).SetShowMessagePreview,
+			get:    (*Store).GetShowMessagePreview,
+			value:  false,
+			defVal: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -104,6 +104,16 @@ func (a *App) SetAlwaysShowMessageCheckbox(enabled bool) error {
 	return a.settingsStore.SetAlwaysShowMessageCheckbox(enabled)
 }
 
+// GetShowMessagePreview returns whether message-list rows show the body preview line
+func (a *App) GetShowMessagePreview() (bool, error) {
+	return a.settingsStore.GetShowMessagePreview()
+}
+
+// SetShowMessagePreview enables or disables the message-list preview line
+func (a *App) SetShowMessagePreview(enabled bool) error {
+	return a.settingsStore.SetShowMessagePreview(enabled)
+}
+
 // GetShowMessageListCircles returns whether colored sender circles are shown in the message list
 func (a *App) GetShowMessageListCircles() (bool, error) {
 	return a.settingsStore.GetShowMessageListCircles()

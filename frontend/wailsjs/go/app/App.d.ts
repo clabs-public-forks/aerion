@@ -353,6 +353,8 @@ export function GetShowMessageListCircles():Promise<boolean>;
 
 export function GetShowMessageListProfilePics():Promise<boolean>;
 
+export function GetShowMessagePreview():Promise<boolean>;
+
 export function GetShowTitleBar():Promise<boolean>;
 
 export function GetShowViewerCircles():Promise<boolean>;
@@ -622,6 +624,8 @@ export function SetSMIMESignPolicy(arg1:string,arg2:string):Promise<void>;
 export function SetShowMessageListCircles(arg1:boolean):Promise<void>;
 
 export function SetShowMessageListProfilePics(arg1:boolean):Promise<void>;
+
+export function SetShowMessagePreview(arg1:boolean):Promise<void>;
 
 export function SetShowTitleBar(arg1:boolean):Promise<void>;
 

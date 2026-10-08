@@ -31,6 +31,7 @@
     showMessageListCircles: boolean
     showMessageListProfilePics: boolean
     alwaysShowMessageCheckbox: boolean
+    showMessagePreview: boolean
     showViewerCircles: boolean
     darkMailContent: boolean
     darkComposerBody: boolean
@@ -59,6 +60,7 @@
     showMessageListCircles = $bindable(),
     showMessageListProfilePics = $bindable(),
     alwaysShowMessageCheckbox = $bindable(),
+    showMessagePreview = $bindable(),
     showViewerCircles = $bindable(),
     darkMailContent = $bindable(),
     darkComposerBody = $bindable(),
@@ -389,6 +391,22 @@
           </Select.Content>
         </Select.Root>
       {/if}
+    </div>
+
+    <!-- Show the body preview line below the subject in the message list -->
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <div>
+          <Label for="show-message-preview">{$_('settingsGeneral.showMessagePreview')}</Label>
+          <p class="text-xs text-muted-foreground">
+            {$_('settingsGeneral.showMessagePreviewHelp')}
+          </p>
+        </div>
+        <Switch
+          id="show-message-preview"
+          bind:checked={showMessagePreview}
+        />
+      </div>
     </div>
 
     <div class="space-y-2">
