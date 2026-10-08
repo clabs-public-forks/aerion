@@ -164,9 +164,11 @@ func (c *Client) Connect() error {
 			writeTimeout: c.config.WriteTimeout,
 		}
 
-		// Use custom TLSConfig if provided (for certificate TOFU)
-		if c.config.TLSConfig != nil {
-			options.TLSConfig = c.config.TLSConfig
+		// Use custom TLSConfig if provided (for certificate TOFU). NewStartTLS
+		// doesn't fill in ServerName, so default it here.
+		options.TLSConfig = c.config.TLSConfig
+		if options.TLSConfig == nil {
+			options.TLSConfig = &tls.Config{ServerName: c.config.Host}
 		}
 
 		c.client, err = imapclient.NewStartTLS(wrappedConn, options)

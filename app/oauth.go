@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hkdb/aerion/internal/account"
+	"github.com/hkdb/aerion/internal/certificate"
 	"github.com/hkdb/aerion/internal/credentials"
 	"github.com/hkdb/aerion/internal/imap"
 	"github.com/hkdb/aerion/internal/logging"
@@ -678,6 +679,7 @@ func (a *App) TestOAuthConnection(accountID string) error {
 	clientConfig.Username = acc.Username
 	clientConfig.AuthType = imap.AuthTypeOAuth2
 	clientConfig.AccessToken = tokens.AccessToken
+	clientConfig.TLSConfig = certificate.BuildTLSConfig(acc.IMAPHost, a.certStore)
 
 	client := imap.NewClient(clientConfig)
 
