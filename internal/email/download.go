@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -250,36 +251,54 @@ func getFilename(part *gomessage.Entity) string {
 	return FallbackFilename(contentType)
 }
 
+// SafeFilename reduces a sender-supplied attachment name to a single path
+// element so it cannot escape the directory it is saved into. Both slash
+// styles are treated as separators; names that reduce to nothing, "." or
+// ".." become "attachment".
+func SafeFilename(name string) string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = path.Base(name)
+	if name == "" || name == "." || name == ".." || name == "/" {
+		return "attachment"
+	}
+	return name
+}
+
+// UniquePath joins dir and name, appending _1, _2, ... before the extension
+// when a file with that name already exists.
+func UniquePath(dir, name string) string {
+	p := filepath.Join(dir, name)
+	if _, err := os.Stat(p); err != nil {
+		return p
+	}
+	ext := filepath.Ext(name)
+	base := name[:len(name)-len(ext)]
+	for i := 1; ; i++ {
+		p = filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			return p
+		}
+	}
+}
+
 // SaveAttachment saves attachment content to disk
 func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content []byte, customPath string) (string, error) {
-	var savePath string
-
-	if customPath != "" {
-		// Use custom path provided by user
-		savePath = customPath
-	} else {
-		// Save to default attachments directory
-		// Create subdirectory based on message ID for organization
-		subDir := filepath.Join(d.attachmentsDir, att.MessageID[:8])
+	savePath := customPath
+	if savePath == "" {
+		// Save to default attachments directory, in a subdirectory named
+		// after the message ID prefix for organization
+		prefix := att.MessageID
+		if len(prefix) > 8 {
+			prefix = prefix[:8]
+		}
+		if prefix == "" {
+			prefix = "unknown"
+		}
+		subDir := filepath.Join(d.attachmentsDir, prefix)
 		if err := os.MkdirAll(subDir, 0700); err != nil {
 			return "", fmt.Errorf("failed to create attachment directory: %w", err)
 		}
-
-		// Generate unique filename to avoid conflicts
-		safeName := filepath.Base(att.Filename)
-		savePath = filepath.Join(subDir, safeName)
-
-		// If file exists, append a number
-		if _, err := os.Stat(savePath); err == nil {
-			ext := filepath.Ext(safeName)
-			base := safeName[:len(safeName)-len(ext)]
-			for i := 1; ; i++ {
-				savePath = filepath.Join(subDir, fmt.Sprintf("%s_%d%s", base, i, ext))
-				if _, err := os.Stat(savePath); os.IsNotExist(err) {
-					break
-				}
-			}
-		}
+		savePath = UniquePath(subDir, SafeFilename(att.Filename))
 	}
 
 	// Write content to file

@@ -390,7 +390,7 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 			continue
 		}
 
-		savePath := filepath.Join(saveDir, att.Filename)
+		savePath := email.UniquePath(saveDir, email.SafeFilename(att.Filename))
 		_, err = downloader.SaveAttachment(att, content, savePath)
 		if err != nil {
 			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
@@ -503,6 +503,7 @@ func (a *App) DownloadEncryptedAttachment(messageID, filename, savePath string) 
 
 	// Create a temporary attachment record for SaveAttachment
 	att := &message.Attachment{
+		MessageID:   messageID,
 		Filename:    filename,
 		ContentType: "application/octet-stream",
 		Size:        len(content),
@@ -636,7 +637,7 @@ func (a *App) SaveAllEncryptedAttachments(messageID string) (string, error) {
 			continue
 		}
 
-		savePath := filepath.Join(saveDir, att.Filename)
+		savePath := email.UniquePath(saveDir, email.SafeFilename(att.Filename))
 		_, err = downloader.SaveAttachment(att, content, savePath)
 		if err != nil {
 			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save encrypted attachment")
