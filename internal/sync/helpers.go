@@ -32,6 +32,18 @@ func applyFlagsToMessage(m *message.Message, flags []imap.Flag) {
 	}
 }
 
+// applyInternalDate records the server's arrival time as ReceivedAt and uses it
+// as the Date when the message has no Date header.
+func applyInternalDate(m *message.Message, internalDate time.Time) {
+	if internalDate.IsZero() {
+		return
+	}
+	m.ReceivedAt = internalDate.UTC()
+	if m.Date.IsZero() {
+		m.Date = m.ReceivedAt
+	}
+}
+
 // applyEnvelopeToMessage sets envelope fields on a Message from an IMAP envelope
 func applyEnvelopeToMessage(m *message.Message, envelope *imap.Envelope) {
 	if envelope == nil {

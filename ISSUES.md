@@ -8,9 +8,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync and storage
 
-- **M6 medium** `internal/message/store.go:1041`: retention deletes by Date
-  header but the server SINCE uses INTERNALDATE, so messages with a zero
-  Date loop between delete and re-fetch. Unverified.
 - **M8/M9 medium** `internal/sync/fetch.go`: partial bodies are stored as
   fetched, and an empty body FETCH deletes the message locally. Unverified.
 - **M10 low** `app/draft.go:296-428`: the old IMAP draft is deleted before

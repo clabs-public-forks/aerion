@@ -1036,12 +1036,18 @@ func (s *Store) CountByFolder(folderID string) (int, error) {
 	return count, nil
 }
 
-// DeleteOlderThan deletes messages older than the specified time for an account
+// DeleteOlderThan deletes messages older than the specified time for an account.
+// A message is old only when both its Date header and its arrival time
+// (received_at, the server's INTERNALDATE) are before the cutoff: the server's
+// SINCE search uses INTERNALDATE, so deleting by Date alone would drop
+// messages the next sync fetches again.
 // Returns the number of messages deleted
 func (s *Store) DeleteOlderThan(accountID string, before time.Time) (int, error) {
+	// Times are stored as text in UTC, so compare against a UTC cutoff.
+	before = before.UTC()
 	result, err := s.db.Exec(
-		"DELETE FROM messages WHERE account_id = ? AND date < ?",
-		accountID, before,
+		"DELETE FROM messages WHERE account_id = ? AND date < ? AND received_at < ?",
+		accountID, before, before,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to delete old messages: %w", err)

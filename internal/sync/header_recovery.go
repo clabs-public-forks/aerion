@@ -119,9 +119,7 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 
 		// Internal date is the IMAP server's record of arrival time; fall back to it if
 		// the message has no Date header (rare but possible alongside missing Subject).
-		if m.Date.IsZero() && !internalDate.IsZero() {
-			m.Date = internalDate.UTC()
-		}
+		applyInternalDate(m, internalDate)
 
 		applyFlagsToMessage(m, flags)
 

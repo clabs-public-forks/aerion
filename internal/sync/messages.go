@@ -776,6 +776,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		var envelope *imap.Envelope
 		var flags []imap.Flag
 		var rfc822Size int64
+		var internalDate time.Time
 		var headerBytes []byte
 
 		for {
@@ -793,6 +794,8 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 				flags = data.Flags
 			case imapclient.FetchItemDataRFC822Size:
 				rfc822Size = data.Size
+			case imapclient.FetchItemDataInternalDate:
+				internalDate = data.Time
 			case imapclient.FetchItemDataBodySection:
 				// Read header bytes from literal reader
 				if data.Literal != nil {
@@ -832,6 +835,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 
 		// Parse envelope using shared helper
 		applyEnvelopeToMessage(m, envelope)
+		applyInternalDate(m, internalDate)
 
 		// Extract References and read receipt header from header bytes
 		var references []string
