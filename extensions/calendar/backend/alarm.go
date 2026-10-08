@@ -98,8 +98,7 @@ func parseAlarmTemplates(icsBlob string) ([]alarmTemplate, error) {
 	if icsBlob == "" {
 		return nil, nil
 	}
-	dec := ical.NewDecoder(strings.NewReader(icsBlob))
-	cal, err := dec.Decode()
+	cal, err := decodeICS(icsBlob)
 	if err != nil {
 		return nil, fmt.Errorf("decode ics: %w", err)
 	}

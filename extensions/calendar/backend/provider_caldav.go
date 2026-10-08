@@ -105,12 +105,17 @@ func (p caldavProvider) SyncCalendar(ctx context.Context, src Source, cal Calend
 		rawICS string
 	}
 	server := make(map[string]serverEntry, len(events))
+	// A malformed event's UID is unknown, so its local copy can't be told
+	// apart from an event deleted on the server. Skip deletions when any
+	// event failed to parse rather than drop it locally.
+	unparsed := false
 	for _, e := range events {
 		if e.rawICS == "" {
 			continue
 		}
 		parsed, perr := ParseCalendarObject(e.rawICS)
 		if perr != nil {
+			unparsed = true
 			continue // skip a malformed event, keep the rest
 		}
 		server[parsed.Master.UID] = serverEntry{
@@ -186,7 +191,7 @@ func (p caldavProvider) SyncCalendar(ctx context.Context, src Source, cal Calend
 
 		// Delete events that disappeared from the server.
 		for uid := range localETags {
-			if _, stillOnServer := server[uid]; stillOnServer {
+			if _, stillOnServer := server[uid]; stillOnServer || unparsed {
 				continue
 			}
 			if err := p.store.DeleteEventByUIDTx(tx, cal.ID, uid); err != nil {

@@ -824,7 +824,7 @@ func masterEvent(blob string) *ical.Event {
 	if strings.TrimSpace(blob) == "" {
 		return nil
 	}
-	cal, err := ical.NewDecoder(strings.NewReader(blob)).Decode()
+	cal, err := decodeICS(blob)
 	if err != nil || len(cal.Events()) == 0 {
 		return nil
 	}

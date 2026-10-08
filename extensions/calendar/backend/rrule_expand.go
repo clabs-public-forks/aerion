@@ -38,8 +38,7 @@ func ExpandInRange(ev Event, overrides []EventOverride, from, to time.Time) ([]E
 	// Recurring: re-parse the master ICS blob, run RecurrenceSet,
 	// generate the occurrence list in window, then apply overrides.
 	loc := resolveLocation(ev.TZName)
-	dec := ical.NewDecoder(strings.NewReader(ev.ICSBlob))
-	cal, err := dec.Decode()
+	cal, err := decodeICS(ev.ICSBlob)
 	if err != nil {
 		return nil, fmt.Errorf("rrule_expand: decode master ICS: %w", err)
 	}
@@ -181,7 +180,7 @@ func resolveLocation(tzName string) *time.Location {
 	if tzName == "" {
 		return configuredTZ()
 	}
-	loc, err := time.LoadLocation(tzName)
+	loc, err := loadTZ(tzName)
 	if err != nil {
 		return configuredTZ()
 	}
@@ -193,8 +192,7 @@ func resolveLocation(tzName string) *time.Location {
 // per RFC 5545 §3.8.4.4: an override is a full VEVENT — the fields it
 // specifies replace the corresponding master fields for that instance only.
 func applyOverride(master Event, ov EventOverride) (EventInstance, error) {
-	dec := ical.NewDecoder(strings.NewReader(ov.ICSBlob))
-	cal, err := dec.Decode()
+	cal, err := decodeICS(ov.ICSBlob)
 	if err != nil {
 		return EventInstance{}, err
 	}
@@ -208,7 +206,7 @@ func applyOverride(master Event, ov EventOverride) (EventInstance, error) {
 	dtstartProp := ev.Props.Get(ical.PropDateTimeStart)
 	if dtstartProp != nil {
 		if tz := dtstartProp.Params.Get(ical.ParamTimezoneID); tz != "" {
-			if l, lerr := time.LoadLocation(tz); lerr == nil {
+			if l, lerr := loadTZ(tz); lerr == nil {
 				loc = l
 			}
 		}

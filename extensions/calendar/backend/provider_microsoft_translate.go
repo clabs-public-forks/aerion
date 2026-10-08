@@ -152,8 +152,7 @@ var errMicrosoftEventCancelled = errors.New("microsoft event cancelled / removed
 // VCALENDAR blob (built by event_crud.go's serializeVEVENT) and produces
 // the Graph JSON shape suitable for POST/PATCH /me/events.
 func translateICSToGraphEvent(icsBlob string) (graphEvent, error) {
-	dec := ical.NewDecoder(strings.NewReader(icsBlob))
-	cal, err := dec.Decode()
+	cal, err := decodeICS(icsBlob)
 	if err != nil {
 		return graphEvent{}, fmt.Errorf("ical decode: %w", err)
 	}
@@ -291,7 +290,7 @@ func icsPropToGraphTime(p *ical.Prop, isAllDay bool) (*graphTimePoint, error) {
 	tzName := p.Params.Get(ical.ParamTimezoneID)
 	loc := time.UTC
 	if tzName != "" {
-		if l, lerr := time.LoadLocation(tzName); lerr == nil {
+		if l, lerr := loadTZ(tzName); lerr == nil {
 			loc = l
 		}
 	}
@@ -319,7 +318,7 @@ func startTimeForRRule(ev *ical.Event) (time.Time, error) {
 	tzName := p.Params.Get(ical.ParamTimezoneID)
 	loc := time.UTC
 	if tzName != "" {
-		if l, lerr := time.LoadLocation(tzName); lerr == nil {
+		if l, lerr := loadTZ(tzName); lerr == nil {
 			loc = l
 		}
 	}

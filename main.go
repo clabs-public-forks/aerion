@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	_ "time/tzdata" // IANA zones for Windows, which has no system tz database
 
 	"github.com/hkdb/aerion/app"
 	"github.com/hkdb/aerion/internal/platform"

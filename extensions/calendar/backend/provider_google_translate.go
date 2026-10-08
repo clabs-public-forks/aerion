@@ -353,8 +353,7 @@ func applyRecurrenceLine(ev *ical.Event, line string) {
 // VCALENDAR blob (built by event_crud.go's serializeVEVENT) and produces
 // the Google JSON shape suitable for POST/PATCH /events.
 func translateICSToGoogleJSON(icsBlob string) (googleEvent, error) {
-	dec := ical.NewDecoder(strings.NewReader(icsBlob))
-	cal, err := dec.Decode()
+	cal, err := decodeICS(icsBlob)
 	if err != nil {
 		return googleEvent{}, fmt.Errorf("ical decode: %w", err)
 	}
@@ -511,7 +510,7 @@ func icsPropToGoogleTime(p *ical.Prop) (*googleTimePoint, error) {
 	tzName := p.Params.Get(ical.ParamTimezoneID)
 	loc := time.UTC
 	if tzName != "" {
-		if l, lerr := time.LoadLocation(tzName); lerr == nil {
+		if l, lerr := loadTZ(tzName); lerr == nil {
 			loc = l
 		}
 	}

@@ -284,7 +284,7 @@ func recurrenceIDMatches(prop *ical.Prop, instanceTimeUnix int64) bool {
 	tzName := prop.Params.Get(ical.ParamTimezoneID)
 	loc := configuredTZ()
 	if tzName != "" {
-		if l, lerr := time.LoadLocation(tzName); lerr == nil {
+		if l, lerr := loadTZ(tzName); lerr == nil {
 			loc = l
 		}
 	}
@@ -362,7 +362,7 @@ func parseRecurrenceIDUnix(prop *ical.Prop) (int64, bool) {
 	tzName := prop.Params.Get(ical.ParamTimezoneID)
 	loc := time.UTC
 	if tzName != "" {
-		if l, lerr := time.LoadLocation(tzName); lerr == nil {
+		if l, lerr := loadTZ(tzName); lerr == nil {
 			loc = l
 		}
 	}

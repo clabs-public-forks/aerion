@@ -108,9 +108,6 @@ has not yet been confirmed against the code.
 - **K3 high** `EventComposerDialog.svelte:358`, `event_crud.go:571,702`:
   editing resets the reminder, rebuilds RRULE from only FREQ, UNTIL and
   COUNT, and drops overrides and X-properties. Unverified.
-- **K4 high** `ical_convert.go:128`, `provider_caldav.go:114,188`: a Windows
-  TZID fails to parse, so the event is skipped and then deleted locally.
-  Unverified.
 - **K5 high** `provider_caldav.go:170`, `event_crud.go:926`: alarms are only
   generated for the 7 days after a write or sync. Unverified.
 - **K6 high** `provider_microsoft_translate.go:685-775`: recurrence is

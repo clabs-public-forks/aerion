@@ -3,7 +3,6 @@ package backend
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/emersion/go-ical"
 )
@@ -43,8 +42,7 @@ func ParseCalendarObject(rawICS string) (*ParsedObject, error) {
 		return nil, fmt.Errorf("ical: empty ICS data")
 	}
 
-	dec := ical.NewDecoder(strings.NewReader(rawICS))
-	cal, err := dec.Decode()
+	cal, err := decodeICS(rawICS)
 	if err != nil {
 		return nil, fmt.Errorf("ical decode: %w", err)
 	}
@@ -120,7 +118,7 @@ func buildEvent(ev *ical.Event, rawICS string) (Event, error) {
 	// explicit TZID still wins.
 	loc := configuredTZ()
 	if tzName != "" {
-		if l, err := time.LoadLocation(tzName); err == nil {
+		if l, err := loadTZ(tzName); err == nil {
 			loc = l
 		}
 	}
@@ -170,7 +168,7 @@ func buildOverride(ev *ical.Event) (EventOverride, error) {
 	tzName := recProp.Params.Get(ical.ParamTimezoneID)
 	loc := configuredTZ() // tz-less RECURRENCE-ID → configured display tz
 	if tzName != "" {
-		if l, err := time.LoadLocation(tzName); err == nil {
+		if l, err := loadTZ(tzName); err == nil {
 			loc = l
 		}
 	}
