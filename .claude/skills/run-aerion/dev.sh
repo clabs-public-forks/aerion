@@ -9,6 +9,8 @@ SIDFILE=${TMPDIR:-/tmp}/aerion-dev.sid
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 
 up() { [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL")" = 200 ]; }
+# True unless dev.sh started a session that has since exited.
+alive() { [ ! -f "$SIDFILE" ] || pgrep -s "$(cat "$SIDFILE")" >/dev/null; }
 
 case "${1:-}" in
   start)
@@ -23,6 +25,7 @@ case "${1:-}" in
   wait)
     for _ in $(seq 1 90); do
       if up; then echo "up at $URL"; exit 0; fi
+      if ! alive; then echo "make dev exited; tail of $LOG:" >&2; tail -20 "$LOG" >&2; exit 1; fi
       sleep 2
     done
     echo "not up after 180s; tail of $LOG:" >&2
@@ -39,7 +42,15 @@ case "${1:-}" in
     fi
     sleep 3
     # `make dev` regenerates the runtime bindings with different file modes.
-    git -C "$ROOT" checkout -- frontend/wailsjs/runtime
+    # Revert only when nothing but modes changed, so real edits survive.
+    rt=frontend/wailsjs/runtime
+    if ! git -C "$ROOT" diff --quiet -- "$rt"; then
+      if git -C "$ROOT" -c core.fileMode=false diff --quiet -- "$rt"; then
+        git -C "$ROOT" checkout -- "$rt"
+      else
+        echo "left $rt alone: it has content changes" >&2
+      fi
+    fi
     if up; then echo "still up at $URL" >&2; exit 1; fi
     echo stopped
     ;;

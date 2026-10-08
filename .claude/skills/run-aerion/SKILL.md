@@ -11,16 +11,14 @@ root.
 
 ## Prerequisites
 
-Go 1.25, Node.js 24, the Wails v2 CLI, and GTK 3 / WebKitGTK 4.1 development
-libraries (see `AGENTS.md`). The user's machine already has them. Install frontend
-dependencies once with `cd frontend && npm ci` if `frontend/node_modules` is
-missing.
+The toolchain is installed. Run `cd frontend && npm ci` first if
+`frontend/node_modules` is missing.
 
 ## Run (agent path)
 
 ```bash
-.claude/skills/run-aerion/dev.sh start   # make dev in its own session, log in /tmp/aerion-dev.log
-.claude/skills/run-aerion/dev.sh wait    # polls http://localhost:34115 for HTTP 200 (first build takes ~1 min)
+.claude/skills/run-aerion/dev.sh start   # make dev in its own session; prints the log path
+.claude/skills/run-aerion/dev.sh wait    # polls http://localhost:34115 for HTTP 200 (first build takes ~1 min); fails early if make dev exits
 ```
 
 `make dev` also opens a native Aerion window on the user's desktop. Ignore it and
@@ -52,14 +50,7 @@ by 1 s.
 When finished, put back anything you changed (see Gotchas), close the tab, then:
 
 ```bash
-.claude/skills/run-aerion/dev.sh stop    # kills wails, vite and the app, then reverts frontend/wailsjs/runtime
-```
-
-## Static checks
-
-```bash
-cd frontend && npm run check && npm run lint && npm run build
-make test   # Go tests
+.claude/skills/run-aerion/dev.sh stop    # kills wails, vite and the app, then reverts mode-only changes in frontend/wailsjs/runtime
 ```
 
 ## Gotchas
@@ -90,5 +81,5 @@ make test   # Go tests
   and run `pkill -TERM -s <SID>`. Vite runs in its own process group, so kill by
   session ID, not process group.
 - **`git status` shows `frontend/wailsjs/runtime/*` changes after a dev run**:
-  `make dev` regenerates those files with different file modes. Run
-  `git checkout -- frontend/wailsjs/runtime` (`dev.sh stop` already does).
+  `make dev` regenerates those files with different file modes. `dev.sh stop`
+  reverts them when only modes changed and warns if their content changed.
