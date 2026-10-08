@@ -189,7 +189,7 @@ func (b *CalendarBridge) shutdown() {
 // frontend must re-send the same accountID.
 func (b *CalendarBridge) Calendar_AddCalDAVSource(name, url, username, password, organizerEmail, accountID string) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -210,7 +210,7 @@ func (b *CalendarBridge) Calendar_AddCalDAVSource(name, url, username, password,
 // lists without re-adding the source. Empty email clears the list.
 func (b *CalendarBridge) Calendar_SetOrganizerIdentity(sourceID, email string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -224,7 +224,7 @@ func (b *CalendarBridge) Calendar_SetOrganizerIdentity(sourceID, email string) e
 // the display tz resolves/changes and on init.
 func (b *CalendarBridge) Calendar_SetDisplayTimezone(tz string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -244,7 +244,7 @@ func (b *CalendarBridge) Calendar_SetDisplayTimezone(tz string) error {
 // should then enter an organizer email via Calendar_SetOrganizerIdentity).
 func (b *CalendarBridge) Calendar_ReprobeCalDAVOrganizerIdentities(sourceID string) (int, error) {
 	if !b.gateEnabled() {
-		return 0, errors.New("calendar: extension disabled")
+		return 0, nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return 0, err
@@ -257,7 +257,7 @@ func (b *CalendarBridge) Calendar_ReprobeCalDAVOrganizerIdentities(sourceID stri
 // extension's SQLite — no remote sync. Idempotent on (name).
 func (b *CalendarBridge) Calendar_AddLocalSource(name string) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -270,7 +270,7 @@ func (b *CalendarBridge) Calendar_AddLocalSource(name string) (string, error) {
 // hash via colorOfHex.
 func (b *CalendarBridge) Calendar_AddLocalCalendar(sourceID, displayName, color string) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -283,7 +283,7 @@ func (b *CalendarBridge) Calendar_AddLocalCalendar(sourceID, displayName, color 
 // calendars are deletable from Aerion. Idempotent.
 func (b *CalendarBridge) Calendar_DeleteCalendar(calendarID string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -302,7 +302,7 @@ func (b *CalendarBridge) Calendar_DeleteCalendar(calendarID string) error {
 // reminder fires at the right moment without waiting for the next sync.
 func (b *CalendarBridge) Calendar_CreateEvent(in EventCreateInput) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -322,7 +322,7 @@ func (b *CalendarBridge) Calendar_CreateEvent(in EventCreateInput) (string, erro
 // Non-recurring events ignore the scope argument.
 func (b *CalendarBridge) Calendar_UpdateEvent(in EventUpdateInput, scope string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -340,7 +340,7 @@ func (b *CalendarBridge) Calendar_UpdateEvent(in EventUpdateInput, scope string)
 // its other fields. Backs the timeline's drag and resize.
 func (b *CalendarBridge) Calendar_MoveEvent(eventID string, dtstartUnix, dtendUnix int64, sendUpdates string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -359,7 +359,7 @@ func (b *CalendarBridge) Calendar_MoveEvent(eventID string, dtstartUnix, dtendUn
 // recurrenceIdUnix and is ignored for scope "all".
 func (b *CalendarBridge) Calendar_DeleteEvent(eventID, scope string, instanceUnix int64) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -475,7 +475,7 @@ func (b *CalendarBridge) Calendar_ListStuckWrites() ([]StuckWrite, error) {
 // replays it). Sync failures are reported through calendar:source-error.
 func (b *CalendarBridge) Calendar_RetryStuckWrite(id string) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -495,7 +495,7 @@ func (b *CalendarBridge) Calendar_RetryStuckWrite(id string) (string, error) {
 // failures are reported through calendar:source-error.
 func (b *CalendarBridge) Calendar_DiscardStuckWrite(id string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -649,7 +649,7 @@ func (b *CalendarBridge) Calendar_SetCalendarColor(calendarID, hex string) error
 // Idempotent; rejects empty / overlong values at the API layer.
 func (b *CalendarBridge) Calendar_RenameSource(sourceID, name string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -699,7 +699,7 @@ func (b *CalendarBridge) Calendar_DismissAlarm(alarmID string) error {
 // nothing. Only the host's stateless URL resolver is invoked.
 func (b *CalendarBridge) Calendar_OpenURL(url string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if b.deps.Core == nil {
 		return errors.New("calendar: core not available")
@@ -765,7 +765,7 @@ func listAllSourceIDs(a *API) []string {
 // flow (Chunk 6 polishes this; Chunk 3 surfaces the error as-is).
 func (b *CalendarBridge) Calendar_ListGoogleCalendarsForAccount(accountID string) ([]GoogleCalendarChoice, error) {
 	if !b.gateEnabled() {
-		return nil, errors.New("calendar: extension disabled")
+		return nil, nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return nil, err
@@ -786,7 +786,7 @@ func (b *CalendarBridge) Calendar_ListGoogleCalendarsForAccount(accountID string
 // this source's calendars.
 func (b *CalendarBridge) Calendar_AddGoogleSource(accountID, name, accountEmail string, selections []GoogleCalendarSelection) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -808,7 +808,7 @@ func (b *CalendarBridge) Calendar_AddGoogleSource(accountID, name, accountEmail 
 // "grant calendar access" banner.
 func (b *CalendarBridge) Calendar_ListMicrosoftCalendarsForAccount(accountID string) ([]MicrosoftCalendarChoice, error) {
 	if !b.gateEnabled() {
-		return nil, errors.New("calendar: extension disabled")
+		return nil, nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return nil, err
@@ -826,7 +826,7 @@ func (b *CalendarBridge) Calendar_ListMicrosoftCalendarsForAccount(accountID str
 // always email-shaped). Stored as the source's organizer identity.
 func (b *CalendarBridge) Calendar_AddMicrosoftSource(accountID, name, accountEmail string, selections []MicrosoftCalendarSelection) (string, error) {
 	if !b.gateEnabled() {
-		return "", errors.New("calendar: extension disabled")
+		return "", nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return "", err
@@ -857,7 +857,7 @@ func (b *CalendarBridge) Calendar_AddMicrosoftSource(accountID, name, accountEma
 // window).
 func (b *CalendarBridge) Calendar_GrantCalendarAccess(provider, accountID, expectedEmail string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if accountID == "" {
 		return errors.New("calendar: accountID is required")
@@ -905,7 +905,7 @@ func (b *CalendarBridge) Calendar_GrantCalendarAccess(provider, accountID, expec
 // Documented in docs/EXTENSIONS.md § Wails-bound surface.
 func (b *CalendarBridge) Calendar_QueryFreeBusy(selfEmails, attendeeEmails []string, fromUnix, toUnix int64) ([]FreeBusyResult, error) {
 	if !b.gateEnabled() {
-		return nil, errors.New("calendar: extension disabled")
+		return nil, nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return nil, err
@@ -923,7 +923,7 @@ func (b *CalendarBridge) Calendar_QueryFreeBusy(selfEmails, attendeeEmails []str
 // extension to detect "actions on the current user's behalf."
 func (b *CalendarBridge) Calendar_UpdateMyAttendeeStatus(eventID string, selfEmails []string, partStat string) error {
 	if !b.gateEnabled() {
-		return errors.New("calendar: extension disabled")
+		return nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return err
@@ -946,7 +946,7 @@ func (b *CalendarBridge) Calendar_UpdateMyAttendeeStatus(eventID string, selfEma
 // example of the cross-extension consumer pattern.
 func (b *CalendarBridge) Calendar_SearchContacts(query string, limit int) ([]coreapi.Contact, error) {
 	if !b.gateEnabled() {
-		return nil, errors.New("calendar: extension disabled")
+		return nil, nil
 	}
 	if err := b.ensureInit(); err != nil {
 		return nil, err

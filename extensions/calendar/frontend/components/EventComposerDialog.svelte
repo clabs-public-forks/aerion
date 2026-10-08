@@ -109,6 +109,8 @@
 
   // Edit-only confirmation dialog state.
   let sendInvitationsOpen = $state(false)
+  // Set per keydown: whether this Esc is closing a Select dropdown.
+  let escClosesDropdown = false
 
   let submitting = $state(false)
   let errorMessage = $state('')
@@ -655,12 +657,17 @@
 <!-- Close on Esc ourselves (same as the mail composer). bits-ui's own Esc
      isn't reliably closing this dialog when the rich-text editor is mounted,
      and DetailOverlay yields Esc to us via its dialogGuard check. Only act on
-     our own Esc, and not while a nested dialog (scope/invitations) is open. -->
+     our own Esc: not while the invitations dialog is open, and not when a
+     Select dropdown was open, since bits-ui closes that on its own. The
+     capture phase sees the dropdown before bits-ui's handler removes it. -->
 <svelte:window
+  onkeydowncapture={(e) => {
+    escClosesDropdown = e.key === 'Escape' && document.querySelector('[role="listbox"]') !== null
+  }}
   onkeydown={(e) => {
     if (!open) return
     if (e.key !== 'Escape') return
-    if (sendInvitationsOpen) return
+    if (sendInvitationsOpen || escClosesDropdown) return
     e.preventDefault()
     close()
   }}

@@ -42,7 +42,8 @@ type Syncer struct {
 	busy   map[string]bool
 	busyMu sync.Mutex
 
-	unsubs []coreapi.Unsubscribe
+	subscribe sync.Once
+	unsubs    []coreapi.Unsubscribe
 }
 
 // NewSyncer constructs a Syncer. Caller must call Start to begin the
@@ -67,8 +68,8 @@ func NewSyncer(store *Store, secrets coreapi.Secrets, events coreapi.EventBus, s
 // system wake/network events. Safe to call multiple times — second call
 // is effectively a no-op since the underlying state is per-source.
 //
-// Returns the parent context's cancel func; the bridge calls it on host
-// shutdown to stop all sync goroutines together.
+// Returns a stop func; the bridge calls it on host shutdown to stop all
+// sync goroutines together and drop the event subscriptions.
 func (s *Syncer) Start() context.CancelFunc {
 	s.mu.Lock()
 	if s.parentCtx == nil {
@@ -89,7 +90,22 @@ func (s *Syncer) Start() context.CancelFunc {
 	// opened calendars populate without waiting for the first tick.
 	go func() { _ = s.SyncAllSources(s.parentCtx) }()
 
-	return s.parentCancel
+	return s.stop
+}
+
+// stop cancels every sync goroutine and unsubscribes the system event
+// handlers so a wake after shutdown doesn't sync a closed store.
+func (s *Syncer) stop() {
+	s.parentCancel()
+	s.mu.Lock()
+	unsubs := s.unsubs
+	s.unsubs = nil
+	s.mu.Unlock()
+	for _, unsub := range unsubs {
+		if unsub != nil {
+			unsub()
+		}
+	}
 }
 
 // AddSource starts a sync goroutine for a newly added source. Called by
@@ -336,11 +352,11 @@ func (s *Syncer) startSourceLoop(sourceID string, interval time.Duration) {
 	}()
 }
 
-// subscribeOnce wires the system event handlers exactly once. Idempotent.
-var subscribeOnceGuard sync.Once
-
+// subscribeOnce wires this Syncer's system event handlers exactly once.
+// Idempotent. Per instance, so a Syncer re-created after the extension is
+// re-enabled subscribes again (EXT_RULES R17).
 func (s *Syncer) subscribeOnce() {
-	subscribeOnceGuard.Do(func() {
+	s.subscribe.Do(func() {
 		// Connectivity is back: give queued writes that exhausted their
 		// retry budget another round before syncing drains the queue.
 		resync := func(_ any) {
@@ -353,7 +369,9 @@ func (s *Syncer) subscribeOnce() {
 		}
 		wakeUnsub, _ := s.events.Subscribe("system:wake", resync)
 		netUnsub, _ := s.events.Subscribe("system:network-online", resync)
+		s.mu.Lock()
 		s.unsubs = append(s.unsubs, wakeUnsub, netUnsub)
+		s.mu.Unlock()
 	})
 }
 

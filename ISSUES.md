@@ -27,9 +27,6 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **K16 low** `bridge.go`: R16 says disabled bridge methods should return
-  empty results, not errors. `sync.go` uses a package-level sync.Once (R17).
-  Escape in the composer is handled on window. Unverified.
 
 ### Frontend
 
