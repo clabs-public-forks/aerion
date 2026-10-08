@@ -61,6 +61,7 @@
   title={$_('contacts.sidebar.title')}
   {sections}
   selectedId={contactsView.selectedSourceId}
+  resizeKey="contacts.sidebar"
   onSelect={pick}
 >
   {#snippet item(it: SidebarItem, { active })}

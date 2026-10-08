@@ -94,7 +94,7 @@
   }
 </script>
 
-<SidebarFrame title={$_('calendar.sidebar.title')}>
+<SidebarFrame title={$_('calendar.sidebar.title')} resizeKey="calendar.sidebar">
   {#snippet body()}
     <div class="py-2">
       {#if sections.length === 0}

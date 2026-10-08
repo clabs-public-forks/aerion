@@ -74,6 +74,7 @@ func defaultUIState() *UIState {
 		UnifiedInboxExpanded: true,
 		CollapsedFolders:     make(map[string]bool),
 		CollapsedSidebars:    make(map[string]bool),
+		PaneWidths:           make(map[string]int),
 	}
 }
 
@@ -103,6 +104,9 @@ func (s *Store) GetUIState() (*UIState, error) {
 	}
 	if state.CollapsedSidebars == nil {
 		state.CollapsedSidebars = make(map[string]bool)
+	}
+	if state.PaneWidths == nil {
+		state.PaneWidths = make(map[string]int)
 	}
 
 	return &state, nil

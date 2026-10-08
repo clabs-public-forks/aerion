@@ -21,6 +21,8 @@
   import Icon from '@iconify/svelte'
   import { _ } from 'svelte-i18n'
   import { getLayoutMode, getResponsiveView, hideSidebar, isSidebarHidden } from '$lib/stores/layout.svelte'
+  import { getPaneWidth, setPaneWidth, savePaneWidths } from '$lib/stores/uiState.svelte'
+  import PaneResizeHandle from './PaneResizeHandle.svelte'
 
   interface Props {
     /** Optional title rendered as <h2>. Omit for sidebars with no title. */
@@ -41,6 +43,10 @@
     /** Extra class string appended to the outer <aside>. Used by SourceSidebar
      *  for its pane-focus-flash indicator. */
     class?: string
+    /** UI-state key ('<rail id>.sidebar') that makes the sidebar resizable
+     *  outside narrow mode; its width persists per view. Omit for a fixed
+     *  w-60 sidebar. */
+    resizeKey?: string
     /** Optional DOM event handlers forwarded to the outer <aside>. */
     onkeydown?: (e: KeyboardEvent) => void
     onfocus?: () => void
@@ -55,6 +61,7 @@
     containerRef = $bindable(null),
     focusable = false,
     class: extraClass = '',
+    resizeKey,
     onkeydown,
     onfocus,
     onmousedown,
@@ -62,6 +69,9 @@
 
   const narrow = $derived(getLayoutMode() === 'narrow')
   const overlayVisible = $derived(narrow && getResponsiveView() === 'sidebar')
+  const key = $derived(resizeKey ?? '')
+  const resizable = $derived(key !== '' && !narrow)
+  const width = $derived(key !== '' ? getPaneWidth(key, 'sidebar') : 0)
 </script>
 
 <!-- Collapsed via the toolbar toggle (full/medium only): hidden but kept
@@ -73,7 +83,8 @@
   role="navigation"
   aria-label={label ?? title ?? 'Sidebar'}
   tabindex={focusable ? 0 : undefined}
-  class="w-60 flex-shrink-0 flex flex-col pt-3 border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {isSidebarHidden() ? 'hidden' : ''} {extraClass}"
+  class="{resizable ? '' : 'w-60'} flex-shrink-0 flex flex-col pt-3 border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {isSidebarHidden() ? 'hidden' : ''} {extraClass}"
+  style:width={resizable ? `${width}px` : undefined}
   {onkeydown}
   {onfocus}
   {onmousedown}
@@ -104,3 +115,13 @@
     </div>
   {/if}
 </aside>
+
+{#if resizable && !isSidebarHidden()}
+  <PaneResizeHandle
+    {width}
+    kind="sidebar"
+    label={$_('aria.resizeSidebar')}
+    onresize={(w) => setPaneWidth(key, w)}
+    oncommit={savePaneWidths}
+  />
+{/if}

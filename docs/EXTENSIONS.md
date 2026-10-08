@@ -1494,7 +1494,7 @@ Extensions need to look and behave like the rest of Aerion — same keys, same f
 
 ### The 1-for-1 rule
 
-Every kit primitive (`Avatar`, `PaneLayout`, `ListPane`, `ListRow`, `ListHeader`, `ResponsiveSidebarToggle`, `SidebarFrame`, `SourceSidebar`, `SourceItem`, `SidebarAddItem`, `DetailPane`, `ConfirmDialog`, `ColorPicker`, `OAuthCredsSlotEditor`, …) is a behavioral replica of how the equivalent functionality works in mail today: same key bindings, same focus semantics, same scroll-into-view, same edge-case behavior. The backwards-compat test: **if mail were ever refactored to consume the kit, the user should see zero difference**. If you can't pass that test on a kit primitive you're writing, you've diverged.
+Every kit primitive (`Avatar`, `PaneLayout`, `ListPane`, `ListRow`, `ListHeader`, `ResponsiveSidebarToggle`, `PaneResizeHandle`, `SidebarFrame`, `SourceSidebar`, `SourceItem`, `SidebarAddItem`, `DetailPane`, `ConfirmDialog`, `ColorPicker`, `OAuthCredsSlotEditor`, …) is a behavioral replica of how the equivalent functionality works in mail today: same key bindings, same focus semantics, same scroll-into-view, same edge-case behavior. The backwards-compat test: **if mail were ever refactored to consume the kit, the user should see zero difference**. If you can't pass that test on a kit primitive you're writing, you've diverged.
 
 **Greenfield exception (R25).** Some kit primitives have no mail equivalent — Calendar's `DetailOverlay`, for example, since mail's viewer is a flex-chain pane, not a fixed overlay. Per [`EXT_RULES.md` R25](./EXT_RULES.md), kit is an extension-driven SDK; when mail has no counterpart, the primitive is designed cleanly from the consumer's needs. The 1-for-1 rule applies to primitives that DO have a mail counterpart (`SidebarAddItem` ↔ mail's "+ Add Account" inline button, `ConfirmDialog` ↔ mail's confirms, etc.). Greenfield primitives are still bound by the kit's general conventions: theme tokens, density-aware sizing, layout-store responsive handling, `shortcuts.ts` predicates for keys, and **no imports from mail's `components/{list,sidebar,viewer}/` namespace**.
 
@@ -1652,6 +1652,7 @@ Lower-level kit primitive owning *only* the visual chrome of an extension sideba
 | `containerRef` | `bindable HTMLElement \| null` | Bind to access the outer `<aside>`. SourceSidebar uses this for its tabindex-based keyboard focus. |
 | `focusable` | `boolean?` | When true, the `<aside>` gets `tabindex="0"`. SourceSidebar passes true; row-only consumers leave false. |
 | `class` | `string?` | Extra class string appended to the outer `<aside>`. SourceSidebar uses this for `pane-focus-flash`. |
+| `resizeKey` | `string?` | Makes the sidebar drag-resizable in full and medium modes (a `PaneResizeHandle` renders after the `<aside>`, hidden while collapsed). Use `'<rail id>.sidebar'`; the width persists per key in `UIState.paneWidths`. Omit for a fixed `w-60` sidebar. `SourceSidebar` forwards the same prop. Narrow mode always uses the `w-60` overlay. |
 | `onkeydown` / `onfocus` / `onmousedown` | `(e) => void`? | DOM event handlers forwarded to the outer `<aside>`. |
 
 **Layout model**: title is non-scrolling (sticky at the top), body fills the remaining space with its own overflow-y-auto, optional footer pins at the bottom. This split is intrinsic to the primitive — it's what enables consumers like Calendar to pin a sync-indicator + settings cog strip below a scrolling list.
@@ -1803,6 +1804,22 @@ Does **not** own:
 ```
 
 Zero-prop drop-in `mdi:dock-left` icon button that fires `toggleActiveSidebar()` (layout store). In narrow mode it opens or closes the slide-in sidebar overlay; in full and medium modes it collapses or expands the active view's sidebar. The collapse state is persisted per rail id in `UIState.collapsedSidebars`, and `SidebarFrame` hides itself (staying mounted) while collapsed, so extensions built on `SidebarFrame` / `SourceSidebar` get collapsing for free. Auto-included inside `ListHeader`; mount it directly only when an extension renders its own custom toolbar (as Calendar's `ViewSwitcher` does).
+
+#### `PaneResizeHandle` — column resize handle
+
+[`frontend/src/lib/components/kit/PaneResizeHandle.svelte`](../frontend/src/lib/components/kit/PaneResizeHandle.svelte)
+
+```svelte
+<PaneResizeHandle
+  width={getPaneWidth('contacts.list', 'list')}
+  kind="list"
+  label={$_('aria.resizeList')}
+  onresize={(w) => setPaneWidth('contacts.list', w)}
+  oncommit={savePaneWidths}
+/>
+```
+
+Drag handle placed directly after a fixed-width pane, the same one mail uses for its folder sidebar and message list. It derives the new width from the drag delta and clamps it to `paneConstraints[kind]`, and `onresize` fires on every move (`oncommit` fires once on release). The resized pane must be `flex-shrink-0` with `width` applied inline. Kit panes read widths with `getPaneWidth(key, kind)`, update the live width with `setPaneWidth(key, w)`, and persist on release with `savePaneWidths()` (all in `uiState.svelte.ts`), keyed `'<rail id>.<pane>'` with `kind` `'sidebar'` (180–400px, default 240) or `'list'` (280–600px, default 420). Render handles only outside narrow mode, and only for list panes in full mode, where the detail pane is a column rather than an overlay. Sidebars get this automatically through `SidebarFrame`'s `resizeKey`.
 
 #### `ConfirmDialog` — destructive-action confirmation
 

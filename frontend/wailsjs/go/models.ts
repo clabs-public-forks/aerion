@@ -780,6 +780,7 @@ export namespace appstate {
 	    collapsedFolders: Record<string, boolean>;
 	    activeExtension?: string;
 	    collapsedSidebars?: Record<string, boolean>;
+	    paneWidths?: Record<string, number>;
 	
 	    static createFrom(source: any = {}) {
 	        return new UIState(source);
@@ -801,6 +802,7 @@ export namespace appstate {
 	        this.collapsedFolders = source["collapsedFolders"];
 	        this.activeExtension = source["activeExtension"];
 	        this.collapsedSidebars = source["collapsedSidebars"];
+	        this.paneWidths = source["paneWidths"];
 	    }
 	}
 

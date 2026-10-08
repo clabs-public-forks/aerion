@@ -940,6 +940,7 @@
     "closeWindow": "Close window",
     "resizeSidebar": "Resize sidebar",
     "resizeMessageList": "Resize message list",
+    "resizeList": "Resize list",
     "emailComposer": "Email composer",
     "textFormatting": "Text formatting",
     "dismiss": "Dismiss",

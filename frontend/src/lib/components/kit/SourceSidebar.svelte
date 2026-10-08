@@ -34,6 +34,8 @@
      *  slot. Consumers typically render kit `SidebarFooter` here for the
      *  shared sync/settings chrome. */
     footerContent?: Snippet
+    /** Forwarded to SidebarFrame; makes the sidebar resizable. */
+    resizeKey?: string
     onSelect: (id: string) => void
   }
 
@@ -47,6 +49,7 @@
     header,
     sectionEmpty,
     footerContent,
+    resizeKey,
     onSelect,
   }: Props = $props()
 
@@ -130,6 +133,7 @@
   {title}
   {label}
   bind:containerRef
+  {resizeKey}
   focusable
   class={flashing ? 'pane-focus-flash' : ''}
   onkeydown={handleKeyDown}

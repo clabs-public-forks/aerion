@@ -24,6 +24,9 @@ export interface UIState {
   activeExtension: string
   // Per-view left sidebar collapse: rail id ('mail', 'contacts', ...) -> collapsed.
   collapsedSidebars: Record<string, boolean>
+  // Kit pane widths keyed '<rail id>.<pane>' ('contacts.sidebar', ...). Mail
+  // uses sidebarWidth/listWidth. Missing entry -> pane default.
+  paneWidths: Record<string, number>
 }
 
 // Pane width constraints
@@ -31,6 +34,8 @@ const SIDEBAR_MIN = 180
 const SIDEBAR_MAX = 400
 const LIST_MIN = 280
 const LIST_MAX = 600
+const SIDEBAR_DEFAULT = 240
+const LIST_DEFAULT = 420
 
 // Default state
 const defaultState: UIState = {
@@ -41,13 +46,14 @@ const defaultState: UIState = {
   selectedThreadId: null,
   selectedConversationAccountId: null,
   selectedConversationFolderId: null,
-  sidebarWidth: 240,
-  listWidth: 420,
+  sidebarWidth: SIDEBAR_DEFAULT,
+  listWidth: LIST_DEFAULT,
   expandedAccounts: {},
   unifiedInboxExpanded: true,
   collapsedFolders: {},
   activeExtension: 'mail',
   collapsedSidebars: {},
+  paneWidths: {},
 }
 
 // Current state (in-memory cache)
@@ -67,8 +73,11 @@ let activeExtensionState = $state<string>('mail')
 // the sidebar toggle and the sidebars themselves.
 let collapsedSidebarsState = $state<Record<string, boolean>>({})
 
+// Reactive mirror of paneWidths, read by kit panes while they render.
+let paneWidthsState = $state<Record<string, number>>({})
+
 // Clamp a value within bounds
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
@@ -88,17 +97,19 @@ export async function loadUIState(): Promise<UIState> {
         selectedConversationAccountId: state.selectedConversationAccountId || null,
         selectedConversationFolderId: state.selectedConversationFolderId || null,
         // Validate and clamp pane widths
-        sidebarWidth: clamp(state.sidebarWidth || 240, SIDEBAR_MIN, SIDEBAR_MAX),
-        listWidth: clamp(state.listWidth || 420, LIST_MIN, LIST_MAX),
+        sidebarWidth: clamp(state.sidebarWidth || SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX),
+        listWidth: clamp(state.listWidth || LIST_DEFAULT, LIST_MIN, LIST_MAX),
         // Sidebar expand/collapse states
         expandedAccounts: state.expandedAccounts || {},
         unifiedInboxExpanded: state.unifiedInboxExpanded !== false, // default true
         collapsedFolders: state.collapsedFolders || {},
         activeExtension: state.activeExtension || 'mail',
         collapsedSidebars: state.collapsedSidebars || {},
+        paneWidths: state.paneWidths || {},
       }
       activeExtensionState = currentState.activeExtension
       collapsedSidebarsState = currentState.collapsedSidebars
+      paneWidthsState = currentState.paneWidths
     }
   } catch (err) {
     console.error('Failed to load UI state:', err)
@@ -148,6 +159,7 @@ export function saveUIState(updates: Partial<UIState>): void {
         collapsedFolders: currentState.collapsedFolders,
         activeExtension: currentState.activeExtension,
         collapsedSidebars: currentState.collapsedSidebars,
+        paneWidths: currentState.paneWidths,
       }
       await SaveUIState(backendState)
     } catch (err) {
@@ -211,8 +223,27 @@ export function setActiveExtension(name: string): void {
 
 // Get pane width constraints (for UI components)
 export const paneConstraints = {
-  sidebar: { min: SIDEBAR_MIN, max: SIDEBAR_MAX },
-  list: { min: LIST_MIN, max: LIST_MAX },
+  sidebar: { min: SIDEBAR_MIN, max: SIDEBAR_MAX, default: SIDEBAR_DEFAULT },
+  list: { min: LIST_MIN, max: LIST_MAX, default: LIST_DEFAULT },
+}
+
+export type PaneKind = keyof typeof paneConstraints
+
+// Kit pane width helpers. Keyed '<rail id>.<pane>' so each view remembers its
+// own widths. Reads clamp to the pane kind's constraints (covering loaded
+// state); setPaneWidth updates the live width during a drag and
+// savePaneWidths persists once the drag ends.
+export function getPaneWidth(key: string, kind: PaneKind): number {
+  const { min, max, default: fallback } = paneConstraints[kind]
+  return clamp(paneWidthsState[key] || fallback, min, max)
+}
+
+export function setPaneWidth(key: string, width: number): void {
+  paneWidthsState = { ...paneWidthsState, [key]: Math.round(width) }
+}
+
+export function savePaneWidths(): void {
+  saveUIState({ paneWidths: paneWidthsState })
 }
 
 // Left sidebar collapse helpers. Keyed by rail id so each view (mail and

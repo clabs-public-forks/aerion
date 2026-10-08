@@ -30,4 +30,9 @@ type UIState struct {
 	// Per-view left sidebar collapse: rail id ("mail", "contacts", "calendar",
 	// ...) -> collapsed. Missing entry -> expanded.
 	CollapsedSidebars map[string]bool `json:"collapsedSidebars,omitempty"`
+
+	// Per-view pane widths for kit-based extension panes, keyed
+	// "<rail id>.<pane>" (e.g. "contacts.sidebar", "contacts.list"). Mail uses
+	// SidebarWidth/ListWidth above. Missing entry -> pane default.
+	PaneWidths map[string]int `json:"paneWidths,omitempty"`
 }

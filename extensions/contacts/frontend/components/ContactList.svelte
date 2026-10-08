@@ -27,6 +27,9 @@
   // badge, search-mode swap. Extension just supplies label/count + per-extension
   // search markup + trailing action buttons.
   import ListHeader from '$lib/components/kit/ListHeader.svelte'
+  import PaneResizeHandle from '$lib/components/kit/PaneResizeHandle.svelte'
+  import { getLayoutMode } from '$lib/stores/layout.svelte'
+  import { getPaneWidth, setPaneWidth, savePaneWidths } from '$lib/stores/uiState.svelte'
   // @ts-ignore - wailsjs bindings
   import type { v1 } from '$wailsjs/go/models'
 
@@ -176,9 +179,18 @@
     const src = contactSourcesStore.sources.find(s => s.id === sel)
     return src?.name || $_('contacts.list.header')
   })
+
+  // Full layout: fixed, user-resizable width beside ContactDetail. Medium and
+  // narrow: fill the space (the detail pane is an overlay there).
+  const paneKey = 'contacts.list'
+  const resizable = $derived(getLayoutMode() === 'full')
+  const width = $derived(getPaneWidth(paneKey, 'list'))
 </script>
 
-<div class="flex-1 min-w-0 min-h-0 flex flex-col border-r border-border bg-background">
+<div
+  class="{resizable ? 'flex-shrink-0' : 'flex-1 min-w-0'} min-h-0 flex flex-col border-r border-border bg-background"
+  style:width={resizable ? `${width}px` : undefined}
+>
   <ListHeader
     label={headerLabel}
     count={contactsView.contacts.length}
@@ -287,6 +299,16 @@
     {/snippet}
   </ListPane>
 </div>
+
+{#if resizable}
+  <PaneResizeHandle
+    {width}
+    kind="list"
+    label={$_('aria.resizeList')}
+    onresize={(w) => setPaneWidth(paneKey, w)}
+    oncommit={savePaneWidths}
+  />
+{/if}
 
 <ConfirmDialog
   bind:open={showDeleteConfirm}

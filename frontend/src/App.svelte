@@ -5,6 +5,7 @@
   import { onMount, untrack } from 'svelte'
   import TitleBar from './lib/components/common/TitleBar.svelte'
   import Sidebar from './lib/components/sidebar/Sidebar.svelte'
+  import PaneResizeHandle from '$lib/components/kit/PaneResizeHandle.svelte'
   import MessageList from './lib/components/list/MessageList.svelte'
   import ConversationViewer from './lib/components/viewer/ConversationViewer.svelte'
   import Composer from './lib/components/composer/Composer.svelte'
@@ -26,7 +27,7 @@
   import { loadSettings, getThemeMode, getShowTitleBar, getNativeTitleBar, getComposerMode, getMailtoMode } from '$lib/stores/settings.svelte'
   import { loadImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
-  import { loadUIState, saveUIState, paneConstraints, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
+  import { loadUIState, saveUIState, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
   import { setPendingDeepLink } from '$lib/stores/extensionDeepLink.svelte'
   import {
     type FocusablePane,
@@ -59,7 +60,6 @@
   let messageListRef: MessageList | null = null
   let viewerRef: ConversationViewer | null = null
   let messageListContainerRef: HTMLElement | null = null
-  let sidebarContainerRef: HTMLElement | null = null
 
   // React to theme mode changes from settings store
   $effect(() => {
@@ -808,45 +808,6 @@
 
   let listWidth = $state(420)
 
-  // Resizing state
-  let isResizingSidebar = $state(false)
-  let isResizingList = $state(false)
-  // Left edge of the pane being resized, measured once at drag start so the
-  // extension rail and a collapsed sidebar don't skew the width.
-  let resizeOriginX = 0
-
-  function startResizeSidebar(e: MouseEvent) {
-    if (isResponsive()) return
-    resizeOriginX = sidebarContainerRef?.getBoundingClientRect().left ?? 0
-    isResizingSidebar = true
-    e.preventDefault()
-  }
-
-  function startResizeList(e: MouseEvent) {
-    if (isResponsive()) return
-    resizeOriginX = messageListContainerRef?.getBoundingClientRect().left ?? sidebarWidth
-    isResizingList = true
-    e.preventDefault()
-  }
-
-  function handleMouseMove(e: MouseEvent) {
-    const width = e.clientX - resizeOriginX
-    if (isResizingSidebar) {
-      sidebarWidth = Math.max(paneConstraints.sidebar.min, Math.min(paneConstraints.sidebar.max, width))
-    } else if (isResizingList) {
-      listWidth = Math.max(paneConstraints.list.min, Math.min(paneConstraints.list.max, width))
-    }
-  }
-
-  function handleMouseUp() {
-    // Save pane widths if we were resizing
-    if (isResizingSidebar || isResizingList) {
-      saveUIState({ sidebarWidth, listWidth })
-    }
-    isResizingSidebar = false
-    isResizingList = false
-  }
-
   // After a synthetic contextmenu event, bits-ui mounts the portal asynchronously.
   // Poll until [role="menu"] appears, then focus the first menuitem.
   function focusContextMenu() {
@@ -1584,7 +1545,7 @@
   }
 </script>
 
-<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} />
+<svelte:window onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} />
 
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Custom Title Bar -->
@@ -1612,9 +1573,8 @@
     <div style:display={getActiveExtension() === 'mail' ? 'contents' : 'none'}>
     <!-- Sidebar (Folder List) -->
     <aside
-      bind:this={sidebarContainerRef}
       class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'} {mailSidebarHidden ? 'hidden' : ''}"
-      style="{getLayoutMode() === 'full' ? `width: ${sidebarWidth}px` : ''}"
+      style="{getLayoutMode() !== 'narrow' ? `width: ${sidebarWidth}px` : ''}"
       role="presentation"
       onclick={() => handlePaneClick('sidebar')}
     >
@@ -1648,15 +1608,14 @@
     {/if}
 
     <!-- Sidebar Resize Handle -->
-    {#if getLayoutMode() === 'full' && !mailSidebarHidden}
-    <button
-      type="button"
-      class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingSidebar
-        ? 'bg-primary/40'
-        : ''}"
-      onmousedown={startResizeSidebar}
-      aria-label={$_('aria.resizeSidebar')}
-    ></button>
+    {#if getLayoutMode() !== 'narrow' && !mailSidebarHidden}
+      <PaneResizeHandle
+        width={sidebarWidth}
+        kind="sidebar"
+        label={$_('aria.resizeSidebar')}
+        onresize={(w) => { sidebarWidth = w }}
+        oncommit={(w) => saveUIState({ sidebarWidth: w })}
+      />
     {/if}
 
     <!-- Message List -->
@@ -1685,14 +1644,13 @@
 
     <!-- List Resize Handle -->
     {#if getLayoutMode() === 'full'}
-    <button
-      type="button"
-      class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingList
-        ? 'bg-primary/40'
-        : ''}"
-      onmousedown={startResizeList}
-      aria-label={$_('aria.resizeMessageList')}
-    ></button>
+      <PaneResizeHandle
+        width={listWidth}
+        kind="list"
+        label={$_('aria.resizeMessageList')}
+        onresize={(w) => { listWidth = w }}
+        oncommit={(w) => saveUIState({ listWidth: w })}
+      />
     {/if}
 
     <!-- Conversation Viewer -->
@@ -1726,11 +1684,6 @@
     </div>
   </div>
 </div>
-
-<!-- Resize cursor overlay when dragging -->
-{#if isResizingSidebar || isResizingList}
-  <div class="fixed inset-0 cursor-col-resize z-50"></div>
-{/if}
 
 <!-- Toast notifications -->
 <ToastContainer />
