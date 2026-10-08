@@ -33,7 +33,10 @@ drive the browser tab:
    keep the image file.
 
 Read state in the page with `javascript_tool`. The dev server serves the source
-modules, so importing a store returns the same instance the app is using:
+modules, so importing a store returns the same instance the app is using.
+After a hot reload the app may hold the module under a `?t=<timestamp>` URL,
+and a plain import then gives a separate copy. Import the exact URL listed in
+`performance.getEntriesByType('resource')` instead:
 
 ```js
 const ui = await window.go.app.App.GetUIState()
@@ -56,16 +59,35 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
 ## Gotchas
 
 - **Dev mode uses the user's real accounts and saved UI state.** It syncs real
-  mail. Collapsed sidebars, the active view, widths and the calendar view mode
-  are all saved for real. Note the starting `GetUIState()`, restore it before
-  stopping, and never open the composer, which could save a draft to the user's
-  account.
+  mail. Collapsed sidebars, the active view and widths are saved for real. Note
+  the starting `GetUIState()` and restore it before stopping. The calendar
+  view mode is not saved; it resets to Month on reload. Never open the
+  composer, which could save a draft to the user's account, and avoid opening
+  real messages, which marks them read.
+- **Fake data instead of real data.** Bindings are looked up on
+  `window.go.app.App` at call time, so a page script can replace one (for
+  example a calendar or contacts list call) to return made-up records. Make the
+  write bindings throw while doing this, so a stray click can't change real
+  data. Call the store's reload (or switch views) to pick up the fake data,
+  and reload the page to undo it. To check a mail layout without opening a
+  message, add a copy of the markup to the page and measure it.
 - **Layout modes come from `matchMedia` on the viewport**: narrow below 768px,
   medium up to 1024px, otherwise full. The `resize_window` tool has no effect
   under the user's window manager. To change modes, ask the user to resize or
   maximize the Chrome window that holds Claude's tab group (it may be minimized
-  or behind other windows), then check `innerWidth`. Ignore
-  `document.visibilityState`: it can read `hidden` while screenshots still work.
+  or behind other windows), then check `innerWidth`. To test a narrow layout
+  without a resize, set a narrower width on the pane's element from
+  `javascript_tool`. That checks how the pane's own content wraps, but it
+  doesn't switch the app into its narrow layout mode.
+- **The tab often reports `document.visibilityState` as `hidden`.** Screenshots
+  can still work, but `requestAnimationFrame` never fires and timers are
+  throttled. Never `await` an animation frame in `javascript_tool`: it hangs
+  and Chrome reports the renderer as frozen. Pauses or freezes seen only in
+  this state come from the background tab, not from the app.
+- **The first screenshot after a hot reload often times out.** Wait a few
+  seconds and retry. If it keeps failing, check layout with
+  `getBoundingClientRect()` or `getClientRects()` from `javascript_tool`
+  instead.
 - **Clicks use the screenshot's coordinate frame**, which is reported with every
   screenshot (e.g. 1568×778 for a 2560px-wide viewport), not CSS pixels. In that
   frame, the rail buttons are at about x=15, y=42 / 70 / 100.
