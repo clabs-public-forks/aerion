@@ -180,7 +180,8 @@
     return src?.name || $_('contacts.list.header')
   })
 
-  // Full layout: fixed, user-resizable width beside ContactDetail. Medium and
+  // Full layout: user-resizable width beside ContactDetail (shrinks first when
+  // the window is tight, see .pane-list-resizable). Medium and
   // narrow: fill the space (the detail pane is an overlay there).
   const paneKey = 'contacts.list'
   const resizable = $derived(getLayoutMode() === 'full')
@@ -188,7 +189,7 @@
 </script>
 
 <div
-  class="{resizable ? 'flex-shrink-0' : 'flex-1 min-w-0'} min-h-0 flex flex-col border-r border-border bg-background"
+  class="{resizable ? 'pane-list-resizable' : 'flex-1 min-w-0'} min-h-0 flex flex-col border-r border-border bg-background"
   style:width={resizable ? `${width}px` : undefined}
 >
   <ListHeader

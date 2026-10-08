@@ -3,8 +3,9 @@
   // Mail's App.svelte and the kit panes (SidebarFrame, ContactList) share it so
   // every column boundary drags the same way. The new width is derived from the
   // drag delta (startWidth + dx), so the pane's position on screen (extension
-  // rail, collapsed sidebar) never skews it. Resized panes must be
-  // flex-shrink-0 so their rendered width matches `width`.
+  // rail, collapsed sidebar) never skews it. The handle must directly follow
+  // its pane: list panes may render narrower than `width` when the window is
+  // tight (see .pane-list-resizable), so drags measure the pane itself.
 
   import { clamp, paneConstraints, type PaneKind } from '$lib/stores/uiState.svelte'
 
@@ -24,25 +25,41 @@
   const { width, kind, label, onresize, oncommit }: Props = $props()
 
   let dragging = $state(false)
+  let moved = false
   let startX = 0
   let startWidth = 0
   let lastWidth = 0
+  let pane: HTMLElement | null = null
+
+  // If the last width didn't fit, continue from the rendered width so
+  // dragging back responds at once instead of first unwinding the excess.
+  function rebase() {
+    if (!pane) return
+    const excess = lastWidth - Math.round(pane.getBoundingClientRect().width)
+    if (excess <= 1) return
+    startWidth -= excess
+    lastWidth -= excess
+  }
 
   // Pointer capture keeps move/up events coming to the handle even when the
   // pointer leaves the window, and lostpointercapture ends a drag that the
   // system interrupts, so the drag can't get stuck.
   function start(e: PointerEvent) {
     if (e.button !== 0) return
+    const handle = e.currentTarget as HTMLElement
+    pane = handle.previousElementSibling as HTMLElement | null
     startX = e.clientX
     startWidth = lastWidth = width
+    moved = false
     dragging = true
-    const handle = e.currentTarget as HTMLElement
     handle.setPointerCapture(e.pointerId)
     e.preventDefault()
   }
 
   function move(e: PointerEvent) {
-    if (!dragging) return
+    if (!dragging || (!moved && e.clientX === startX)) return
+    rebase()
+    moved = true
     const { min, max } = paneConstraints[kind]
     lastWidth = clamp(startWidth + e.clientX - startX, min, max)
     onresize(lastWidth)
@@ -51,6 +68,10 @@
   function end() {
     if (!dragging) return
     dragging = false
+    // A click without a drag must not save a squeezed rendered width.
+    if (!moved) return
+    rebase()
+    onresize(lastWidth)
     oncommit?.(lastWidth)
   }
 </script>

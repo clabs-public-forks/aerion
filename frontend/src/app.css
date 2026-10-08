@@ -241,6 +241,19 @@ mark {
   height: auto;
 }
 
+/* Full-layout list + detail columns. When the window can't fit the stored
+   list width, the list shrinks first (down to LIST_MIN in uiState) so the
+   detail pane keeps about 20rem; the detail pane only shrinks after that. */
+.pane-list-resizable {
+  flex-shrink: 1000;
+  min-width: 280px;
+}
+
+.pane-detail {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
 /* Responsive layout overlays */
 .responsive-sidebar-overlay {
   position: absolute;
