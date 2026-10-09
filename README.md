@@ -4,13 +4,22 @@
 
 ## Overview
 
-This is a personal fork of [Aerion](https://github.com/hkdb/aerion), the cross-platform email client by [hkdb](https://github.com/hkdb). It turns Aerion into a Messenger/Chat-style email client: you read and answer conversations the way you would in a chat app, not as a list of messages.
+- This is a personal fork of [Aerion](https://github.com/hkdb/aerion), a cross-platform email client by [hkdb](https://github.com/hkdb). 
+- The goal of this project is to turn Aerion into a Beeper-like chat app for email.
 
-[This repository](https://github.com/clabs-public-forks/aerion) is where that work happens.
+**Notes:**
+
+- This fork started as a simple UI customizaton for Aerion, but has diverged greatly since.
+- This fork tracks upstream Aerion for now, but it is likely to diverge and may eventually stop tracking it.
+- This fork will eventually be renamed and moved to a new Github repo.
+- Expect these differences:
+  - Upstream release binaries do not include these changes. Build from source to use this fork.
+  - Only the English UI is maintained. Other languages may be incomplete or out of date.
+  - Report problems with fork features here, not upstream.
 
 ![Aerion chat mail view in the Nord dark theme](docs/ss.png)
 
-## Chat Mail
+## Features
 
 - Threads show as chat bubbles, with quoted history and signatures hidden
 - A docked reply box at the bottom of each conversation
@@ -19,27 +28,6 @@ This is a personal fork of [Aerion](https://github.com/hkdb/aerion), the cross-p
 - Pin, snooze, and sender priority are stored on this computer and are not synced to the server
 
 See [Email Management](docs/user-guide/features/email-management.md#chat-mail) for details.
-
-## Other Changes From Upstream
-
-- Collapsible and resizable panes
-- Clearer call-to-action buttons (Compose, Reply, and so on)
-- Several bug fixes
-
-## Inherited From Aerion
-
-- Resource efficiency: minimal CPU, RAM, and battery use
-- Keyboard and mouse friendly, with vim-style shortcuts
-- No dependency on GNOME Online Accounts or other system services
-- Search that finds your email
-
-## Relationship to Upstream
-
-This fork tracks upstream Aerion for now, but it is likely to diverge and may eventually stop tracking it. Expect these differences:
-
-- Upstream release binaries do not include these changes. Build from source to use this fork.
-- Only the English UI is maintained. Other languages may be incomplete or out of date.
-- Report problems with fork features here, not upstream.
 
 ## Installation
 
