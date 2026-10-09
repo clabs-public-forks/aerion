@@ -455,7 +455,7 @@
       onwheel={() => (anchor = null)}
       onpointerdown={() => (anchor = null)}
     >
-      <div bind:this={content} class="pb-6 pt-2">
+      <div bind:this={content} class="pb-6">
         {#each items as item (item.msg.id)}
           {#if item.newDay}<div class="px-4"><ChatDaySeparator date={item.date} /></div>{/if}
           <ChatBubble

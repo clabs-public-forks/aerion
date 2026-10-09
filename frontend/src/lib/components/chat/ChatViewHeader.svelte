@@ -189,7 +189,7 @@
     </div>
   </div>
 
-  <div class="flex items-center gap-3 min-w-0 px-4 py-3">
+  <div class="flex items-center gap-3 min-w-0 px-4 pt-3 pb-1">
     <div class="flex -space-x-1 shrink-0" aria-hidden="true">
       {#each people.slice(0, MAX_AVATARS) as p (p.email)}
         {@const photo = contactPhotos.get(p.email)}
