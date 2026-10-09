@@ -10,7 +10,6 @@
 
 - `frontend/wailsjs/` holds generated Wails bindings; regenerate with `make generate` after binding changes.
 - `extensions/` (contacts, calendar) contains both backend and frontend code. Check extension, core API, and kit changes against `docs/EXT_RULES.md` before committing.
-- Go tests live beside implementation files.
 - `docs/EXTENSIONS.md` (about 170 KB), `docs/CASAT2.md`, and `docs/LANGUAGE.md` are long: grep them or read by section, never whole.
 
 ## Commands
@@ -22,15 +21,15 @@ Toolchain: Go 1.26, Node.js 24 (matches CI), Wails v2 CLI. Linux needs GTK 3 and
 - `make dev`: launch the desktop app with hot reload. It blocks; for agent-driven UI checks use `.claude/skills/run-aerion/dev.sh` instead.
 - `make build`: production build in `build/bin/`.
 - `make generate`: regenerate Wails TypeScript bindings.
-- `make test`: run `go test ./...`.
+- `make test`, `make fmt`: Go tests and formatting.
 - `make lint`: golangci-lint v2 and frontend ESLint.
-- `make fmt`: format Go code.
 - `cd frontend && npm run check`: Svelte/TypeScript checks.
+- OAuth testing: copy `.env.example` to `.env`; `.env.local` overrides it.
 
 ## Code Style
 
-- Go: log with zerolog, comment exported functions, and prefer guard clauses and switches over long `else if` chains.
-- Frontend: use Svelte 5 runes (`$state`, `$derived`), keep components under 500 lines, and preserve keyboard accessibility. ESLint enforces formatting.
+- Go: log with zerolog, and prefer guard clauses and switches over long `else if` chains.
+- Frontend: use Svelte 5 runes (`$state`, `$derived`), keep components under 500 lines, and preserve keyboard accessibility.
 - Localization: this fork targets English. Update English locale files only, and leave non-English locale files out of searches and reviews unless the task concerns localization. Preserve the existing i18n structure. See `docs/LANGUAGE.md` when changing localized strings.
 
 ## Testing
@@ -44,9 +43,10 @@ Toolchain: Go 1.26, Node.js 24 (matches CI), Wails v2 CLI. Linux needs GTK 3 and
 
 - When a change affects user-visible behavior, commands, configuration, or developer workflows, update the relevant documentation in the same task.
 - Correct existing guidance instead of adding duplicate instructions.
-- Internal changes that do not alter documented behavior need no documentation update.
 
 ## Milestones
+
+These steps apply to `PLAN.md` milestones. For a small independent fix, run the relevant checks, review the diff, and commit; skip steps 2 and 4.
 
 Before marking a milestone done:
 
@@ -61,8 +61,18 @@ Never push.
 ## Commits and PRs
 
 - Use descriptive prefixes for downstream commits: `feat:`, `fix:`, `docs:`.
-- In PRs, describe behavior changes, link relevant issues, and report validation.
+- Work on a branch per feature or audit pass, not on `main`, and land it as described in Landing a Branch.
+- One commit per milestone or independent fix. Fold corrections to a commit that has not been pushed into it (`git commit --amend`) instead of adding a new commit.
+- Commit `PLAN.md` and `ISSUES.md` updates with the change they describe, not separately.
 - See `CONTRIBUTING.md` for setup and workflow details. Consult upstream's own guidelines when submitting upstream.
+
+## Landing a Branch
+
+When all of a feature's milestones are done or an audit pass is complete, land the branch without being asked. Checks must pass and nothing may be uncommitted.
+
+1. If `main` has commits the branch lacks, rebase the branch onto `main` and rerun the relevant checks. On conflicts, run `git rebase --abort`, stop, and report the conflicting files.
+2. Run `git switch main` and `git merge --squash <branch>`, then commit once, listing each change the branch made in the commit body.
+3. Run `git branch -D <branch>` only after `git diff main <branch>` prints nothing.
 
 ## Planning Files
 
@@ -74,9 +84,3 @@ Never push.
 ## Compaction
 
 When compacting, preserve the current milestone and sub-step, files modified so far, failing checks with their exact commands, and discoveries not yet written to the plan.
-
-## Security
-
-- Copy `.env.example` to `.env` for OAuth testing; `.env.local` overrides it.
-- Keep credentials out of commits and logs.
-- Follow `SECURITY.md` for vulnerability reporting.
