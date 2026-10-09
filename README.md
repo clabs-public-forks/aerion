@@ -1,35 +1,49 @@
-![Plasmail logo](frontend/src/assets/images/logo-universal.png)
+![Aerion logo](frontend/src/assets/images/logo-universal.png)
 
 # Aerion Email Client (_Personal Fork_)
 
 ## Overview
 
-_Aerion_ is a cross-platform email client created by [hkdb/aerion](https://github.com/hkdb/aerion).
+This is a personal fork of [Aerion](https://github.com/hkdb/aerion), the cross-platform email client by [hkdb](https://github.com/hkdb). It turns Aerion into a Messenger/Chat-style email client: you read and answer conversations the way you would in a chat app, not as a list of messages.
 
-[This repository](https://github.com/clabs-public-forks/aerion) is a personal fork for custom development.
-
-## Features
+[This repository](https://github.com/clabs-public-forks/aerion) is where that work happens.
 
 ![Aerion chat mail view in the Nord dark theme](docs/ss.png)
 
-- Resource Efficiency - Minimal CPU, RAM, and battery consumption
-- Modern UX - Clean, intuitive interface with dark mode support
-- Keyboard & Mouse Friendly - Full keyboard navigation with vim-style shortcuts
-- Independence - No dependency on Gnome Online Accounts or other system services
-- Search That Works - Basic search that actually finds your emails
+## Chat Mail
 
-## Fork Differences
+- Threads show as chat bubbles, with quoted history and signatures hidden
+- A docked reply box at the bottom of each conversation
+- Keyboard triage: Done, pin, snooze, and mark unread
+- A Low priority split that keeps newsletters and other bulk mail out of the main list
+- Pin, snooze, and sender priority are stored on this computer and are not synced to the server
 
-This personal focus has the follow major changes from the upstream Aerion repo:
+See [Email Management](docs/user-guide/features/email-management.md#chat-mail) for details.
 
-- Chat-style mail: threads as chat bubbles with quoted history hidden, a docked reply box, and keyboard triage (Done, pin, snooze, mark unread, a Low priority split for newsletters). Pin and snooze are local only. See [Email Management](docs/user-guide/features/email-management.md#chat-mail).
-- Collapsible/resizable panes
-- Clearer call to action buttons (such as Compose, Reply, etc)
+## Other Changes From Upstream
+
+- Collapsible and resizable panes
+- Clearer call-to-action buttons (Compose, Reply, and so on)
 - Several bug fixes
+
+## Inherited From Aerion
+
+- Resource efficiency: minimal CPU, RAM, and battery use
+- Keyboard and mouse friendly, with vim-style shortcuts
+- No dependency on GNOME Online Accounts or other system services
+- Search that finds your email
+
+## Relationship to Upstream
+
+This fork tracks upstream Aerion for now, but it is likely to diverge and may eventually stop tracking it. Expect these differences:
+
+- Upstream release binaries do not include these changes. Build from source to use this fork.
+- Only the English UI is maintained. Other languages may be incomplete or out of date.
+- Report problems with fork features here, not upstream.
 
 ## Installation
 
-- [Installation Guide](docs/user-guide/getting-started/installation/index.md)
+Build from source with the [Build Guide](docs/BUILD.md). The [Installation Guide](docs/user-guide/getting-started/installation/index.md) covers upstream's release binaries, which do not include this fork's changes.
 
 ## Documentation
 
@@ -37,8 +51,8 @@ This personal focus has the follow major changes from the upstream Aerion repo:
 
 ## Development
 
-This application was built with [Wails](https://wails.io) + [Svelte](https://svelte.dev/).
+This application is built with [Wails](https://wails.io) and [Svelte](https://svelte.dev/).
 
 ### Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md)
+Please see [CONTRIBUTING.md](CONTRIBUTING.md).
