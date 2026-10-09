@@ -171,8 +171,8 @@
     <!-- Avatar: one person, or two stacked for a group -->
     <div class="relative shrink-0 w-11 h-11" aria-hidden="true">
       {#if people.length > 1}
-        <div class="absolute top-0 left-0">{@render avatar(people[0], 30)}</div>
-        <div class="absolute bottom-0 right-0 rounded-full ring-2 ring-background">{@render avatar(people[1], 30)}</div>
+        <div class="absolute top-0 left-0">{@render avatar(people[0], 26)}</div>
+        <div class="absolute bottom-0 right-0 rounded-full ring-2 ring-background">{@render avatar(people[1], 26)}</div>
       {:else}
         {@render avatar(people[0], 44)}
       {/if}

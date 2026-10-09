@@ -189,7 +189,7 @@
     </div>
   </div>
 
-  <div class="flex items-center justify-center gap-3 min-w-0 px-3 py-2">
+  <div class="flex items-center gap-3 min-w-0 px-4 py-3">
     <div class="flex -space-x-1 shrink-0" aria-hidden="true">
       {#each people.slice(0, MAX_AVATARS) as p (p.email)}
         {@const photo = contactPhotos.get(p.email)}
@@ -201,7 +201,7 @@
 
     <div class="min-w-0">
       <h2 class="text-sm font-semibold text-foreground truncate" title={people.map((p) => p.email).join(', ')}>{title}</h2>
-      <p class="text-sm text-foreground truncate" title={subject}>
+      <p class="text-sm text-muted-foreground truncate" title={subject}>
         {#if snoozeLabel}<Icon icon="mdi:alarm-snooze" class="inline w-3.5 h-3.5 -mt-0.5" /> {$_('chat.snoozedUntil', { values: { time: snoozeLabel } })} · {/if}{subject || $_('viewer.noSubject')}
       </p>
     </div>

@@ -204,7 +204,7 @@
               {#if msg.chat!.hasQuoted}
                 <!-- Quiet marker at the end of the text, not a pill below it -->
                 <button
-                  class="inline-flex align-middle ml-1.5 -my-1 px-1 rounded opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity {item.mine ? 'hover:bg-primary-foreground/20' : 'hover:bg-foreground/10'}"
+                  class="inline-flex align-middle ml-1.5 -my-1 px-1 rounded opacity-50 group-hover:opacity-70 hover:opacity-100! focus-visible:opacity-100! transition-opacity {item.mine ? 'hover:bg-primary-foreground/20' : 'hover:bg-foreground/10'}"
                   title={showQuoted ? $_('chat.hideQuoted') : $_('chat.showQuoted')}
                   aria-label={showQuoted ? $_('chat.hideQuoted') : $_('chat.showQuoted')}
                   aria-expanded={showQuoted}
