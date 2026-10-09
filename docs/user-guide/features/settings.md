@@ -221,6 +221,31 @@ This is where to set your default **CC** address for each account which will be 
 
 This is where to set your default **BCC** address for each account which will be used by every e-mail you send.
 
+## Chat Tab
+---
+
+Options for the chat-style mail list, thread view, and reply box.
+
+### Send Key
+
+**Enter** (default) sends from the reply box, with Shift+Enter for a new line. **Ctrl+Enter** sends instead, and Enter adds a new line.
+
+### Include Quoted History
+
+On by default. Chat replies quote the replied-to message below your text, so recipients using traditional email clients keep the context. The quote stays hidden in the chat view.
+
+### After Done, Snooze, Delete, or Move
+
+Which chat opens when the current one leaves the list (dragging a chat onto a sidebar folder does not open another): the next (older) chat, which is the default, or the previous (newer) chat.
+
+### Show Low Priority Group
+
+On by default. The All filter lists newsletters and bulk mail in a collapsed Low priority group. When off, they appear only under the Low priority filter, and a pinned low-priority chat appears only under Low priority too.
+
+### Notify Only for Priority Mail
+
+On by default. New-mail notifications skip newsletters and bulk mail, and senders you moved to Low priority. Snoozed chats always notify when they return.
+
 ## Images Tab
 ---
 

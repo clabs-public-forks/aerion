@@ -491,3 +491,61 @@ func TestGenericSetGet(t *testing.T) {
 		t.Errorf("got %q, want empty string", got)
 	}
 }
+
+func TestSetGetChatAutoAdvance(t *testing.T) {
+	tests := []struct {
+		name      string
+		direction string
+		wantErr   bool
+		wantValue string
+	}{
+		{name: "unset", wantValue: ChatAutoAdvanceNext},
+		{name: "next", direction: "next", wantValue: ChatAutoAdvanceNext},
+		{name: "previous", direction: "previous", wantValue: ChatAutoAdvancePrevious},
+		{name: "invalid", direction: "up", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := NewStore(openTestDB(t))
+
+			if tt.direction != "" {
+				err := store.SetChatAutoAdvance(tt.direction)
+				if tt.wantErr {
+					if err == nil {
+						t.Fatal("expected error, got nil")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+
+			got, err := store.GetChatAutoAdvance()
+			if err != nil {
+				t.Fatalf("unexpected error on get: %v", err)
+			}
+			if got != tt.wantValue {
+				t.Errorf("got %q, want %q", got, tt.wantValue)
+			}
+		})
+	}
+}
+
+func TestSetGetChatShowLowGroup(t *testing.T) {
+	store := NewStore(openTestDB(t))
+
+	got, err := store.GetChatShowLowGroup()
+	if err != nil || !got {
+		t.Fatalf("default: got %v, %v; want true", got, err)
+	}
+	for _, want := range []bool{false, true} {
+		if err := store.SetChatShowLowGroup(want); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := store.GetChatShowLowGroup(); err != nil || got != want {
+			t.Errorf("got %v, %v; want %v", got, err, want)
+		}
+	}
+}

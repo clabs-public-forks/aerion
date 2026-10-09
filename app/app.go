@@ -341,6 +341,13 @@ type App struct {
 	// Desktop notifications with click handling
 	notifier notification.Notifier
 
+	// Chat snooze wake-up timer (app/chat.go)
+	chatStateMu   goSync.Mutex  // serializes pin/snooze read-modify-write
+	chatFlushed   chan struct{} // signaled by ChatDraftsFlushed during shutdown
+	snoozeMu      goSync.Mutex
+	snoozeTimer   *time.Timer
+	snoozeStopped bool
+
 	// DebugMode function reference (injected from main)
 	debugMode func() bool
 
@@ -718,6 +725,7 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize undo stack (max 50 commands, 30 second timeout)
 	a.undoStack = undo.NewStack(50, 30*time.Second)
+	a.chatFlushed = make(chan struct{}, 1)
 
 	// OAuth2 manager was constructed earlier (before the Auth Broker, which
 	// captures it). See the earlier guarded init above for the rationale.
@@ -790,6 +798,9 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize desktop notifications with click handling
 	a.initNotifications(ctx)
+
+	// Drop pin/snooze state of vanished threads, then arm the snooze timer
+	go a.initChatState()
 
 	// Initialize sleep/wake monitor for auto-sync on wake
 	a.initSleepWakeMonitor(ctx)
@@ -887,6 +898,7 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 	go func() {
 		defer recoverPanic("app", "shutdown")
 		time.Sleep(150 * time.Millisecond)
+		a.waitChatDraftsFlushed()
 		wailsRuntime.Quit(a.ctx)
 	}()
 
@@ -941,6 +953,7 @@ func (a *App) CloseWindow() {
 	go func() {
 		defer recoverPanic("app", "shutdown")
 		time.Sleep(150 * time.Millisecond)
+		a.waitChatDraftsFlushed()
 		wailsRuntime.Quit(a.ctx)
 	}()
 }
@@ -960,6 +973,7 @@ func (a *App) QuitApp() {
 	go func() {
 		defer recoverPanic("app", "shutdown")
 		time.Sleep(150 * time.Millisecond)
+		a.waitChatDraftsFlushed()
 		wailsRuntime.Quit(a.ctx)
 	}()
 }
@@ -1039,6 +1053,8 @@ func (a *App) Shutdown(ctx context.Context) {
 		_ = a.themeMonitor.Stop()
 		log.Info().Msg("Theme monitor stopped")
 	}
+
+	a.stopSnoozeTimer()
 
 	// Stop notification listener
 	if a.notifier != nil {

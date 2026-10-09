@@ -40,6 +40,45 @@ has not yet been confirmed against the code.
   and the DAV setup flow has no certificate-accept prompt like the mail
   account flow does. Such servers can't be added from the UI.
 
+### Chat mail
+
+Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
+
+- **CM1 low** `app/background.go` `handleNewMailNotification`: sync reports
+  only a new-mail count, so priority-only notifications classify the `count`
+  highest-UID inbox rows. A sync that also stores older mail with higher
+  UIDs (moves, UIDVALIDITY reset) can misclassify that window. The fix is
+  for `sync.NewMailInfo` to carry the new message IDs.
+- **CM2 low** frontend: the inbox lookup (`MessageList`, `Sidebar`), the
+  sync toggle and trash-with-undo exist as unshared copies in the classic
+  and chat components. Consolidate them, or delete the classic copies once
+  the classic components leave the tree.
+- **CM3 low** chat views infer `isMine` from account emails and Sent folder
+  ids in the frontend; a backend `mine` flag set beside `attachChatText`
+  would give one source of truth.
+- **CM4 low** `internal/message/chattext.go` `ExtractChatText` reruns on
+  every conversation reload (~4 ms and 2 MB per 165 KB newsletter body, per
+  `BenchmarkExtractChatTextNewsletter`). Cache it per message if long
+  threads feel slow.
+- **CM5 low** chat search results in Sent Mail name me instead of the
+  recipients: `ConversationSearchResult` (upstream `store.go`) has no
+  `recipients`, so the Sent-row fallback in `chatPeople` covers chats only.
+  Add recipients to search results, or reuse the chat recipients query.
+- **CM6 low** `viewer/AttachmentList.svelte` (chat and classic): Outlook
+  signature images and other `Content-Disposition: inline` parts show as
+  attachment cards, about a dozen per message on one real thread. Hiding
+  parts that the HTML body references by `cid:` would cut the noise in both
+  views.
+- **CM7 low** `app/background.go` IDLE handler: an IDLE push syncs INBOX
+  only, so mail sent from another client (e.g. the Gmail web UI) reaches
+  Sent, and the chat thread, only on the next scheduled sync (30 min by
+  default) or a manual sync. Syncing Sent after an IDLE-triggered INBOX sync,
+  or a shorter Sent interval, would show replies from other clients sooner.
+- **CM8 low** `internal/smtp/client.go`: `net/smtp` greets with
+  `EHLO localhost` because `Hello` is never called. Gmail recorded it in
+  `Received`, and it is a mild spam signal. Sending an address literal
+  (`[ip]`, as Thunderbird does) avoids leaking the hostname.
+
 ### Dependencies
 
 - **D2 low** `frontend/package.json`: TypeScript is held at 6.0.x.

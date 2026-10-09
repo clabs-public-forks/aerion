@@ -125,6 +125,8 @@ export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
 
 export function CancelOAuthFlow():Promise<void>;
 
+export function ChatDraftsFlushed():Promise<void>;
+
 export function CheckRecipientCerts(arg1:Array<string>):Promise<Record<string, boolean>>;
 
 export function CheckRecipientPGPKeys(arg1:Array<string>):Promise<Record<string, boolean>>;
@@ -236,6 +238,22 @@ export function GetAttachments(arg1:string):Promise<Array<message.Attachment>>;
 export function GetAutoDetectedFolders(arg1:string):Promise<Record<string, string>>;
 
 export function GetAutostart():Promise<boolean>;
+
+export function GetChatAutoAdvance():Promise<string>;
+
+export function GetChatCount(arg1:string,arg2:string):Promise<number>;
+
+export function GetChatDraft(arg1:string,arg2:string):Promise<app.ChatDraft>;
+
+export function GetChatIncludeQuote():Promise<boolean>;
+
+export function GetChatNotifyPriorityOnly():Promise<boolean>;
+
+export function GetChatSendKey():Promise<string>;
+
+export function GetChatShowLowGroup():Promise<boolean>;
+
+export function GetChats(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<message.Chat>>;
 
 export function GetComposerFormat():Promise<string>;
 
@@ -507,6 +525,8 @@ export function PickRecipientPGPKeyFile():Promise<string>;
 
 export function PickSMIMECertificateFile():Promise<string>;
 
+export function PinChat(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
 export function Preflight():Promise<void>;
 
 export function PrepareReply(arg1:string,arg2:string):Promise<smtp.ComposeMessage>;
@@ -524,6 +544,8 @@ export function ReauthorizeAccount(arg1:string):Promise<void>;
 export function RebuildFTSIndex(arg1:string):Promise<void>;
 
 export function RefreshWindowConstraints():Promise<void>;
+
+export function ReleaseChatDraft(arg1:string,arg2:string):Promise<void>;
 
 export function RemoveAccount(arg1:string):Promise<void>;
 
@@ -543,6 +565,8 @@ export function SaveAllEncryptedAttachments(arg1:string):Promise<string>;
 
 export function SaveAttachmentAs(arg1:string):Promise<string>;
 
+export function SaveChatDraft(arg1:app.ChatReply):Promise<string>;
+
 export function SaveDraft(arg1:string,arg2:smtp.ComposeMessage,arg3:string):Promise<app.DraftResult>;
 
 export function SaveEncryptedAttachmentAs(arg1:string,arg2:string):Promise<string>;
@@ -556,6 +580,8 @@ export function SearchContacts(arg1:string,arg2:number):Promise<Array<contact.Co
 export function SearchConversations(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string):Promise<Array<message.ConversationSearchResult>>;
 
 export function SearchUnifiedInbox(arg1:string,arg2:number,arg3:number,arg4:string):Promise<Array<message.ConversationSearchResult>>;
+
+export function SendChatReply(arg1:app.ChatReply):Promise<void>;
 
 export function SendMessage(arg1:string,arg2:smtp.ComposeMessage):Promise<void>;
 
@@ -574,6 +600,16 @@ export function SetAlwaysLoadImages(arg1:boolean):Promise<void>;
 export function SetAlwaysShowMessageCheckbox(arg1:boolean):Promise<void>;
 
 export function SetAutostart(arg1:boolean):Promise<void>;
+
+export function SetChatAutoAdvance(arg1:string):Promise<void>;
+
+export function SetChatIncludeQuote(arg1:boolean):Promise<void>;
+
+export function SetChatNotifyPriorityOnly(arg1:boolean):Promise<void>;
+
+export function SetChatSendKey(arg1:string):Promise<void>;
+
+export function SetChatShowLowGroup(arg1:boolean):Promise<void>;
 
 export function SetComposerFormat(arg1:string):Promise<void>;
 
@@ -629,6 +665,8 @@ export function SetSMIMEEncryptPolicy(arg1:string,arg2:string):Promise<void>;
 
 export function SetSMIMESignPolicy(arg1:string,arg2:string):Promise<void>;
 
+export function SetSenderCategory(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function SetShowMessageListCircles(arg1:boolean):Promise<void>;
 
 export function SetShowMessageListProfilePics(arg1:boolean):Promise<void>;
@@ -650,6 +688,8 @@ export function SetTermsAccepted(arg1:boolean):Promise<void>;
 export function SetThemeMode(arg1:string):Promise<void>;
 
 export function ShowWindow():Promise<void>;
+
+export function SnoozeChat(arg1:string,arg2:string,arg3:number):Promise<void>;
 
 export function Star(arg1:Array<string>):Promise<void>;
 
@@ -688,6 +728,8 @@ export function TestSMTPConnection(arg1:string,arg2:number,arg3:string,arg4:stri
 export function Trash(arg1:Array<string>):Promise<boolean>;
 
 export function Undo():Promise<string>;
+
+export function UnsnoozeChat(arg1:string,arg2:string):Promise<void>;
 
 export function Unstar(arg1:Array<string>):Promise<void>;
 

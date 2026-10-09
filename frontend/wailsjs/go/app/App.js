@@ -214,6 +214,10 @@ export function CancelOAuthFlow() {
   return window['go']['app']['App']['CancelOAuthFlow']();
 }
 
+export function ChatDraftsFlushed() {
+  return window['go']['app']['App']['ChatDraftsFlushed']();
+}
+
 export function CheckRecipientCerts(arg1) {
   return window['go']['app']['App']['CheckRecipientCerts'](arg1);
 }
@@ -436,6 +440,38 @@ export function GetAutoDetectedFolders(arg1) {
 
 export function GetAutostart() {
   return window['go']['app']['App']['GetAutostart']();
+}
+
+export function GetChatAutoAdvance() {
+  return window['go']['app']['App']['GetChatAutoAdvance']();
+}
+
+export function GetChatCount(arg1, arg2) {
+  return window['go']['app']['App']['GetChatCount'](arg1, arg2);
+}
+
+export function GetChatDraft(arg1, arg2) {
+  return window['go']['app']['App']['GetChatDraft'](arg1, arg2);
+}
+
+export function GetChatIncludeQuote() {
+  return window['go']['app']['App']['GetChatIncludeQuote']();
+}
+
+export function GetChatNotifyPriorityOnly() {
+  return window['go']['app']['App']['GetChatNotifyPriorityOnly']();
+}
+
+export function GetChatSendKey() {
+  return window['go']['app']['App']['GetChatSendKey']();
+}
+
+export function GetChatShowLowGroup() {
+  return window['go']['app']['App']['GetChatShowLowGroup']();
+}
+
+export function GetChats(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['GetChats'](arg1, arg2, arg3, arg4);
 }
 
 export function GetComposerFormat() {
@@ -978,6 +1014,10 @@ export function PickSMIMECertificateFile() {
   return window['go']['app']['App']['PickSMIMECertificateFile']();
 }
 
+export function PinChat(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PinChat'](arg1, arg2, arg3);
+}
+
 export function Preflight() {
   return window['go']['app']['App']['Preflight']();
 }
@@ -1012,6 +1052,10 @@ export function RebuildFTSIndex(arg1) {
 
 export function RefreshWindowConstraints() {
   return window['go']['app']['App']['RefreshWindowConstraints']();
+}
+
+export function ReleaseChatDraft(arg1, arg2) {
+  return window['go']['app']['App']['ReleaseChatDraft'](arg1, arg2);
 }
 
 export function RemoveAccount(arg1) {
@@ -1050,6 +1094,10 @@ export function SaveAttachmentAs(arg1) {
   return window['go']['app']['App']['SaveAttachmentAs'](arg1);
 }
 
+export function SaveChatDraft(arg1) {
+  return window['go']['app']['App']['SaveChatDraft'](arg1);
+}
+
 export function SaveDraft(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveDraft'](arg1, arg2, arg3);
 }
@@ -1076,6 +1124,10 @@ export function SearchConversations(arg1, arg2, arg3, arg4, arg5, arg6) {
 
 export function SearchUnifiedInbox(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SearchUnifiedInbox'](arg1, arg2, arg3, arg4);
+}
+
+export function SendChatReply(arg1) {
+  return window['go']['app']['App']['SendChatReply'](arg1);
 }
 
 export function SendMessage(arg1, arg2) {
@@ -1112,6 +1164,26 @@ export function SetAlwaysShowMessageCheckbox(arg1) {
 
 export function SetAutostart(arg1) {
   return window['go']['app']['App']['SetAutostart'](arg1);
+}
+
+export function SetChatAutoAdvance(arg1) {
+  return window['go']['app']['App']['SetChatAutoAdvance'](arg1);
+}
+
+export function SetChatIncludeQuote(arg1) {
+  return window['go']['app']['App']['SetChatIncludeQuote'](arg1);
+}
+
+export function SetChatNotifyPriorityOnly(arg1) {
+  return window['go']['app']['App']['SetChatNotifyPriorityOnly'](arg1);
+}
+
+export function SetChatSendKey(arg1) {
+  return window['go']['app']['App']['SetChatSendKey'](arg1);
+}
+
+export function SetChatShowLowGroup(arg1) {
+  return window['go']['app']['App']['SetChatShowLowGroup'](arg1);
 }
 
 export function SetComposerFormat(arg1) {
@@ -1222,6 +1294,10 @@ export function SetSMIMESignPolicy(arg1, arg2) {
   return window['go']['app']['App']['SetSMIMESignPolicy'](arg1, arg2);
 }
 
+export function SetSenderCategory(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetSenderCategory'](arg1, arg2, arg3);
+}
+
 export function SetShowMessageListCircles(arg1) {
   return window['go']['app']['App']['SetShowMessageListCircles'](arg1);
 }
@@ -1264,6 +1340,10 @@ export function SetThemeMode(arg1) {
 
 export function ShowWindow() {
   return window['go']['app']['App']['ShowWindow']();
+}
+
+export function SnoozeChat(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SnoozeChat'](arg1, arg2, arg3);
 }
 
 export function Star(arg1) {
@@ -1340,6 +1420,10 @@ export function Trash(arg1) {
 
 export function Undo() {
   return window['go']['app']['App']['Undo']();
+}
+
+export function UnsnoozeChat(arg1, arg2) {
+  return window['go']['app']['App']['UnsnoozeChat'](arg1, arg2);
 }
 
 export function Unstar(arg1) {

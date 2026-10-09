@@ -580,8 +580,8 @@ func (s *Store) Create(m *Message) error {
 			subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
 			snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 			size, has_attachments, body_text, body_html, body_fetched,
-			read_receipt_to, read_receipt_handled, received_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			read_receipt_to, read_receipt_handled, received_at, is_bulk
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := s.db.Exec(query,
@@ -594,7 +594,7 @@ func (s *Store) Create(m *Message) error {
 		m.Size, m.HasAttachments,
 		nullString(m.BodyText), nullString(m.BodyHTML), m.BodyFetched,
 		nullString(m.ReadReceiptTo), m.ReadReceiptHandled,
-		m.ReceivedAt,
+		m.ReceivedAt, m.IsBulk,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create message: %w", err)
@@ -620,8 +620,8 @@ func (s *Store) Upsert(m *Message) error {
 			subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
 			snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 			size, has_attachments, body_text, body_html, body_fetched,
-			read_receipt_to, read_receipt_handled, received_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			read_receipt_to, read_receipt_handled, received_at, is_bulk
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(folder_id, uid) DO UPDATE SET
 			id=excluded.id, account_id=excluded.account_id,
 			message_id=excluded.message_id, in_reply_to=excluded.in_reply_to,
@@ -636,7 +636,8 @@ func (s *Store) Upsert(m *Message) error {
 			body_text=excluded.body_text, body_html=excluded.body_html,
 			body_fetched=excluded.body_fetched,
 			read_receipt_to=excluded.read_receipt_to, read_receipt_handled=excluded.read_receipt_handled,
-			received_at=excluded.received_at
+			received_at=excluded.received_at,
+			is_bulk=COALESCE(excluded.is_bulk, messages.is_bulk)
 	`
 
 	_, err := s.db.Exec(query,
@@ -649,7 +650,7 @@ func (s *Store) Upsert(m *Message) error {
 		m.Size, m.HasAttachments,
 		nullString(m.BodyText), nullString(m.BodyHTML), m.BodyFetched,
 		nullString(m.ReadReceiptTo), m.ReadReceiptHandled,
-		m.ReceivedAt,
+		m.ReceivedAt, m.IsBulk,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to upsert message: %w", err)

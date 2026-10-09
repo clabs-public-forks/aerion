@@ -247,9 +247,10 @@ export function savePaneWidths(): void {
 }
 
 // Left sidebar collapse helpers. Keyed by rail id so each view (mail and
-// every extension) remembers its own state. Missing entry -> expanded.
+// every extension) remembers its own state. Missing entry -> expanded, except
+// mail, whose chat list scope menu covers inbox switching.
 export function isSidebarCollapsed(view: string = activeExtensionState): boolean {
-  return collapsedSidebarsState[view] === true
+  return collapsedSidebarsState[view] ?? view === 'mail'
 }
 
 function setSidebarCollapsed(view: string, collapsed: boolean): void {

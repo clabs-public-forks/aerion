@@ -8,7 +8,7 @@
 
 ## Layout Notes
 
-- `frontend/wailsjs/` holds generated Wails bindings; regenerate with `make generate` after binding changes.
+- `frontend/wailsjs/` holds generated Wails bindings; regenerate with `make generate` after binding changes, then revert unrelated churn in `frontend/wailsjs/runtime/*`. Stop any running Aerion first (`dev.sh stop`): the single-instance lock makes the generator exit without writing anything.
 - `extensions/` (contacts, calendar) contains both backend and frontend code. Check extension, core API, and kit changes against `docs/EXT_RULES.md` before committing.
 - `docs/EXTENSIONS.md` (about 170 KB), `docs/CASAT2.md`, and `docs/LANGUAGE.md` are long: grep them or read by section, never whole.
 
@@ -37,7 +37,7 @@ Toolchain: Go 1.26, Node.js 24 (matches CI), Wails v2 CLI. Linux needs GTK 3 and
 - Start with checks relevant to the change.
 - Run `make test` when a change affects multiple Go packages or shared behavior, or when focused checks leave unresolved risks.
 - Use table-driven Go tests for critical paths and edge cases.
-- There is no frontend test script. For frontend changes, run `npm run lint` and `npm run check` in `frontend/`, then verify the UI manually.
+- There is no frontend test script. For frontend changes, run `npm run lint` and `npm run check` in `frontend/`, then verify the UI with the `run-aerion` skill. If no display is available (for example, in a cloud session), say so in the PLAN.md Progress entry and in your report.
 
 ## Documentation
 
@@ -54,9 +54,7 @@ Before marking a milestone done:
 2. Have a read-only subagent check the milestone's acceptance criteria. If no subagent or review tool is available, do the equivalent review directly and report the missing independent check.
 3. Fix gaps that affect correctness or stated requirements; treat style-only findings as optional.
 4. Simplify the changed code without changing behavior.
-5. Commit locally, staging only files changed for the task and preserving unrelated user changes.
-
-Never push.
+5. Commit and push, staging only files changed for the task and preserving unrelated user changes.
 
 ## Commits and PRs
 

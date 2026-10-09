@@ -41,6 +41,8 @@
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     onOpenChange?: (open: boolean) => void
     children?: Snippet
+    // Items shown above the standard ones (chat triage actions).
+    extraItems?: Snippet
   }
 
   let {
@@ -54,6 +56,7 @@
     onReply,
     onOpenChange,
     children,
+    extraItems,
   }: Props = $props()
 
   // Accounts list — passed to FolderPickerDialog for its account dropdown.
@@ -311,6 +314,10 @@
   </ContextMenuPrimitive.Trigger>
 
   <ContextMenuContent>
+    {#if extraItems}
+      {@render extraItems()}
+      <ContextMenuSeparator />
+    {/if}
     <!-- Reply actions (single message only) -->
     {#if isSingleMessage}
       <ContextMenuItem onSelect={handleReply}>

@@ -271,6 +271,36 @@ func (a *App) GetSpellcheckEnabled() (bool, error) {
 	return a.settingsStore.GetSpellcheckEnabled()
 }
 
+// GetChatNotifyPriorityOnly returns whether new-mail notifications skip low-priority mail
+func (a *App) GetChatNotifyPriorityOnly() (bool, error) {
+	return a.settingsStore.GetChatNotifyPriorityOnly()
+}
+
+// SetChatNotifyPriorityOnly sets whether new-mail notifications skip low-priority mail
+func (a *App) SetChatNotifyPriorityOnly(only bool) error {
+	return a.settingsStore.SetChatNotifyPriorityOnly(only)
+}
+
+// GetChatSendKey returns the chat composer's send key ("enter" or "ctrl-enter")
+func (a *App) GetChatSendKey() (string, error) {
+	return a.settingsStore.GetChatSendKey()
+}
+
+// SetChatSendKey sets the chat composer's send key
+func (a *App) SetChatSendKey(key string) error {
+	return a.settingsStore.SetChatSendKey(key)
+}
+
+// GetChatIncludeQuote returns whether chat replies quote the replied-to message (defaults on)
+func (a *App) GetChatIncludeQuote() (bool, error) {
+	return a.settingsStore.GetChatIncludeQuote()
+}
+
+// SetChatIncludeQuote sets whether chat replies quote the replied-to message
+func (a *App) SetChatIncludeQuote(include bool) error {
+	return a.settingsStore.SetChatIncludeQuote(include)
+}
+
 // SetSpellcheckEnabled sets the composer spellcheck master toggle
 func (a *App) SetSpellcheckEnabled(enabled bool) error {
 	return a.settingsStore.SetSpellcheckEnabled(enabled)
@@ -586,4 +616,24 @@ func extractEmailFromHeader(header string) string {
 
 	// Otherwise, assume it's just an email address
 	return header
+}
+
+// GetChatAutoAdvance returns which chat opens after a chat leaves the list ("next" or "previous")
+func (a *App) GetChatAutoAdvance() (string, error) {
+	return a.settingsStore.GetChatAutoAdvance()
+}
+
+// SetChatAutoAdvance sets the chat auto-advance direction
+func (a *App) SetChatAutoAdvance(direction string) error {
+	return a.settingsStore.SetChatAutoAdvance(direction)
+}
+
+// GetChatShowLowGroup returns whether the chat list's All filter shows the Low priority group
+func (a *App) GetChatShowLowGroup() (bool, error) {
+	return a.settingsStore.GetChatShowLowGroup()
+}
+
+// SetChatShowLowGroup sets whether the chat list's All filter shows the Low priority group
+func (a *App) SetChatShowLowGroup(show bool) error {
+	return a.settingsStore.SetChatShowLowGroup(show)
 }

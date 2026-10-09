@@ -1384,4 +1384,52 @@ var migrations = []Migration{
 			ALTER TABLE trusted_certificates_new RENAME TO trusted_certificates;
 		`,
 	},
+	{
+		Version: 46,
+		SQL: `
+			-- Chat-style mail triage. is_bulk is set from list/auto headers at
+			-- header sync (NULL = not classified yet; backfilled for inboxes).
+			-- conversation_state holds local-only pin/snooze per thread, keyed
+			-- by the thread id without angle brackets; times are unix seconds.
+			-- snoozed_at lets a reply that arrives during the snooze wake it.
+			-- sender_category is the user's per-sender override of is_bulk.
+
+			ALTER TABLE messages ADD COLUMN is_bulk INTEGER;
+
+			CREATE TABLE IF NOT EXISTS conversation_state (
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				thread_key TEXT NOT NULL,
+				pinned_at INTEGER,
+				snoozed_until INTEGER,
+				snoozed_at INTEGER,
+				PRIMARY KEY (account_id, thread_key)
+			);
+			CREATE INDEX IF NOT EXISTS idx_conversation_state_snoozed
+				ON conversation_state(snoozed_until) WHERE snoozed_until IS NOT NULL;
+
+			CREATE TABLE IF NOT EXISTS sender_category (
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				email TEXT NOT NULL,
+				category TEXT NOT NULL CHECK (category IN ('priority', 'low')),
+				PRIMARY KEY (account_id, email)
+			);
+		`,
+	},
+	{
+		Version: 47,
+		SQL: `
+			-- Chat composer drafts: maps a thread to its local draft. The typed
+			-- text is the first text_len bytes of the draft's text body, so the
+			-- text itself stays in the (possibly encrypted) draft.
+			CREATE TABLE IF NOT EXISTS chat_drafts (
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				thread_key TEXT NOT NULL,
+				draft_id TEXT NOT NULL UNIQUE REFERENCES drafts(id) ON DELETE CASCADE,
+				message_id TEXT NOT NULL,
+				reply_all INTEGER NOT NULL DEFAULT 0,
+				text_len INTEGER NOT NULL,
+				PRIMARY KEY (account_id, thread_key)
+			);
+		`,
+	},
 }

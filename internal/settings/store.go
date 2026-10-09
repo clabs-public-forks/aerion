@@ -41,11 +41,16 @@ const (
 	KeyAlwaysShowMessageCheckbox  = "always_show_message_checkbox"   // reserve a fixed checkbox column instead of the hover/swipe slide-reveal (default off)
 	KeyShowMessagePreview         = "show_message_preview"           // show the body preview line in message-list rows (default off)
 	KeyShowViewerCircles          = "show_viewer_circles"
-	KeyLastSeenVersion            = "last_seen_version"       // for "What's new in this version" launch dialog
-	KeyOAuthWarningDisabled       = "oauth_warning_disabled"  // user toggled "Don't show again" on the missing-OAuth-creds launch warning
-	KeySpellcheckEnabled          = "spellcheck_enabled"      // composer spellcheck master toggle (defaults on)
-	KeySpellcheckLanguages        = "spellcheck_languages"    // JSON array of enabled dictionary codes, e.g. ["en","de"]
-	KeySpellcheckCustomWords      = "spellcheck_custom_words" // JSON array of user-added dictionary words
+	KeyLastSeenVersion            = "last_seen_version"         // for "What's new in this version" launch dialog
+	KeyOAuthWarningDisabled       = "oauth_warning_disabled"    // user toggled "Don't show again" on the missing-OAuth-creds launch warning
+	KeySpellcheckEnabled          = "spellcheck_enabled"        // composer spellcheck master toggle (defaults on)
+	KeySpellcheckLanguages        = "spellcheck_languages"      // JSON array of enabled dictionary codes, e.g. ["en","de"]
+	KeySpellcheckCustomWords      = "spellcheck_custom_words"   // JSON array of user-added dictionary words
+	KeyChatSendKey                = "chat_send_key"             // "enter" or "ctrl-enter": which key sends from the chat composer
+	KeyChatIncludeQuote           = "chat_include_quote"        // quote the replied-to message below chat replies (defaults on)
+	KeyChatNotifyPriorityOnly     = "chat_notify_priority_only" // skip new-mail notifications for low-priority mail (defaults on)
+	KeyChatAutoAdvance            = "chat_auto_advance"         // "next" or "previous": which chat opens after Done, Snooze, delete, or move
+	KeyChatShowLowGroup           = "chat_show_low_group"       // show the Low priority group under the All filter (defaults on)
 )
 
 // Extension enable/disable keys. Format: extension_<name>_enabled.
@@ -125,6 +130,18 @@ const DefaultThemeMode = ThemeModeSystem
 const (
 	ComposerModeInline   = "inline"
 	ComposerModeDetached = "detached"
+)
+
+// Chat composer send keys
+const (
+	ChatSendKeyEnter     = "enter"
+	ChatSendKeyCtrlEnter = "ctrl-enter"
+)
+
+// Chat auto-advance directions
+const (
+	ChatAutoAdvanceNext     = "next"     // the row below (older)
+	ChatAutoAdvancePrevious = "previous" // the row above (newer)
 )
 
 // DefaultComposerMode is the default compose mode
@@ -692,6 +709,55 @@ func (s *Store) GetSpellcheckEnabled() (bool, error) {
 	return value != "false", nil
 }
 
+// GetChatSendKey returns the chat composer's send key: "enter" (default) or
+// "ctrl-enter".
+func (s *Store) GetChatSendKey() (string, error) {
+	value, err := s.Get(KeyChatSendKey)
+	if err != nil || value != ChatSendKeyCtrlEnter {
+		return ChatSendKeyEnter, err
+	}
+	return value, nil
+}
+
+// SetChatSendKey sets the chat composer's send key.
+func (s *Store) SetChatSendKey(key string) error {
+	if key != ChatSendKeyEnter && key != ChatSendKeyCtrlEnter {
+		return fmt.Errorf("invalid chat send key: %s", key)
+	}
+	return s.Set(KeyChatSendKey, key)
+}
+
+// GetChatIncludeQuote returns whether chat replies quote the replied-to
+// message. Defaults to true.
+func (s *Store) GetChatIncludeQuote() (bool, error) {
+	value, err := s.Get(KeyChatIncludeQuote)
+	if err != nil {
+		return true, err
+	}
+	return value != "false", nil
+}
+
+// SetChatIncludeQuote sets whether chat replies quote the replied-to message.
+func (s *Store) SetChatIncludeQuote(include bool) error {
+	return s.Set(KeyChatIncludeQuote, strconv.FormatBool(include))
+}
+
+// GetChatNotifyPriorityOnly returns whether new-mail notifications skip
+// low-priority mail. Defaults to true.
+func (s *Store) GetChatNotifyPriorityOnly() (bool, error) {
+	value, err := s.Get(KeyChatNotifyPriorityOnly)
+	if err != nil {
+		return true, err
+	}
+	return value != "false", nil
+}
+
+// SetChatNotifyPriorityOnly sets whether new-mail notifications skip
+// low-priority mail.
+func (s *Store) SetChatNotifyPriorityOnly(only bool) error {
+	return s.Set(KeyChatNotifyPriorityOnly, strconv.FormatBool(only))
+}
+
 // SetSpellcheckEnabled sets the composer spellcheck master toggle
 func (s *Store) SetSpellcheckEnabled(enabled bool) error {
 	value := "false"
@@ -944,4 +1010,37 @@ func ReadNativeTitleBar(dbPath string) bool {
 		return false
 	}
 	return value == "true"
+}
+
+// GetChatAutoAdvance returns which chat opens after a chat leaves the list:
+// "next" (default) or "previous".
+func (s *Store) GetChatAutoAdvance() (string, error) {
+	value, err := s.Get(KeyChatAutoAdvance)
+	if err != nil || value != ChatAutoAdvancePrevious {
+		return ChatAutoAdvanceNext, err
+	}
+	return value, nil
+}
+
+// SetChatAutoAdvance sets the chat auto-advance direction.
+func (s *Store) SetChatAutoAdvance(direction string) error {
+	if direction != ChatAutoAdvanceNext && direction != ChatAutoAdvancePrevious {
+		return fmt.Errorf("invalid chat auto-advance direction: %s", direction)
+	}
+	return s.Set(KeyChatAutoAdvance, direction)
+}
+
+// GetChatShowLowGroup returns whether the All filter shows the Low priority
+// group. Defaults to true.
+func (s *Store) GetChatShowLowGroup() (bool, error) {
+	value, err := s.Get(KeyChatShowLowGroup)
+	if err != nil {
+		return true, err
+	}
+	return value != "false", nil
+}
+
+// SetChatShowLowGroup sets whether the All filter shows the Low priority group.
+func (s *Store) SetChatShowLowGroup(show bool) error {
+	return s.Set(KeyChatShowLowGroup, strconv.FormatBool(show))
 }

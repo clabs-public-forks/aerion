@@ -204,6 +204,10 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE smime_sender_certs DROP COLUMN trusted`); err != nil {
 		t.Fatalf("drop smime_sender_certs.trusted for re-migrate: %v", err)
 	}
+	// And v46's is_bulk on messages (its tables use IF NOT EXISTS).
+	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN is_bulk`); err != nil {
+		t.Fatalf("drop messages.is_bulk for re-migrate: %v", err)
+	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
 	if err := db.Migrate(); err != nil {
@@ -363,6 +367,10 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	// And v44's trusted on smime_sender_certs.
 	if _, err := db.Exec(`ALTER TABLE smime_sender_certs DROP COLUMN trusted`); err != nil {
 		t.Fatalf("drop smime_sender_certs.trusted for re-migrate: %v", err)
+	}
+	// And v46's is_bulk on messages (its tables use IF NOT EXISTS).
+	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN is_bulk`); err != nil {
+		t.Fatalf("drop messages.is_bulk for re-migrate: %v", err)
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,
@@ -545,5 +553,73 @@ func TestMigration31_DuplicateCardDAVEmailDoesNotFailMigration(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("want 1 deduped contact_emails row, got %d", n)
+	}
+}
+
+// TestMigrationV46_ChatTriage upgrades a v45 database: existing messages get
+// NULL is_bulk (unclassified), and the state tables enforce their keys,
+// category values, and account cascade.
+func TestMigrationV46_ChatTriage(t *testing.T) {
+	db := openTestDB(t)
+
+	// Roll back to v45 with a message already present.
+	for _, stmt := range []string{
+		`DROP TABLE conversation_state`,
+		`DROP TABLE sender_category`,
+		`ALTER TABLE messages DROP COLUMN is_bulk`,
+		`DELETE FROM migrations WHERE version >= 46`,
+		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+			VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com')`,
+		`INSERT INTO folders (id, account_id, name, path, folder_type) VALUES ('f-1', 'acct-1', 'INBOX', 'INBOX', 'inbox')`,
+		`INSERT INTO messages (id, account_id, folder_id, uid, subject, from_name, from_email, date)
+			VALUES ('m-1', 'acct-1', 'f-1', 1, 'Hi', 'Alice', 'alice@example.com', CURRENT_TIMESTAMP)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("prepare v45 state (%s): %v", stmt, err)
+		}
+	}
+
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("migrate to v46: %v", err)
+	}
+
+	var isBulk sql.NullInt64
+	if err := db.QueryRow(`SELECT is_bulk FROM messages WHERE id = 'm-1'`).Scan(&isBulk); err != nil {
+		t.Fatalf("read is_bulk: %v", err)
+	}
+	if isBulk.Valid {
+		t.Errorf("existing message is_bulk = %d, want NULL", isBulk.Int64)
+	}
+
+	execs := []struct {
+		name    string
+		sql     string
+		wantErr bool
+	}{
+		{"insert state", `INSERT INTO conversation_state (account_id, thread_key, pinned_at) VALUES ('acct-1', 'k', 1)`, false},
+		{"duplicate state key", `INSERT INTO conversation_state (account_id, thread_key) VALUES ('acct-1', 'k')`, true},
+		{"state for unknown account", `INSERT INTO conversation_state (account_id, thread_key) VALUES ('nope', 'k')`, true},
+		{"low sender", `INSERT INTO sender_category (account_id, email, category) VALUES ('acct-1', 'a@x', 'low')`, false},
+		{"priority sender", `INSERT INTO sender_category (account_id, email, category) VALUES ('acct-1', 'b@x', 'priority')`, false},
+		{"invalid category", `INSERT INTO sender_category (account_id, email, category) VALUES ('acct-1', 'c@x', 'spam')`, true},
+	}
+	for _, tt := range execs {
+		_, err := db.Exec(tt.sql)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("%s: err = %v, wantErr %v", tt.name, err, tt.wantErr)
+		}
+	}
+
+	if _, err := db.Exec(`DELETE FROM accounts WHERE id = 'acct-1'`); err != nil {
+		t.Fatalf("delete account: %v", err)
+	}
+	for _, table := range []string{"conversation_state", "sender_category"} {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		if n != 0 {
+			t.Errorf("%s has %d rows after account delete, want 0", table, n)
+		}
 	}
 }

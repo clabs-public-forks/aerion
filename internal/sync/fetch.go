@@ -9,6 +9,7 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/hkdb/aerion/internal/folder"
 	imapPkg "github.com/hkdb/aerion/internal/imap"
 	"github.com/hkdb/aerion/internal/message"
 	"github.com/hkdb/aerion/internal/smime"
@@ -491,6 +492,14 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 	if err != nil {
 		e.pool.Release(conn)
 		return fmt.Errorf("failed to select mailbox: %w", err)
+	}
+
+	// Classify inbox mail synced before bulk detection existed. Shares this
+	// connection and the body lock; failures only delay classification.
+	if f.Type == folder.TypeInbox {
+		if err := e.backfillBulkFlags(ctx, conn.Client().RawClient(), folderID); err != nil {
+			e.log.Warn().Err(err).Str("folder", f.Path).Msg("Bulk classification backfill failed")
+		}
 	}
 
 	// Get total count of messages without body (respecting sync period)

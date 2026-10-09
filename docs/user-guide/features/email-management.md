@@ -6,6 +6,20 @@ sidebar_position: 2
 
 Aerion provides essential tools to manage your email efficiently.
 
+## Chat Mail
+
+The mail section shows email as chats. Each chat is one email thread, listed by the people in it with their avatar, the subject, and the latest line.
+
+- **List filters** - All, Unread, Low priority, and Snoozed. Under All, pinned chats come first, then Chats, then a collapsed **Low priority** group for newsletters and bulk mail. The group's header offers **Archive all** (undoable) and **Mark all read**.
+- **Thread view** - Messages appear as chat bubbles, with your replies on the right. Quoted history and signatures are hidden behind "•••". Newsletters and other rich mail show as cards that expand into the full message; encrypted or signed mail, and any message after **Show original**, renders in full.
+- **Reply box** - A reply box stays docked at the bottom of the open chat. Typed text is saved as a draft. **Send & Done** sends and archives the chat; **Open in full composer** moves the draft to the full composer.
+- **Triage** - **Done** archives the chat and opens the next one. **Pin** keeps a chat at the top, **Snooze** hides it until a chosen time (or until new mail arrives), and **Mark unread** brings it back later. Each chat's ⋯ menu and row context menu can move its sender to Low priority or back to Priority.
+- **Low priority** - Mail with mailing-list or bulk headers is low priority. A thread counts as low only while every message in it is, so a person's reply lifts it into Chats. By default, low-priority mail does not raise notifications.
+
+Pin, snooze, and sender priority are stored locally on this computer and are not synced to the server or other devices. Pin is separate from the server star.
+
+See [Keyboard Shortcuts](keyboard-shortcuts.md) for chat triage keys and [Settings](settings.md#chat-tab) for chat options.
+
 ## Unified Inbox
 
 The Unified Inbox shows all incoming mail from all your accounts in one view.
@@ -84,7 +98,7 @@ Toggling either copy or move to folder will bring up a dialog with a scrollable 
 
 ### Bulk Actions
 
-Select multiple messages to apply actions in bulk:
+The chat list has no checkboxes; use the Low priority group's bulk actions or triage chats one by one. In list views that offer checkboxes, select multiple messages to apply actions in bulk:
 
 1. Check the checkbox on each message, or
 2. Use `Space` to toggle the checkbox on the focused message, or

@@ -339,6 +339,86 @@ export namespace app {
 	        this.label = source["label"];
 	    }
 	}
+	export class ChatDraft {
+	    draftId: string;
+	    messageId: string;
+	    text: string;
+	    replyAll: boolean;
+	    attachments: smtp.Attachment[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatDraft(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.draftId = source["draftId"];
+	        this.messageId = source["messageId"];
+	        this.text = source["text"];
+	        this.replyAll = source["replyAll"];
+	        this.attachments = this.convertValues(source["attachments"], smtp.Attachment);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ChatReply {
+	    accountId: string;
+	    threadKey: string;
+	    messageId: string;
+	    text: string;
+	    replyAll: boolean;
+	    attachments: smtp.Attachment[];
+	    draftId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatReply(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accountId = source["accountId"];
+	        this.threadKey = source["threadKey"];
+	        this.messageId = source["messageId"];
+	        this.text = source["text"];
+	        this.replyAll = source["replyAll"];
+	        this.attachments = this.convertValues(source["attachments"], smtp.Attachment);
+	        this.draftId = source["draftId"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ComposeMode {
 	    accountId: string;
 	    mode: string;
@@ -1956,6 +2036,24 @@ export namespace message {
 	        this.localPath = source["localPath"];
 	    }
 	}
+	export class ChatText {
+	    text: string;
+	    quoted?: string;
+	    hasQuoted: boolean;
+	    isRich: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatText(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.quoted = source["quoted"];
+	        this.hasQuoted = source["hasQuoted"];
+	        this.isRich = source["isRich"];
+	    }
+	}
 	export class Message {
 	    id: string;
 	    accountId: string;
@@ -2000,6 +2098,7 @@ export namespace message {
 	    hasPGP?: boolean;
 	    // Go type: time
 	    receivedAt: any;
+	    chat?: ChatText;
 	
 	    static createFrom(source: any = {}) {
 	        return new Message(source);
@@ -2048,6 +2147,7 @@ export namespace message {
 	        this.pgpEncrypted = source["pgpEncrypted"];
 	        this.hasPGP = source["hasPGP"];
 	        this.receivedAt = this.convertValues(source["receivedAt"], null);
+	        this.chat = this.convertValues(source["chat"], ChatText);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2068,6 +2168,81 @@ export namespace message {
 		    return a;
 		}
 	}
+	export class Chat {
+	    threadId: string;
+	    subject: string;
+	    snippet: string;
+	    messageCount: number;
+	    unreadCount: number;
+	    hasAttachments: boolean;
+	    isStarred: boolean;
+	    // Go type: time
+	    latestDate: any;
+	    participants: Address[];
+	    messageIds: string[];
+	    isEncrypted: boolean;
+	    messages?: Message[];
+	    accountId?: string;
+	    accountName?: string;
+	    accountColor?: string;
+	    folderId?: string;
+	    threadKey: string;
+	    isPinned: boolean;
+	    // Go type: time
+	    snoozedUntil?: any;
+	    isLowPriority: boolean;
+	    lastFromMe: boolean;
+	    recipients?: Address[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Chat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.threadId = source["threadId"];
+	        this.subject = source["subject"];
+	        this.snippet = source["snippet"];
+	        this.messageCount = source["messageCount"];
+	        this.unreadCount = source["unreadCount"];
+	        this.hasAttachments = source["hasAttachments"];
+	        this.isStarred = source["isStarred"];
+	        this.latestDate = this.convertValues(source["latestDate"], null);
+	        this.participants = this.convertValues(source["participants"], Address);
+	        this.messageIds = source["messageIds"];
+	        this.isEncrypted = source["isEncrypted"];
+	        this.messages = this.convertValues(source["messages"], Message);
+	        this.accountId = source["accountId"];
+	        this.accountName = source["accountName"];
+	        this.accountColor = source["accountColor"];
+	        this.folderId = source["folderId"];
+	        this.threadKey = source["threadKey"];
+	        this.isPinned = source["isPinned"];
+	        this.snoozedUntil = this.convertValues(source["snoozedUntil"], null);
+	        this.isLowPriority = source["isLowPriority"];
+	        this.lastFromMe = source["lastFromMe"];
+	        this.recipients = this.convertValues(source["recipients"], Address);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class Conversation {
 	    threadId: string;
 	    subject: string;

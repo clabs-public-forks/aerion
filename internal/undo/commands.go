@@ -6,6 +6,7 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 	imapPkg "github.com/hkdb/aerion/internal/imap"
+	"github.com/hkdb/aerion/internal/message"
 )
 
 // UndoContext provides dependencies for undo operations
@@ -167,4 +168,38 @@ func (c *MoveCommand) Undo() error {
 
 	// Reuse the full move pipeline (IMAP + local DB + events)
 	return c.undoCtx.MoveMessagesToFolder(localMsgIDs, c.sourceFolderID)
+}
+
+// ChatStateRestorer writes a thread's local pin/snooze state back.
+type ChatStateRestorer interface {
+	RestoreChatState(accountID, threadKey string, state message.ChatState) error
+}
+
+// ChatStateCommand undoes a pin or snooze change by restoring the thread's
+// previous local state. Pin and snooze never touch the server.
+type ChatStateCommand struct {
+	BaseCommand
+	restorer  ChatStateRestorer
+	accountID string
+	threadKey string
+	previous  message.ChatState
+}
+
+// NewChatStateCommand creates a ChatStateCommand that restores previous.
+func NewChatStateCommand(restorer ChatStateRestorer, accountID, threadKey string, previous message.ChatState, description string) *ChatStateCommand {
+	return &ChatStateCommand{
+		BaseCommand: NewBaseCommand(description),
+		restorer:    restorer,
+		accountID:   accountID,
+		threadKey:   threadKey,
+		previous:    previous,
+	}
+}
+
+// Execute performs the action (already done at creation time)
+func (c *ChatStateCommand) Execute() error { return nil }
+
+// Undo restores the state from before the change
+func (c *ChatStateCommand) Undo() error {
+	return c.restorer.RestoreChatState(c.accountID, c.threadKey, c.previous)
 }

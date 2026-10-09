@@ -1,3 +1,5 @@
 @AGENTS.md
 
-Use /finish-milestone for the Milestones steps.
+Use /next-milestone to implement the next PLAN.md milestone, and /finish-milestone to wrap up one whose code is already written; together they follow the Milestones steps.
+
+Do not add Co-Authored-By or Claude-Session trailers to commit messages.

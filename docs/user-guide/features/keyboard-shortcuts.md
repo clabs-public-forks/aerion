@@ -6,6 +6,8 @@ sidebar_position: 5
 
 Aerion is designed for efficient keyboard navigation. Use these shortcuts to manage your email without touching the mouse.
 
+The mail section's chat list, chat triage, and chat view keys are listed in [the fork's keyboard reference](https://github.com/clabs-public-forks/aerion/blob/main/docs/KEYBOARD_SHORTCUTS.md#chat-list). Where they differ from the tables below (for example `E` for Done and `V` for Move in the chat list), the chat keys apply.
+
 ## Global Shortcuts
 
 These work anywhere in the application (unless you're typing in a text field).

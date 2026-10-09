@@ -1,8 +1,11 @@
 package undo
 
 import (
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/hkdb/aerion/internal/message"
 )
 
 type mockCommand struct {
@@ -168,5 +171,47 @@ func TestSize(t *testing.T) {
 	}
 	if s.Size() != n {
 		t.Fatalf("expected size %d, got %d", n, s.Size())
+	}
+}
+
+type fakeChatStore struct {
+	states map[string]message.ChatState
+}
+
+func (f *fakeChatStore) RestoreChatState(accountID, threadKey string, state message.ChatState) error {
+	f.states[accountID+"/"+threadKey] = state
+	return nil
+}
+
+func TestChatStateCommandUndo(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	later := now.Add(time.Hour)
+	tests := []struct {
+		name     string
+		previous message.ChatState
+		after    message.ChatState
+	}{
+		{"undo pin", message.ChatState{}, message.ChatState{PinnedAt: &now}},
+		{"undo unpin", message.ChatState{PinnedAt: &now}, message.ChatState{}},
+		{"undo snooze keeps pin", message.ChatState{PinnedAt: &now}, message.ChatState{PinnedAt: &now, SnoozedUntil: &later, SnoozedAt: &now}},
+		{"undo unsnooze", message.ChatState{SnoozedUntil: &later, SnoozedAt: &now}, message.ChatState{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &fakeChatStore{states: map[string]message.ChatState{"acct/k": tt.after}}
+			stack := NewStack(10, time.Minute)
+			stack.Push(NewChatStateCommand(store, "acct", "k", tt.previous, tt.name))
+
+			cmd := stack.Pop()
+			if cmd == nil || cmd.Description() != tt.name {
+				t.Fatalf("Pop = %v", cmd)
+			}
+			if err := cmd.Undo(); err != nil {
+				t.Fatalf("Undo: %v", err)
+			}
+			if got := store.states["acct/k"]; !reflect.DeepEqual(got, tt.previous) {
+				t.Errorf("state after undo = %+v, want %+v", got, tt.previous)
+			}
+		})
 	}
 }

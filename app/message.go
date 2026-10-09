@@ -72,6 +72,7 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 
 	// If body is already fetched, just return it
 	if msg.BodyFetched {
+		attachChatText(msg)
 		return msg, nil
 	}
 
@@ -81,7 +82,19 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 		return nil, fmt.Errorf("failed to fetch message body: %w", err)
 	}
 
+	attachChatText(updatedMsg)
 	return updatedMsg, nil
+}
+
+// attachChatText fills m.Chat for chat bubbles. Encrypted or signed messages
+// are skipped: their stored body is the raw envelope, and the chat view
+// renders the decrypted body instead.
+func attachChatText(m *message.Message) {
+	if m == nil || !m.BodyFetched || m.HasSMIME || m.HasPGP {
+		return
+	}
+	chat := message.ExtractChatText(m.BodyText, m.BodyHTML)
+	m.Chat = &chat
 }
 
 // GetConversations returns conversations (threaded messages) for a folder with pagination
@@ -127,6 +140,7 @@ func (a *App) GetConversation(threadID, folderID string) (*message.Conversation,
 
 	if conv != nil && conv.Messages != nil {
 		for i, m := range conv.Messages {
+			attachChatText(m)
 			log.Debug().
 				Int("index", i).
 				Str("messageID", m.ID).

@@ -101,6 +101,41 @@ export const LIST_MOVE_TO = (e: KeyboardEvent): boolean =>
 export const LIST_COPY_TO = (e: KeyboardEvent): boolean =>
   altOnly(e) && e.key === 'c'
 
+// Chat mail triage (mail section only). Shifted symbols ('#', '/') ignore
+// Shift because keyboard layouts differ on whether it is needed.
+function plainKey(e: KeyboardEvent): boolean {
+  return !e.ctrlKey && !e.metaKey && !e.altKey
+}
+
+// R / Shift+R — focus the docked composer (reply / reply all)
+export const CHAT_REPLY = (e: KeyboardEvent): boolean =>
+  plainKey(e) && (e.key === 'r' || e.key === 'R')
+
+// E — Done (archive the chat, then advance)
+export const CHAT_DONE = (e: KeyboardEvent): boolean => e.key === 'e' && noMods(e)
+
+// Shift+U — mark the chat unread
+export const CHAT_UNREAD = (e: KeyboardEvent): boolean =>
+  plainKey(e) && e.shiftKey && (e.key === 'U' || e.key === 'u')
+
+// P — pin / unpin
+export const CHAT_PIN = (e: KeyboardEvent): boolean => e.key === 'p' && noMods(e)
+
+// H — snooze picker
+export const CHAT_SNOOZE = (e: KeyboardEvent): boolean => e.key === 'h' && noMods(e)
+
+// L — move the sender to Low priority / back to Priority
+export const CHAT_LOW_PRIORITY = (e: KeyboardEvent): boolean => e.key === 'l' && noMods(e)
+
+// # — delete the chat
+export const CHAT_DELETE = (e: KeyboardEvent): boolean => plainKey(e) && e.key === '#'
+
+// V — move the chat to a folder (replaces the classic list's V = open)
+export const CHAT_MOVE = (e: KeyboardEvent): boolean => e.key === 'v' && noMods(e)
+
+// / — focus chat search
+export const CHAT_SEARCH = (e: KeyboardEvent): boolean => plainKey(e) && e.key === '/'
+
 // Convenience: namespace export for predicates that the kit imports as a group.
 export const KEY = {
   LIST_NEXT,
@@ -123,6 +158,15 @@ export const KEY = {
   SIDEBAR_TOGGLE,
   LIST_MOVE_TO,
   LIST_COPY_TO,
+  CHAT_REPLY,
+  CHAT_DONE,
+  CHAT_UNREAD,
+  CHAT_PIN,
+  CHAT_SNOOZE,
+  CHAT_LOW_PRIORITY,
+  CHAT_DELETE,
+  CHAT_MOVE,
+  CHAT_SEARCH,
 }
 
 // matchesAny is a small helper for cases where several predicates should be

@@ -75,6 +75,13 @@ type Message struct {
 
 	// Timestamps
 	ReceivedAt time.Time `json:"receivedAt"`
+
+	// Bulk-mail classification from list/auto headers; nil = not classified.
+	// Upserts keep the stored value when this is nil.
+	IsBulk *bool `json:"-"`
+
+	// Chat view text; computed on read by the conversation binding, never persisted
+	Chat *ChatText `json:"chat,omitempty"`
 }
 
 // Address represents an email address

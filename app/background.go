@@ -9,6 +9,7 @@ import (
 	"github.com/hkdb/aerion/internal/folder"
 	"github.com/hkdb/aerion/internal/imap"
 	"github.com/hkdb/aerion/internal/logging"
+	"github.com/hkdb/aerion/internal/message"
 	"github.com/hkdb/aerion/internal/notification"
 	"github.com/hkdb/aerion/internal/platform"
 	"github.com/hkdb/aerion/internal/sync"
@@ -568,24 +569,51 @@ func (a *App) handleNewMailNotification(info sync.NewMailInfo) {
 	// Get the most recent conversation for the notification
 	var subject, fromName, fromEmail, threadID string
 
-	inbox, err := a.folderStore.GetByType(info.AccountID, folder.TypeInbox)
-	if err == nil && inbox != nil {
-		// Get the most recent conversation (sorted by newest first)
-		conversations, err := a.messageStore.ListConversationsByFolder(info.FolderID, 0, 1, "newest", "")
-		if err == nil && len(conversations) > 0 {
-			conv := conversations[0]
-			subject = conv.Subject
-			threadID = conv.ThreadID
-			// Get sender info from participants
-			if len(conv.Participants) > 0 {
-				fromName = conv.Participants[0].Name
-				fromEmail = conv.Participants[0].Email
-			}
-		}
+	onlyPriority, err := a.settingsStore.GetChatNotifyPriorityOnly()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to read notify-priority-only setting")
+	}
+	newest, err := a.messageStore.ListNewestMail(info.FolderID, info.Count)
+	if err != nil {
+		// With onlyPriority this fails closed: unclassified mail stays quiet.
+		log.Warn().Err(err).Msg("Failed to load new mail for notification")
+	}
+	count, latest := pickNotifyMail(newest, info.Count, onlyPriority)
+	if count == 0 {
+		log.Debug().Msg("New mail is all low priority, notification skipped")
+		return
+	}
+	info.Count = count
+	if latest != nil {
+		subject, fromName, fromEmail, threadID = latest.Subject, latest.FromName, latest.FromEmail, latest.ThreadID
 	}
 
 	// Send system notification
 	a.sendSystemNotification(info, subject, fromName, fromEmail, threadID)
+}
+
+// pickNotifyMail returns how many new messages to announce and the newest of
+// them. With onlyPriority, low-priority mail is left out; otherwise every new
+// message counts, as reported by sync (newest may hold fewer rows).
+func pickNotifyMail(newest []message.NewMail, count int, onlyPriority bool) (int, *message.NewMail) {
+	if !onlyPriority {
+		if len(newest) == 0 {
+			return count, nil
+		}
+		return count, &newest[0]
+	}
+	var latest *message.NewMail
+	n := 0
+	for i := range newest {
+		if newest[i].IsLow {
+			continue
+		}
+		if latest == nil {
+			latest = &newest[i]
+		}
+		n++
+	}
+	return n, latest
 }
 
 // sendSystemNotification sends a desktop notification for new mail
@@ -821,6 +849,9 @@ func (a *App) handleSystemSleep() {
 // Waits for network via the network monitor, then syncs all accounts and restarts IDLE
 func (a *App) handleSystemWake() {
 	log := logging.WithComponent("app.sleep-wake")
+
+	// Timers pause during sleep; wake snoozes that came due meanwhile.
+	a.armSnoozeTimer(time.Second)
 	log.Info().Msg("System woke from sleep - waiting for network...")
 
 	// NOTE: We intentionally do NOT call Invalidate() or CloseAll() here.

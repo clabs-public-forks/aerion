@@ -69,6 +69,11 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
   every load). Never open the
   composer, which could save a draft to the user's account, and avoid opening
   real messages, which marks them read.
+- **Sync fails with `unauthorized_client`.** The account's refresh token was
+  issued to a different OAuth client than the one in `.env`/`.env.local`.
+  Only the owner can fix it, by clicking **Re-authorize** on the account in
+  Settings → Accounts (see `CONTRIBUTING.md`). Check first with
+  `await window.go.app.App.TestOAuthConnection(id)`.
 - **Fake data instead of real data.** Bindings are looked up on
   `window.go.app.App` at call time, so a page script can replace one (for
   example a calendar or contacts list call) to return made-up records. While
@@ -80,10 +85,12 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
   and reload the page to undo it. To check a mail layout without opening a
   message, add a copy of the markup to the page and measure it.
 - **Layout modes come from `matchMedia` on the viewport**: narrow below 768px,
-  medium up to 1024px, otherwise full. The `resize_window` tool has no effect
-  under the user's window manager. To change modes, ask the user to resize or
-  maximize the Chrome window that holds Claude's tab group (it may be minimized
-  or behind other windows), then check `innerWidth`. To test a narrow layout
+  medium up to 1024px, otherwise full. The owner allows resizing the Chrome
+  window yourself. `resize_window` has had no effect under the user's window
+  manager, so try it, check `innerWidth`, and if it didn't change, try another
+  way (for example a new window opened at the size you need). Ask the user to
+  resize the window holding Claude's tab group only as a last resort (it may
+  be minimized or behind other windows). To test a narrow layout
   without a resize, set a narrower width on the pane's element from
   `javascript_tool`. That checks how the pane's own content wraps, but it
   doesn't switch the app into its narrow layout mode.
@@ -93,6 +100,14 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
   `javascript_tool` (it hangs), and treat pauses seen only there as the
   background tab, not the app. Retry a timed-out screenshot after a few
   seconds, or measure with `getBoundingClientRect()` instead.
+  A closed bits-ui dialog also stays mounted there (`data-state=closed`),
+  because its exit animation waits on a frame. The dialog guard stays on and
+  swallows keyboard shortcuts, so reload the page (and reinstall any binding
+  fakes) after closing a dialog.
+- **Stores can be driven from the page.** `await import('/src/lib/stores/settings.svelte.ts')`
+  returns the app's own module instance, so its setters (for example
+  `setChatAutoAdvance`) change the running app. They also save the setting, so
+  call them only while non-read bindings are blocked.
 - **Clicks use the screenshot's coordinate frame**, which is reported with every
   screenshot (e.g. 1568×778 for a 2560px-wide viewport), not CSS pixels. In that
   frame, the rail buttons are at about x=15, y=42 / 70 / 100.

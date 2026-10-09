@@ -5,9 +5,9 @@
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs path
-  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerMode, SetComposerMode, GetMailtoMode, SetMailtoMode, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetDarkComposerBody, SetDarkComposerBody, GetAccentBarUnread, SetAccentBarUnread, GetAccentUnreadStyle, SetAccentUnreadStyle, GetShowMessageListCircles, SetShowMessageListCircles, GetShowMessageListProfilePics, SetShowMessageListProfilePics, GetAlwaysShowMessageCheckbox, SetAlwaysShowMessageCheckbox, GetShowMessagePreview, SetShowMessagePreview, GetShowViewerCircles, SetShowViewerCircles, GetSpellcheckEnabled, SetSpellcheckEnabled, GetSpellcheckLanguages, SetSpellcheckLanguages, QuitApp } from '../../../../wailsjs/go/app/App.js'
+  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerMode, SetComposerMode, GetMailtoMode, SetMailtoMode, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetDarkComposerBody, SetDarkComposerBody, GetAccentBarUnread, SetAccentBarUnread, GetAccentUnreadStyle, SetAccentUnreadStyle, GetShowMessageListCircles, SetShowMessageListCircles, GetShowMessageListProfilePics, SetShowMessageListProfilePics, GetAlwaysShowMessageCheckbox, SetAlwaysShowMessageCheckbox, GetShowMessagePreview, SetShowMessagePreview, GetShowViewerCircles, SetShowViewerCircles, GetSpellcheckEnabled, SetSpellcheckEnabled, GetSpellcheckLanguages, SetSpellcheckLanguages, GetChatSendKey, SetChatSendKey, GetChatIncludeQuote, SetChatIncludeQuote, GetChatAutoAdvance, SetChatAutoAdvance, GetChatNotifyPriorityOnly, SetChatNotifyPriorityOnly, GetChatShowLowGroup, SetChatShowLowGroup, QuitApp } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
-  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerMode as updateComposerModeStore, setMailtoMode as updateMailtoModeStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setDarkComposerBody as updateDarkComposerBodyStore, setAccentBarUnread as updateAccentBarUnreadStore, setAccentUnreadStyle as updateAccentUnreadStyleStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowMessageListProfilePics as updateShowMessageListProfilePicsStore, setAlwaysShowMessageCheckbox as updateAlwaysShowMessageCheckboxStore, setShowMessagePreview as updateShowMessagePreviewStore, setShowViewerCircles as updateShowViewerCirclesStore, setSpellcheckEnabled as updateSpellcheckEnabledStore, setSpellcheckLanguages as updateSpellcheckLanguagesStore, type MessageListDensity, type ThemeMode, type ComposerMode, type ComposerFormat } from '$lib/stores/settings.svelte'
+  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerMode as updateComposerModeStore, setMailtoMode as updateMailtoModeStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setDarkComposerBody as updateDarkComposerBodyStore, setAccentBarUnread as updateAccentBarUnreadStore, setAccentUnreadStyle as updateAccentUnreadStyleStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowMessageListProfilePics as updateShowMessageListProfilePicsStore, setAlwaysShowMessageCheckbox as updateAlwaysShowMessageCheckboxStore, setShowMessagePreview as updateShowMessagePreviewStore, setShowViewerCircles as updateShowViewerCirclesStore, setSpellcheckEnabled as updateSpellcheckEnabledStore, setSpellcheckLanguages as updateSpellcheckLanguagesStore, setChatSendKey as updateChatSendKeyStore, setChatAutoAdvance as updateChatAutoAdvanceStore, setChatShowLowGroup as updateChatShowLowGroupStore, type ChatSendKey, type ChatAutoAdvance, type MessageListDensity, type ThemeMode, type ComposerMode, type ComposerFormat } from '$lib/stores/settings.svelte'
   import { syncSpellcheckLanguagesIfActive, defaultSpellcheckLanguages } from '$lib/spellcheck/settings'
   import { applyThemeFromMode } from '$lib/stores/theme.svelte'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
@@ -16,6 +16,7 @@
   import GeneralTab from './GeneralTab.svelte'
   import ComposerTab from './ComposerTab.svelte'
   import ImagesTab from './ImagesTab.svelte'
+  import ChatTab from './ChatTab.svelte'
   import AccountsTab from './AccountsTab.svelte'
   import ContactsTab from './ContactsTab.svelte'
   import ExtensionsTab from './ExtensionsTab.svelte'
@@ -59,6 +60,11 @@
   let alwaysShowMessageCheckbox = $state<boolean>(false)
   let showMessagePreview = $state<boolean>(false)
   let showViewerCircles = $state<boolean>(true)
+  let chatSendKey = $state<string>('enter')
+  let chatIncludeQuote = $state<boolean>(true)
+  let chatAutoAdvance = $state<string>('next')
+  let chatNotifyPriorityOnly = $state<boolean>(true)
+  let chatShowLowGroup = $state<boolean>(true)
   let originalNativeTitleBar = false
   // Snapshot of the saved theme at dialog open time. Used to revert live preview
   // if the dialog closes without Save (Cancel / ESC / click-outside).
@@ -110,7 +116,7 @@
     loading = true
     hasSaved = false
     try {
-      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, comp, mail, compFmt, nativeTB, alwaysImages, darkMail, darkComposer, accentBar, accentStyle, listCircles, listProfilePics, alwaysCheckbox, messagePreview, viewerCircles, scEnabled, scLangs] = await Promise.all([
+      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, comp, mail, compFmt, nativeTB, alwaysImages, darkMail, darkComposer, accentBar, accentStyle, listCircles, listProfilePics, alwaysCheckbox, messagePreview, viewerCircles, scEnabled, scLangs, sendKey, includeQuote, autoAdvance, notifyPriority, showLow] = await Promise.all([
         GetReadReceiptResponsePolicy(),
         GetMarkAsReadDelay(),
         GetMessageListDensity(),
@@ -136,6 +142,11 @@
         GetShowViewerCircles(),
         GetSpellcheckEnabled(),
         GetSpellcheckLanguages(),
+        GetChatSendKey(),
+        GetChatIncludeQuote(),
+        GetChatAutoAdvance(),
+        GetChatNotifyPriorityOnly(),
+        GetChatShowLowGroup(),
       ])
       readReceiptResponsePolicy = policy
       // Convert ms to seconds for display
@@ -165,6 +176,11 @@
       alwaysShowMessageCheckbox = alwaysCheckbox ?? false
       showMessagePreview = messagePreview ?? false
       showViewerCircles = viewerCircles ?? true
+      chatSendKey = sendKey || 'enter'
+      chatIncludeQuote = includeQuote ?? true
+      chatAutoAdvance = autoAdvance || 'next'
+      chatNotifyPriorityOnly = notifyPriority ?? true
+      chatShowLowGroup = showLow ?? true
       originalNativeTitleBar = nativeTitleBar
     } catch (err) {
       console.error('Failed to load settings:', err)
@@ -207,6 +223,11 @@
       await SetAlwaysShowMessageCheckbox(alwaysShowMessageCheckbox)
       await SetShowMessagePreview(showMessagePreview)
       await SetShowViewerCircles(showViewerCircles)
+      await SetChatSendKey(chatSendKey)
+      await SetChatIncludeQuote(chatIncludeQuote)
+      await SetChatAutoAdvance(chatAutoAdvance)
+      await SetChatNotifyPriorityOnly(chatNotifyPriorityOnly)
+      await SetChatShowLowGroup(chatShowLowGroup)
       // Update the reactive stores so UI updates immediately
       updateDensityStore(messageListDensity as MessageListDensity)
       updateThemeStore(themeMode as ThemeMode)
@@ -234,6 +255,9 @@
       updateAlwaysShowMessageCheckboxStore(alwaysShowMessageCheckbox)
       updateShowMessagePreviewStore(showMessagePreview)
       updateShowViewerCirclesStore(showViewerCircles)
+      updateChatSendKeyStore(chatSendKey as ChatSendKey)
+      updateChatAutoAdvanceStore(chatAutoAdvance as ChatAutoAdvance)
+      updateChatShowLowGroupStore(chatShowLowGroup)
       addToast({
         type: 'success',
         message: $_('toast.settingsSaved'),
@@ -295,7 +319,7 @@
       </div>
     {:else}
       <Tabs.Root bind:value={activeTab} class="w-full">
-        <Tabs.List class="grid w-full grid-cols-7">
+        <Tabs.List class="grid w-full grid-cols-8">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:settings-2" width="16" height="16" /></span>
             {$_('settings.general')}
@@ -303,6 +327,10 @@
           <Tabs.Trigger value="composer" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:square-pen" width="46" height="46" /></span>
             {$_('settings.composer')}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="chat" class="flex items-center gap-2">
+            <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:messages-square" width="16" height="16" /></span>
+            {$_('settings.chat')}
           </Tabs.Trigger>
           <Tabs.Trigger value="images" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:image" width="16" height="16" /></span>
@@ -375,6 +403,16 @@
             />
           </Tabs.Content>
 
+          <Tabs.Content value="chat" class="mt-0">
+            <ChatTab
+              bind:sendKey={chatSendKey}
+              bind:includeQuote={chatIncludeQuote}
+              bind:autoAdvance={chatAutoAdvance}
+              bind:notifyPriorityOnly={chatNotifyPriorityOnly}
+              bind:showLowGroup={chatShowLowGroup}
+            />
+          </Tabs.Content>
+
           <Tabs.Content value="images" class="mt-0">
             <ImagesTab
               bind:alwaysLoadImages
@@ -400,8 +438,8 @@
         </div>
       </Tabs.Root>
 
-      <!-- Actions - show Save/Cancel on General and Composer tabs -->
-      {#if activeTab === 'general' || activeTab === 'composer' || activeTab === 'images'}
+      <!-- Actions - show Save/Cancel on the tabs with dialog-saved settings -->
+      {#if ['general', 'composer', 'chat', 'images'].includes(activeTab)}
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
           <Button variant="ghost" onclick={handleCancel} disabled={saving}>
             {$_('common.cancel')}

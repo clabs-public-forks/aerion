@@ -6,8 +6,9 @@
   import TitleBar from './lib/components/common/TitleBar.svelte'
   import Sidebar from './lib/components/sidebar/Sidebar.svelte'
   import PaneResizeHandle from '$lib/components/kit/PaneResizeHandle.svelte'
-  import MessageList from './lib/components/list/MessageList.svelte'
-  import ConversationViewer from './lib/components/viewer/ConversationViewer.svelte'
+  import ChatList from './lib/components/chat/ChatList.svelte'
+  import { flushChatComposers } from '$lib/components/chat/chatComposer.svelte'
+  import ChatView from './lib/components/chat/ChatView.svelte'
   import Composer from './lib/components/composer/Composer.svelte'
   import ToastContainer from './lib/components/ui/toast/ToastContainer.svelte'
   import SpellSuggestionMenu from './lib/spellcheck/SpellSuggestionMenu.svelte'
@@ -44,7 +45,7 @@
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive, isSidebarHidden, toggleActiveSidebar } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled, GetLastSeenVersion, SetLastSeenVersion, GetAppInfo } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled, GetLastSeenVersion, SetLastSeenVersion, GetAppInfo, ChatDraftsFlushed } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -57,8 +58,8 @@
   // context — they're only used inside event handlers. Making them $state
   // added bookkeeping cost (visible in idle-CPU profiling) without any benefit.
   let sidebarRef: Sidebar | null = null
-  let messageListRef: MessageList | null = null
-  let viewerRef: ConversationViewer | null = null
+  let messageListRef: ChatList | null = null
+  let viewerRef: ChatView | null = null
   let messageListContainerRef: HTMLElement | null = null
 
   // React to theme mode changes from settings store
@@ -108,16 +109,6 @@
     }
     focusMode = 'thread'
     focusedMessageIdInFocus = null
-  }
-
-  function toggleMessageFocus(messageId: string) {
-    if (focusMode === 'message' && focusedMessageIdInFocus === messageId) {
-      focusMode = 'off'
-      focusedMessageIdInFocus = null
-      return
-    }
-    focusMode = 'message'
-    focusedMessageIdInFocus = messageId
   }
 
   // Auto-reset focus mode when the conversation changes (or is closed).
@@ -350,6 +341,8 @@
     // Listen for shutdown event from backend (triggered by OS close signal)
     EventsOn('app:shutting-down', () => {
       isShuttingDown = true
+      // Save chat composer text before the backend quits; it waits for this.
+      void flushChatComposers().finally(() => ChatDraftsFlushed())
     })
 
     // Listen for untrusted certificate events from background sync
@@ -683,6 +676,17 @@
         message: $_('composer.failedToLoadDraft'),
       })
     }
+  }
+
+  // Open a chat draft handed over by the docked chat composer's Expand
+  function handleExpandChatDraft(draftId: string) {
+    const accountId = resolveAccountId(selectedConversationAccountId) || resolveAccountId(selectedAccountId)
+    if (!accountId) return
+    if (getComposerMode() === 'detached' || focusMode !== 'off') {
+      OpenComposerWindow(accountId, '', '', draftId, '')
+      return
+    }
+    void handleEditDraft(draftId)
   }
 
   // Handle compose to a specific email address (from mailto: links in emails)
@@ -1026,15 +1030,8 @@
           return
         case 'u':
           e.preventDefault()
-          if (messageListRef?.hasCheckedMessages()) {
-            const messageIds = messageListRef.getCheckedMessageIds()
-            if (e.shiftKey) {
-              handleBulkMarkUnread(messageIds)
-            } else {
-              handleBulkMarkRead(messageIds)
-            }
-          } else {
-            // Mark the keyboard-focused message as read/unread
+          {
+            // Mark the keyboard-focused chat as read/unread
             const focusedIds = messageListRef?.getSelectedMessageIds() ?? []
             if (focusedIds.length > 0) {
               if (e.shiftKey) {
@@ -1047,10 +1044,8 @@
           return
         case 'k':
           e.preventDefault()
-          if (messageListRef?.hasCheckedMessages()) {
-            handleBulkArchive(messageListRef.getCheckedMessageIds())
-          } else {
-            // Archive the keyboard-focused message
+          {
+            // Archive the keyboard-focused chat
             const focusedIds = messageListRef?.getSelectedMessageIds() ?? []
             if (focusedIds.length > 0) {
               handleBulkArchive(focusedIds)
@@ -1059,10 +1054,8 @@
           return
         case 'j':
           e.preventDefault()
-          if (messageListRef?.hasCheckedMessages()) {
-            handleBulkSpam(messageListRef.getCheckedMessageIds())
-          } else {
-            // Spam the keyboard-focused message
+          {
+            // Spam the keyboard-focused chat
             const focusedIds = messageListRef?.getSelectedMessageIds() ?? []
             if (focusedIds.length > 0) {
               handleBulkSpam(focusedIds)
@@ -1252,11 +1245,13 @@
         hideSidebar()
         return
       }
-      if (messageListRef?.hasCheckedMessages()) {
-        // First: clear checkboxes
-        messageListRef.clearChecked()
-      } else if (selectedThreadId) {
-        // Second: close conversation viewer
+      // In the open chat: back to the chat list, keeping the chat open.
+      if (focusedPane === 'viewer' && selectedThreadId) {
+        messageListRef?.focusList()
+        return
+      }
+      if (selectedThreadId) {
+        // Close the open chat
         selectedThreadId = null
         selectedConversationFolderId = null
         selectedConversationAccountId = null
@@ -1277,13 +1272,11 @@
       if (focusedPane === 'sidebar') {
         sidebarRef?.selectPreviousFolder()
       } else if (focusedPane === 'messageList') {
-        if (e.shiftKey) {
-          messageListRef?.selectPreviousWithCheck()
-        } else {
-          messageListRef?.selectPrevious()
-        }
+        messageListRef?.selectPrevious(opensOnMove())
       } else if (focusedPane === 'viewer') {
-        viewerRef?.scrollUp()
+        // K moves to the previous chat; the arrow scrolls the open one.
+        if (e.key === 'ArrowUp') viewerRef?.scrollUp()
+        else messageListRef?.selectPrevious(true)
       }
       return
     }
@@ -1293,13 +1286,10 @@
       if (focusedPane === 'sidebar') {
         sidebarRef?.selectNextFolder()
       } else if (focusedPane === 'messageList') {
-        if (e.shiftKey) {
-          messageListRef?.selectNextWithCheck()
-        } else {
-          messageListRef?.selectNext()
-        }
+        messageListRef?.selectNext(opensOnMove())
       } else if (focusedPane === 'viewer') {
-        viewerRef?.scrollDown()
+        if (e.key === 'ArrowDown') viewerRef?.scrollDown()
+        else messageListRef?.selectNext(true)
       }
       return
     }
@@ -1329,9 +1319,14 @@
         } else if (focusedPane === 'sidebar' && sidebarRef?.hasSelectedFolderWithChildren()) {
           e.preventDefault()
           sidebarRef.toggleSelectedFolderCollapse()
-        } else if (focusedPane === 'messageList') {
+        } else if (focusedPane === 'messageList' && messageListRef?.hasSelection()) {
+          // Open the chat and start a reply.
           e.preventDefault()
-          messageListRef?.openSelected()
+          messageListRef.openSelected()
+          viewerRef?.focusComposer()
+        } else if (focusedPane === 'viewer' && selectedThreadId) {
+          e.preventDefault()
+          viewerRef?.focusComposer()
         }
         return
       case ' ':  // Space - toggle checkbox on focused message, or expand/collapse account
@@ -1351,8 +1346,6 @@
           sidebarRef.toggleFocusedAccount()
         } else if (focusedPane === 'sidebar' && sidebarRef?.hasSelectedFolderWithChildren()) {
           sidebarRef.toggleSelectedFolderCollapse()
-        } else if (focusedPane === 'messageList') {
-          messageListRef?.toggleCheck()
         }
         return
     }
@@ -1374,23 +1367,17 @@
       return
     }
 
-    // V — open the keyboard-focused conversation in the viewer (alias of
-    // Enter; shared predicate — kit list panes consume KEY.LIST_VIEW locally)
-    if (KEY.LIST_VIEW(e)) {
-      if (focusedPane === 'messageList') {
-        e.preventDefault()
-        messageListRef?.openSelected()
-      }
+    // Chat triage keys (V here is Move, not the kit lists' V = open).
+    if (isMailActive() && handleChatKey(e, hasConversation)) {
+      e.preventDefault()
       return
     }
 
     // Single-key shortcuts
     switch (e.key) {
       case 's':
-        if (messageListRef?.hasCheckedMessages()) {
-          handleBulkToggleStar(messageListRef.getCheckedMessageIds(), messageListRef.getCheckedHasUnstarred())
-        } else {
-          // Toggle star on the keyboard-focused message
+        {
+          // Toggle star on the keyboard-focused chat
           const focusedIds = messageListRef?.getSelectedMessageIds() ?? []
           if (focusedIds.length > 0) {
             const isStarred = messageListRef?.isSelectedStarred() ?? false
@@ -1433,10 +1420,6 @@
           viewerRef.trash()
           return
         }
-        if (messageListRef?.hasCheckedMessages()) {
-          messageListRef.requestDelete(messageListRef.getCheckedMessageIds(), e.shiftKey)
-          return
-        }
         const focusedMessageIds = messageListRef?.getSelectedMessageIds() ?? []
         if (focusedMessageIds.length > 0) {
           messageListRef?.requestDelete(focusedMessageIds, e.shiftKey)
@@ -1444,6 +1427,48 @@
         return
       }
     }
+  }
+
+  // Chat list J/K opens each chat as it is selected, except in the narrow
+  // layout, where opening would cover the list.
+  function opensOnMove(): boolean {
+    return getLayoutMode() !== 'narrow'
+  }
+
+  // handleChatKey runs the chat triage shortcuts. They act on the chat
+  // selected in the list (the open one, after J/K or a click), falling back
+  // to the open chat. Returns whether the key was handled.
+  function handleChatKey(e: KeyboardEvent, hasConversation: boolean): boolean {
+    const list = messageListRef
+    const hasSelection = !!list?.hasSelection()
+    if (KEY.CHAT_REPLY(e)) {
+      if (!hasConversation) return false
+      viewerRef?.focusComposer(e.shiftKey)
+      return true
+    }
+    if (KEY.CHAT_SEARCH(e)) {
+      list?.toggleSearchFocus()
+      setFocusedPane('messageList')
+      return true
+    }
+    if (KEY.CHAT_DONE(e)) {
+      if (hasSelection) list!.doneSelected()
+      else if (hasConversation) viewerRef?.archive()
+      return hasSelection || hasConversation
+    }
+    if (KEY.CHAT_SNOOZE(e)) {
+      if (hasSelection) list!.openSnoozeForSelected()
+      else if (hasConversation) viewerRef?.openSnooze()
+      return hasSelection || hasConversation
+    }
+    if (!hasSelection) return false
+    if (KEY.CHAT_UNREAD(e)) list!.markSelectedUnread()
+    else if (KEY.CHAT_PIN(e)) list!.pinSelected()
+    else if (KEY.CHAT_LOW_PRIORITY(e)) list!.toggleSelectedSenderLow()
+    else if (KEY.CHAT_DELETE(e)) list!.requestDelete(list!.getSelectedMessageIds())
+    else if (KEY.CHAT_MOVE(e)) list!.toggleMoveToDialog()
+    else return false
+    return true
   }
 
   // Get the last message ID from the current conversation (for reply/forward)
@@ -1461,7 +1486,6 @@
     try {
       await Archive(messageIds)
       addToast({ type: 'success', message: $_('toast.archived'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
-      messageListRef?.clearChecked()
       messageListRef?.handleActionComplete(true)
     } catch (err) {
       console.error('Archive failed:', err)
@@ -1483,7 +1507,6 @@
         addToast({ type: 'success', message: $_('toast.markedAsSpam'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
       }
 
-      messageListRef?.clearChecked()
       messageListRef?.handleActionComplete(true)
     } catch (err) {
       const isSpamFolder = selectedFolderType === 'spam'
@@ -1496,7 +1519,6 @@
     try {
       await MarkAsRead(messageIds)
       addToast({ type: 'success', message: $_('toast.markedAsRead') })
-      messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
       console.error('Mark as read failed:', err)
@@ -1508,7 +1530,6 @@
     try {
       await MarkAsUnread(messageIds)
       addToast({ type: 'success', message: $_('toast.markedAsUnread') })
-      messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
       console.error('Mark as unread failed:', err)
@@ -1525,7 +1546,6 @@
         await Unstar(messageIds)
         addToast({ type: 'success', message: $_('toast.starRemoved') })
       }
-      messageListRef?.clearChecked()
       messageListRef?.handleActionComplete()
     } catch (err) {
       console.error('Star toggle failed:', err)
@@ -1617,7 +1637,7 @@
       />
     {/if}
 
-    <!-- Message List -->
+    <!-- Chat List -->
     <section
       bind:this={messageListContainerRef}
       class="{isResponsive() ? 'flex-1 min-w-0' : 'pane-list-resizable'} border-r border-border bg-background"
@@ -1627,7 +1647,7 @@
       tabindex="-1"
       onclick={() => handlePaneClick('messageList')}
     >
-      <MessageList
+      <ChatList
         bind:this={messageListRef}
         accountId={selectedAccountId}
         folderId={selectedFolderId}
@@ -1637,6 +1657,8 @@
         onReply={handleReply}
         onRowActionComplete={() => viewerRef?.refreshFlags()}
         onCompose={viewerIsOverlay ? handleCompose : undefined}
+        onUnifiedInboxSelect={handleUnifiedInboxSelect}
+        onFolderSelect={handleFolderSelect}
         isFocused={getFocusedPane() === 'messageList'}
         isFlashing={isPaneFlashing('messageList')}
       />
@@ -1660,7 +1682,7 @@
       data-pane="viewer"
       onclick={() => handlePaneClick('viewer')}
     >
-      <ConversationViewer
+      <ChatView
         bind:this={viewerRef}
         threadId={selectedThreadId}
         folderId={selectedConversationFolderId}
@@ -1670,16 +1692,17 @@
         onCompose={handleCompose}
         onComposeToAddress={handleComposeToAddress}
         onEditDraft={handleEditDraft}
+        onExpandDraft={handleExpandChatDraft}
         onActionComplete={(autoSelectNext) => messageListRef?.handleActionComplete(autoSelectNext)}
         isFocused={getFocusedPane() === 'viewer'}
         isFlashing={isPaneFlashing('viewer')}
         showBackButton={isResponsive()}
         onBack={() => { focusMode = 'off'; focusedMessageIdInFocus = null; hideViewer() }}
-        inFocusMode={focusMode !== 'off'}
-        focusModeKind={focusMode === 'off' ? null : focusMode}
-        focusedMessageIdInFocus={focusedMessageIdInFocus}
-        onToggleThreadFocus={toggleThreadFocus}
-        onToggleMessageFocus={toggleMessageFocus}
+        onEscape={() => {
+          if (isResponsive() && getResponsiveView() === 'viewer') hideViewer()
+          messageListRef?.focusList()
+        }}
+        focusedMessageIdInFocus={focusMode === 'message' ? focusedMessageIdInFocus : null}
       />
     </main>
     </div>

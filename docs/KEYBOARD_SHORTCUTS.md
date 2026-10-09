@@ -70,32 +70,48 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 | `Alt + Enter` / `Space` | Expand/collapse account (when account header is focused) |
 | `Alt(L) + Alt(R)` | Brings up context menu for the focused folder |
 
-### Message List
+### Chat List
 
 | Shortcut | Action |
 |----------|--------|
-| `Up` / `K` | Select previous conversation |
-| `Down` / `J` | Select next conversation |
-| `G` (lowercase) | Select + scroll to first conversation |
-| `Shift+G` | Select + scroll to last loaded conversation (does not auto-load more) |
-| `Shift+Up` / `Shift+K` | Select previous + toggle checkbox |
-| `Shift+Down` / `Shift+J` | Select next + toggle checkbox |
-| `Space` | Toggle checkbox on current conversation |
-| `Enter` / `V` | Open selected conversation in viewer |
-| `D` | Delete selected/checked message(s) — move to Trash (same as `Delete`) |
-| `CTRL+A` | Select all messages in folder |
-| `Alt+M` | Toggle "Move to folder" dialog for the focused message |
-| `Alt+C` | Toggle "Copy to folder" dialog for the focused message |
-| `Alt(R)` | Brings up context menu for the selected message(s) |
+| `Up` / `K` | Previous chat (opens it, except in the narrow layout) |
+| `Down` / `J` | Next chat (opens it, except in the narrow layout) |
+| `G` (lowercase) | Select + scroll to first chat |
+| `Shift+G` | Select + scroll to last loaded chat (does not auto-load more) |
+| `Enter` | Open the selected chat and focus the reply box |
+| `D` | Delete the selected chat — move to Trash (same as `Delete`) |
+| `Alt+M` | Toggle "Move to folder" dialog for the selected chat |
+| `Alt+C` | Toggle "Copy to folder" dialog for the selected chat |
+| `Alt(R)` | Brings up context menu for the selected chat |
 
-`G` / `Shift+G` / `V` also work in extension list panes (e.g., Contacts list, Calendar agenda).
+`G` / `Shift+G` / `V` (open) also work in extension list panes (e.g., Contacts list, Calendar agenda). In the chat list, `V` is Move (see Chat Triage).
 
-### Conversation Viewer
+### Chat Triage
+
+These act on the selected chat (the open one after `J`/`K` or a click) from the chat list or the open chat, and never fire while typing in the reply box.
 
 | Shortcut | Action |
 |----------|--------|
-| `Up` / `K` | Scroll up |
-| `Down` / `J` | Scroll down |
+| `R` / `Enter` (open chat) | Focus the reply box |
+| `Shift+R` | Focus the reply box as Reply All |
+| `E` | Done: archive the chat and open the next one, or the previous one per Settings → Chat (undoable) |
+| `Shift+U` | Mark the chat unread |
+| `P` | Pin / unpin (undoable) |
+| `H` | Snooze picker: Later today, Tomorrow, This weekend, Next week, Pick date (undoable) |
+| `L` | Move the sender to Low priority, or back to Priority (Undo clears the override) |
+| `#` | Delete the chat (move to Trash, undoable) |
+| `V` | Move the chat to a folder |
+| `/` | Focus chat search |
+| `Escape` | In the reply box or open chat: back to the chat list |
+
+Hovering a chat row shows Done, Pin, Snooze and Mark unread buttons; its right-click menu adds Done, Pin, Snooze, Unsnooze and the sender priority switch to the usual message actions.
+
+### Chat View
+
+| Shortcut | Action |
+|----------|--------|
+| `Up` / `Down` | Scroll |
+| `K` / `J` | Previous / next chat |
 | `Tab` | Cycle through messages when focused on conversation viewer |
 | `Delete` / `Backspace` | Delete focused message when focused on conversation viewer |
 | `Ctrl + A` | Select all text of message in viewport |
@@ -113,7 +129,7 @@ These work when not in an input field. They apply to checked messages (bulk) or 
 | `S` | Toggle star |
 | `Backspace` / `Delete` | Move to trash |
 | `Shift+Backspace` / `Shift+Delete` | Permanently delete |
-| `Escape` | Clear checkboxes (first press), close conversation (second press) |
+| `Escape` | From the open chat, back to the chat list; from the list, close the chat |
 
 ---
 

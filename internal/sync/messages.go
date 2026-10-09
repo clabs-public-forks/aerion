@@ -843,6 +843,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 			references = e.extractReferences(headerBytes)
 			m.ReadReceiptTo = e.extractDispositionNotificationTo(headerBytes)
 		}
+		m.IsBulk = bulkFlag(headerBytes, m.FromEmail)
 
 		// Store references as JSON array
 		if len(references) > 0 {

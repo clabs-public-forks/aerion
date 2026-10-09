@@ -168,3 +168,29 @@ func TestToRFC822_AttachmentsWithoutBody(t *testing.T) {
 		}
 	}
 }
+
+func TestToRFC822_MessageIDDomain(t *testing.T) {
+	tests := []struct {
+		from, want string
+	}{
+		{"sender@example.com", "@example.com>"},
+		{"no-at-sign", "@localhost>"},
+	}
+	for _, tt := range tests {
+		msg := &ComposeMessage{From: Address{Address: tt.from}, TextBody: "x"}
+		data, err := msg.ToRFC822()
+		if err != nil {
+			t.Fatalf("ToRFC822(%q) returned error: %v", tt.from, err)
+		}
+		var id string
+		for _, line := range strings.Split(string(data), "\r\n") {
+			if v, ok := strings.CutPrefix(line, "Message-ID: "); ok {
+				id = v
+				break
+			}
+		}
+		if !strings.HasPrefix(id, "<") || !strings.HasSuffix(id, tt.want) {
+			t.Errorf("from %q: Message-ID = %q, want suffix %q", tt.from, id, tt.want)
+		}
+	}
+}
