@@ -52,7 +52,7 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
 - **CM2 low** frontend: the inbox lookup (`MessageList`, `Sidebar`), the
   sync toggle and trash-with-undo exist as unshared copies in the classic
   and chat components. Consolidate them, or delete the classic copies once
-  the classic components leave the tree. Within
+  the classic components leave the tree (see Upstream independence). Within
   the chat components, trash-with-undo is shared through
   `components/chat/chatTriage.ts` (`trashMessages`,
   `deleteMessagesPermanently`).
@@ -90,6 +90,21 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
   sender's domain, and `domainFromEmail` falls back to `localhost` for an
   address without exactly one `@`. Compose validates From, so this is
   unreachable today; keep `aerion` as the fallback if that changes.
+
+### Upstream independence
+
+This fork may eventually stop tracking upstream Aerion. Until then, some code
+is kept or left untouched only to keep upstream merges clean. Record each such
+cleanup here, so it can be done once the fork is independent.
+
+- **U1** frontend: delete the unmounted classic `MessageList`,
+  `ConversationRow` and `ConversationViewer`, kept only to avoid merge
+  conflicts, along with the copies they share with the chat components
+  (CM2).
+- **U2** `internal/message/store.go`: run `gofmt`; it is left unformatted
+  because it is unmodified upstream code.
+- **U3** non-English locale files: this fork updates English only, so the
+  other locales drift. Remove them, or decide to maintain them.
 
 ### Dependencies
 
