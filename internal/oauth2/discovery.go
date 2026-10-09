@@ -89,14 +89,20 @@ func secureRedirectsOnly(req *http.Request, via []*http.Request) error {
 }
 
 func (d OIDCDiscovery) requireSecureEndpoints() error {
-	if err := RequireSecureURL(d.AuthorizationEndpoint, "authorization endpoint"); err != nil {
+	return RequireSecureEndpoints(d.AuthorizationEndpoint, d.TokenEndpoint, d.UserinfoEndpoint)
+}
+
+// RequireSecureEndpoints applies RequireSecureURL to a provider's
+// authorization and token endpoints and, when set, its userinfo endpoint.
+func RequireSecureEndpoints(authURL, tokenURL, userinfoURL string) error {
+	if err := RequireSecureURL(authURL, "authorization endpoint"); err != nil {
 		return err
 	}
-	if err := RequireSecureURL(d.TokenEndpoint, "token endpoint"); err != nil {
+	if err := RequireSecureURL(tokenURL, "token endpoint"); err != nil {
 		return err
 	}
-	if d.UserinfoEndpoint != "" {
-		return RequireSecureURL(d.UserinfoEndpoint, "userinfo endpoint")
+	if userinfoURL != "" {
+		return RequireSecureURL(userinfoURL, "userinfo endpoint")
 	}
 	return nil
 }

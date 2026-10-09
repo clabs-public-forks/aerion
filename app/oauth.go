@@ -268,16 +268,8 @@ func (a *App) StartCustomOAuthFlow(authURL, tokenURL, userinfoURL string, scopes
 	if authURL == "" || tokenURL == "" || clientID == "" {
 		return fmt.Errorf("custom OAuth requires authorization URL, token URL, and client ID")
 	}
-	if err := oauth2.RequireSecureURL(authURL, "authorization URL"); err != nil {
+	if err := oauth2.RequireSecureEndpoints(authURL, tokenURL, userinfoURL); err != nil {
 		return err
-	}
-	if err := oauth2.RequireSecureURL(tokenURL, "token URL"); err != nil {
-		return err
-	}
-	if userinfoURL != "" {
-		if err := oauth2.RequireSecureURL(userinfoURL, "userinfo URL"); err != nil {
-			return err
-		}
 	}
 
 	provider := &oauth2.ProviderConfig{
