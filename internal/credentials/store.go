@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/hkdb/aerion/internal/crypto"
+	"github.com/hkdb/aerion/internal/keylock"
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/rs/zerolog"
 	gokeyring "github.com/zalando/go-keyring"
@@ -22,8 +22,8 @@ type Store struct {
 	keyringEnabled bool
 	log            zerolog.Logger
 
-	// refreshLocks holds one *sync.Mutex per refreshKey; see LockOAuthRefresh.
-	refreshLocks sync.Map
+	// refreshLocks holds one lock per refreshKey; see LockOAuthRefresh.
+	refreshLocks keylock.Map[refreshKey]
 }
 
 // NewStore creates a new credential store

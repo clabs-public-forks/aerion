@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	goImap "github.com/emersion/go-imap/v2"
@@ -13,6 +12,7 @@ import (
 	"github.com/hkdb/aerion/internal/draft"
 	"github.com/hkdb/aerion/internal/folder"
 	"github.com/hkdb/aerion/internal/imap"
+	"github.com/hkdb/aerion/internal/keylock"
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/hkdb/aerion/internal/message"
 	"github.com/hkdb/aerion/internal/pgp"
@@ -280,22 +280,14 @@ func (ops *draftOps) deleteDraftCore(ctx context.Context, d *draft.Draft) (*fold
 	if err := ops.draftStore.Delete(d.ID); err != nil {
 		return draftsFolder, fmt.Errorf("failed to delete draft: %w", err)
 	}
-	draftSyncLocks.Delete(d.ID)
+	draftSyncLocks.Forget(d.ID)
 
 	return draftsFolder, nil
 }
 
-// draftSyncLocks holds a *sync.Mutex per draft ID so syncs of one draft
-// never overlap.
-var draftSyncLocks sync.Map
-
-// lockDraftSync locks the draft's sync mutex and returns its unlock func.
-func lockDraftSync(draftID string) func() {
-	mu, _ := draftSyncLocks.LoadOrStore(draftID, &sync.Mutex{})
-	m := mu.(*sync.Mutex)
-	m.Lock()
-	return m.Unlock
-}
+// draftSyncLocks holds a lock per draft ID so syncs of one draft never
+// overlap.
+var draftSyncLocks keylock.Map[string]
 
 // syncToIMAP syncs a draft to the IMAP server. The emitStatus callback lets each
 // caller emit events to its own Wails context. Returns the drafts folder on success
@@ -306,7 +298,7 @@ func (ops *draftOps) syncToIMAP(ctx context.Context, localDraft *draft.Draft, ms
 	// One sync per draft at a time. A cancelled sync may already be past its
 	// last cancel check, so wait for it, then re-read the draft to pick up
 	// the IMAP UID it recorded.
-	unlock := lockDraftSync(localDraft.ID)
+	unlock := draftSyncLocks.Lock(localDraft.ID)
 	defer unlock()
 	if ctx.Err() != nil {
 		return nil

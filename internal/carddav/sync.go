@@ -3,11 +3,11 @@ package carddav
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/hkdb/aerion/internal/contact"
 	"github.com/hkdb/aerion/internal/credentials"
+	"github.com/hkdb/aerion/internal/keylock"
 	"github.com/hkdb/aerion/internal/kit/davutil"
 	"github.com/hkdb/aerion/internal/logging"
 	"github.com/rs/zerolog"
@@ -53,7 +53,7 @@ type Syncer struct {
 	onSyncComplete  func(sourceID string) // optional: fired after a source syncs successfully
 	log             zerolog.Logger
 
-	sourceLocks sync.Map // source ID -> *sync.Mutex; serializes syncs of one source
+	sourceLocks keylock.Map[string] // serializes syncs of one source
 }
 
 // NewSyncer creates a new contact syncer
@@ -84,9 +84,7 @@ func (s *Syncer) SetSyncCompleteHandler(fn func(sourceID string)) {
 // SyncSource syncs contacts for a source based on its type (CardDAV, Google, Microsoft)
 // Syncs of the same source run one at a time, whichever path started them.
 func (s *Syncer) SyncSource(sourceID string) error {
-	mu, _ := s.sourceLocks.LoadOrStore(sourceID, &sync.Mutex{})
-	mu.(*sync.Mutex).Lock()
-	defer mu.(*sync.Mutex).Unlock()
+	defer s.sourceLocks.Lock(sourceID)()
 
 	s.log.Info().Str("sourceID", sourceID).Msg("Starting source sync")
 

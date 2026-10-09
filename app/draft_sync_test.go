@@ -3,9 +3,7 @@ package app
 import (
 	"context"
 	"path/filepath"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/hkdb/aerion/internal/account"
 	"github.com/hkdb/aerion/internal/database"
@@ -66,27 +64,4 @@ func TestSyncToIMAPFailureKeepsServerCopy(t *testing.T) {
 		t.Errorf("after failure: status %q uid %d folder %q emitted %d, want failed 42 %q 42",
 			stored.SyncStatus, stored.IMAPUID, stored.FolderID, emitted, inbox.ID)
 	}
-}
-
-// TestLockDraftSyncSerializes checks that syncs of one draft never overlap
-// while different drafts don't block each other.
-func TestLockDraftSyncSerializes(t *testing.T) {
-	unlockA := lockDraftSync("a")
-	unlockB := lockDraftSync("b") // a different draft is not blocked
-
-	var entered atomic.Bool
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		unlock := lockDraftSync("a")
-		entered.Store(true)
-		unlock()
-	}()
-	time.Sleep(20 * time.Millisecond)
-	if entered.Load() {
-		t.Fatal("second sync of the same draft ran while the first held the lock")
-	}
-	unlockA()
-	<-done
-	unlockB()
 }
