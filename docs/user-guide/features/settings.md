@@ -6,7 +6,7 @@ sidebar_position: 6
 
 Configure Aerion to work the way you prefer.
 
-Access settings by clicking the **gear icon** in the sidebar or navigating to the Settings view.
+Access settings by clicking the **gear icon** at the bottom of the far-left rail, below Mail and any enabled extensions (Contacts, Calendar).
 
 ## General Tab
 ---

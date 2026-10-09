@@ -5,7 +5,6 @@
   import UnifiedInboxSection from './UnifiedInboxSection.svelte'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
   import DeleteAccountDialog from '$lib/components/settings/DeleteAccountDialog.svelte'
-  import SettingsDialog from '$lib/components/settings/SettingsDialog.svelte'
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -140,7 +139,6 @@
   // Dialog state
   let showAccountDialog = $state(false)
   let showDeleteDialog = $state(false)
-  let showSettingsDialog = $state(false)
   let editingAccount = $state<account.Account | null>(null)
   let deletingAccount = $state<account.Account | null>(null)
 
@@ -621,7 +619,7 @@
     {/if}
   </div>
 
-  <!-- Footer: Sync Status + Settings. Chrome (padding/border/min-height)
+  <!-- Footer: Sync Status. Chrome (padding/border/min-height)
        lives in kit `SidebarFooter` so mail, calendar, and contacts all
        render the same strip height. Mail's progress bar overlay + 2-line
        leading content (account name + status label) pass through
@@ -655,18 +653,6 @@
         </div>
       </button>
     {/snippet}
-    {#snippet trailing()}
-      <button
-        class="p-1 hover:text-foreground hover:bg-muted rounded transition-colors relative"
-        onclick={() => showSettingsDialog = true}
-        title={$_('sidebar.settings')}
-      >
-        <Icon icon="mdi:cog" class="w-4 h-4" />
-        {#if contactSourcesStore.hasErrors}
-          <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-destructive rounded-full border border-background"></span>
-        {/if}
-      </button>
-    {/snippet}
   </SidebarFooter>
 </div>
 
@@ -688,15 +674,6 @@
   onClose={() => {
     showDeleteDialog = false
     deletingAccount = null
-    setFocusedPane('messageList')
-  }}
-/>
-
-<!-- Settings Dialog -->
-<SettingsDialog
-  bind:open={showSettingsDialog}
-  onClose={() => {
-    showSettingsDialog = false
     setFocusedPane('messageList')
   }}
 />

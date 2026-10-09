@@ -31,13 +31,6 @@ export function getRailTabs(): v1.RailTabRequest[] {
   return railTabs
 }
 
-// Rail renders when there's at least one enabled extension to switch between
-// Mail and. (Mail is always-on but not in enabledExtensions, so one enabled
-// extension = two rail items: Mail + that extension.)
-export function isRailVisible(): boolean {
-  return enabledExtensions.length >= 1
-}
-
 export function isExtensionEnabled(name: string): boolean {
   return enabledExtensions.includes(name)
 }

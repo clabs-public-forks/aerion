@@ -11,8 +11,8 @@
   // extensions) on the same vertical rhythm.
   //
   // Layout: leading on the left (flex-1, min-w-0, items-center so 1-line
-  // content centers vertically in the 52px box), trailing on the right
-  // (shrink-0). An optional overlay snippet supports mail's absolute-
+  // content centers vertically in the 52px box), optional trailing on the
+  // right (shrink-0). An optional overlay snippet supports mail's absolute-
   // positioned sync-progress bar — anchored by the wrapper's `relative`.
 
   import { type Snippet } from 'svelte'
@@ -23,7 +23,7 @@
     leading: Snippet
     /** Right-side content: cog button, sync action, etc. Wrapped in a
      *  shrink-0 row so it never gets crowded out by long leading labels. */
-    trailing: Snippet
+    trailing?: Snippet
     /** Optional absolutely-positioned overlay (top-0, h-1 progress bar
      *  for mail's sync indicator). Renders before the row content so it
      *  sits visually behind. */
@@ -43,7 +43,9 @@
   <div class="flex items-center gap-2 min-w-0 flex-1">
     {@render leading()}
   </div>
-  <div class="flex items-center gap-1 shrink-0">
-    {@render trailing()}
-  </div>
+  {#if trailing}
+    <div class="flex items-center gap-1 shrink-0">
+      {@render trailing()}
+    </div>
+  {/if}
 </div>
