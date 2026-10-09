@@ -90,6 +90,13 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
   sender's domain, and `domainFromEmail` falls back to `localhost` for an
   address without exactly one `@`. Compose validates From, so this is
   unreachable today; keep `aerion` as the fallback if that changes.
+- **CM11 low** stored `to_list`/`cc_list` rows synced before `e8e7822` can
+  hold address-less entries (`{"name":"","email":""}`) from group syntax
+  such as `To: undisclosed-recipients:;`. Sync now drops them, and
+  `parseAddressList` and the chat people/reply logic skip them, but the chat
+  bubble's To/Cc tooltip (`ChatBubble.svelte`, via `parseRecipients`) still
+  shows blank entries. A one-time migration stripping empty-email entries,
+  or a filter in `parseRecipients`, would remove them.
 
 ### Upstream independence
 
@@ -101,8 +108,11 @@ cleanup here, so it can be done once the fork is independent.
   `ConversationRow` and `ConversationViewer`, kept only to avoid merge
   conflicts, along with the copies they share with the chat components
   (CM2).
-- **U2** `internal/message/store.go`: run `gofmt`; it is left unformatted
-  because it is unmodified upstream code.
+- **U2** Go sources: `gofmt -l` lists 54 files (for example
+  `internal/message/store.go`, `app/compose.go`, `app/account.go`, and many
+  under `extensions/` and `internal/`), mostly struct-tag alignment and
+  import order. They are left unformatted to keep upstream merges clean;
+  run `gofmt -w` across the tree once the fork is independent.
 - **U3** non-English locale files: this fork updates English only, so the
   other locales drift. Remove them, or decide to maintain them.
 
