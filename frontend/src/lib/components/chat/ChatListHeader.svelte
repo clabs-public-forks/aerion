@@ -49,7 +49,7 @@
     accountStore.accounts
       .map((a) => ({
         account: a.account,
-        inbox: a.folders.find((t) => t.folder?.type === 'inbox')?.folder,
+        inbox: accountStore.getInbox(a.account.id),
       }))
       .filter((x): x is { account: typeof x.account; inbox: folder.Folder } => !!x.inbox)
   )

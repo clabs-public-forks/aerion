@@ -63,6 +63,8 @@
     if (encrypted || showOriginal || !msg.chat) return 'full'
     return msg.chat.isRich ? 'card' : 'bubble'
   })
+  // Attachment-only mail: no empty colored bubble above the attachment list.
+  const bare = $derived(mode === 'bubble' && msg.hasAttachments && !msg.chat?.hasQuoted && !msg.chat?.text.trim())
 
   const bodyHtml = $derived(pgp?.bodyHtml ?? smime?.bodyHtml ?? msg.bodyHtml)
   const bodyText = $derived(pgp?.bodyText ?? smime?.bodyText ?? msg.bodyText)
@@ -181,7 +183,7 @@
         <ChatSecurityBanners {msg} {thread} />
 
         <div
-          class="relative w-full rounded-2xl {focused ? 'ring-2 ring-primary/40' : ''} {mode === 'bubble' ? (item.mine ? 'w-auto bg-primary text-primary-foreground rounded-br-md' : 'w-auto bg-muted text-foreground rounded-bl-md') : ''}"
+          class="relative w-full rounded-2xl {focused ? 'ring-2 ring-primary/40' : ''} {mode === 'bubble' && !bare ? (item.mine ? 'w-auto bg-primary text-primary-foreground rounded-br-md' : 'w-auto bg-muted text-foreground rounded-bl-md') : ''}"
         >
           {#if notFetched && thread.bodyErrors.has(msg.id)}
             <div class="flex items-center gap-2 px-3.5 py-2 text-sm text-muted-foreground bg-muted rounded-2xl">
@@ -194,6 +196,8 @@
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
               {notFetched ? $_('viewer.downloadingContent') : $_('viewer.decryptingMessage')}
             </div>
+          {:else if bare}
+            <!-- Attachment-only mail: the attachment list below is the message -->
           {:else if mode === 'bubble'}
             <div class="px-3.5 py-2 text-sm whitespace-pre-wrap wrap-anywhere">
               {@render text(msg.chat!.text)}

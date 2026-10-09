@@ -40,6 +40,20 @@ export interface SelectedFolder {
   folderName: string
 }
 
+/**
+ * Depth-first search of a folder tree for the first node whose folder matches.
+ */
+export function findFolderNode(
+  trees: folder.FolderTree[],
+  match: (f: folder.Folder) => boolean
+): folder.FolderTree | undefined {
+  for (const t of trees) {
+    if (t.folder && match(t.folder)) return t
+    const hit = t.children && findFolderNode(t.children, match)
+    if (hit) return hit
+  }
+}
+
 class AccountStore {
   // State
   accounts = $state<AccountWithFolders[]>([])
@@ -509,14 +523,14 @@ class AccountStore {
    * Get a folder by ID from an account's folder tree
    */
   getFolder(accountId: string, folderId: string): folder.Folder | undefined {
-    const find = (trees: folder.FolderTree[]): folder.Folder | undefined => {
-      for (const t of trees) {
-        if (t.folder?.id === folderId) return t.folder
-        const hit = t.children && find(t.children)
-        if (hit) return hit
-      }
-    }
-    return find(this.getAccount(accountId)?.folders ?? [])
+    return findFolderNode(this.getAccount(accountId)?.folders ?? [], (f) => f.id === folderId)?.folder
+  }
+
+  /**
+   * Get an account's inbox folder
+   */
+  getInbox(accountId: string): folder.Folder | undefined {
+    return findFolderNode(this.getAccount(accountId)?.folders ?? [], (f) => f.type === 'inbox')?.folder
   }
 
   /**

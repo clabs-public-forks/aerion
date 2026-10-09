@@ -7,7 +7,7 @@
   import DeleteAccountDialog from '$lib/components/settings/DeleteAccountDialog.svelte'
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
-  import { accountStore } from '$lib/stores/accounts.svelte'
+  import { accountStore, findFolderNode } from '$lib/stores/accounts.svelte'
   import { contactSourcesStore } from '$lib/stores/contactSources.svelte'
   import { isAccountExpanded, setAccountExpanded, isUnifiedInboxExpanded, setFolderCollapsed, getUIState, getUIStateVersion, saveUIState } from '$lib/stores/uiState.svelte'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
@@ -179,22 +179,9 @@
   // Get accounts with their inbox folders for unified inbox section
   function getAccountsWithInbox() {
     return accountStore.accounts.map(acc => {
-      // Find the inbox folder in the folder tree
-      const findInbox = (folders: folder.FolderTree[]): folder.Folder | null => {
-        for (const f of folders) {
-          if (f.folder?.type === 'inbox') {
-            return f.folder
-          }
-          if (f.children) {
-            const found = findInbox(f.children)
-            if (found) return found
-          }
-        }
-        return null
-      }
       return {
         account: acc.account,
-        inbox: findInbox(acc.folders || [])
+        inbox: accountStore.getInbox(acc.account.id) ?? null
       }
     })
   }
@@ -303,17 +290,7 @@
           // Skip if account is not fully loaded yet (can happen during reauth)
           if (!accWithFolders.account) continue
 
-          const findInbox = (trees: folder.FolderTree[]): folder.Folder | null => {
-            for (const tree of trees) {
-              if (tree.folder?.type === 'inbox') return tree.folder
-              if (tree.children) {
-                const found = findInbox(tree.children)
-                if (found) return found
-              }
-            }
-            return null
-          }
-          const inbox = findInbox(accWithFolders.folders || [])
+          const inbox = accountStore.getInbox(accWithFolders.account.id)
           if (inbox) {
             items.push({
               type: 'unified-account',
@@ -511,22 +488,10 @@
   // Check if a folder has children by searching the account folder trees
   function folderHasChildren(folderId: string): boolean {
     for (const acc of accountStore.accounts) {
-      const found = findTreeNode(acc.folders || [], folderId)
+      const found = findFolderNode(acc.folders || [], (f) => f.id === folderId)
       if (found) return (found.children && found.children.length > 0) || false
     }
     return false
-  }
-
-  // Find a FolderTree node by folder ID
-  function findTreeNode(trees: folder.FolderTree[], folderId: string): folder.FolderTree | null {
-    for (const tree of trees) {
-      if (tree.folder?.id === folderId) return tree
-      if (tree.children) {
-        const found = findTreeNode(tree.children, folderId)
-        if (found) return found
-      }
-    }
-    return null
   }
 </script>
 

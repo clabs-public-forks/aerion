@@ -86,6 +86,9 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 	return updatedMsg, nil
 }
 
+// chatTextCache spares conversation reloads from re-parsing unchanged bodies.
+var chatTextCache = message.NewChatTextCache()
+
 // attachChatText fills m.Chat for chat bubbles. Encrypted or signed messages
 // are skipped: their stored body is the raw envelope, and the chat view
 // renders the decrypted body instead.
@@ -93,7 +96,7 @@ func attachChatText(m *message.Message) {
 	if m == nil || !m.BodyFetched || m.HasSMIME || m.HasPGP {
 		return
 	}
-	chat := message.ExtractChatText(m.BodyText, m.BodyHTML)
+	chat := chatTextCache.Extract(m.ID, m.BodyText, m.BodyHTML)
 	m.Chat = &chat
 }
 

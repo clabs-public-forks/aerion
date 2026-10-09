@@ -47,7 +47,7 @@
   let listRef = $state<HTMLDivElement | null>(null)
   let headerRef = $state<ChatListHeader | null>(null)
   let selectedKey = $state<string | null>(null)
-  let rowRefs = $state.raw<Record<string, ChatRow | null>>({})
+  let rowRefs = $state<Record<string, ChatRow | null>>({})
 
   $effect(() => {
     const acct = accountId

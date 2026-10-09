@@ -98,14 +98,7 @@ function toItem(c: message.Chat | message.ChatSearchResult | message.Conversatio
 }
 
 function isInboxFolder(accountId: string, folderId: string): boolean {
-  const acct = accountStore.accounts.find((a) => a.account.id === accountId)
-  const stack = [...(acct?.folders || [])]
-  while (stack.length > 0) {
-    const tree = stack.pop()!
-    if (tree.folder?.id === folderId) return tree.folder.type === 'inbox'
-    stack.push(...(tree.children || []))
-  }
-  return false
+  return accountStore.getFolder(accountId, folderId)?.type === 'inbox'
 }
 
 class ChatListStore {

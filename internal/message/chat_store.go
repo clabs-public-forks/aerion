@@ -91,10 +91,43 @@ const snoozeActiveExpr = `(cs.snoozed_until IS NOT NULL AND cs.snoozed_until > ?
 // parseAggregatedToListJSON; it needs the folders join as f.
 const recipientsJSONExpr = `json_group_array(json(CASE WHEN f.folder_type = 'sent' AND json_valid(m.to_list) THEN m.to_list ELSE '[]' END))`
 
+// chatListColumns are the per-thread columns ListChats scans.
+var chatListColumns = `
+				MIN(COALESCE(m.thread_id, m.id)) AS conv_thread_id,
+				` + threadKeyExpr("m.") + ` AS thread_key,
+				COALESCE(MIN(m.subject), '') AS subject,
+				MAX(m.snippet) AS snippet,
+				COUNT(*) AS message_count,
+				SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
+				MAX(CASE WHEN m.has_attachments = 1 THEN 1 ELSE 0 END) AS has_attachments,
+				MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END) AS is_starred,
+				MAX(m.date) AS latest_date,
+				GROUP_CONCAT(m.id) AS message_ids,
+				MAX(CASE WHEN m.smime_encrypted = 1 OR m.pgp_encrypted = 1 THEN 1 ELSE 0 END) AS is_encrypted,
+				a.id AS account_id,
+				a.name AS account_name,
+				a.color AS account_color,
+				MIN(f.id) AS folder_id,
+				json_group_array(json_object('name', m.from_name, 'email', m.from_email, 'date', m.date, 'snippet', m.snippet)) AS participants_json,
+				MIN(` + isLowExpr + `) AS is_low,
+				MAX(REPLACE(SUBSTR(m.received_at, 1, 19), 'T', ' ')) AS latest_received,
+				` + recipientsJSONExpr + ` AS recipients_json
+`
+
+// chatCountColumns are the columns chatBaseQuery's GROUP BY and section
+// filters need; counting skips the JSON aggregates.
+var chatCountColumns = `
+				` + threadKeyExpr("m.") + ` AS thread_key,
+				a.id AS account_id,
+				SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
+				MIN(` + isLowExpr + `) AS is_low,
+				MAX(REPLACE(SUBSTR(m.received_at, 1, 19), 'T', ' ')) AS latest_received
+`
+
 // chatBaseQuery builds the grouped chat query for a scope (a folder ID, or
-// "" for every enabled account's inbox) and section. It selects the chat
-// columns; callers add ordering and paging or wrap it in a count.
-func chatBaseQuery(scope, section string, now time.Time) (string, []any, error) {
+// "" for every enabled account's inbox) and section, selecting columns from
+// each thread group; callers add ordering and paging or wrap it in a count.
+func chatBaseQuery(scope, section, columns string, now time.Time) (string, []any, error) {
 	folderCond := "f.folder_type = 'inbox'"
 	var args []any
 	if scope != "" {
@@ -124,26 +157,7 @@ func chatBaseQuery(scope, section string, now time.Time) (string, []any, error) 
 	query := `
 		SELECT g.*, cs.pinned_at, cs.snoozed_until
 		FROM (
-			SELECT
-				MIN(COALESCE(m.thread_id, m.id)) AS conv_thread_id,
-				` + threadKeyExpr("m.") + ` AS thread_key,
-				COALESCE(MIN(m.subject), '') AS subject,
-				MAX(m.snippet) AS snippet,
-				COUNT(*) AS message_count,
-				SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
-				MAX(CASE WHEN m.has_attachments = 1 THEN 1 ELSE 0 END) AS has_attachments,
-				MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END) AS is_starred,
-				MAX(m.date) AS latest_date,
-				GROUP_CONCAT(m.id) AS message_ids,
-				MAX(CASE WHEN m.smime_encrypted = 1 OR m.pgp_encrypted = 1 THEN 1 ELSE 0 END) AS is_encrypted,
-				a.id AS account_id,
-				a.name AS account_name,
-				a.color AS account_color,
-				MIN(f.id) AS folder_id,
-				json_group_array(json_object('name', m.from_name, 'email', m.from_email, 'date', m.date, 'snippet', m.snippet)) AS participants_json,
-				MIN(` + isLowExpr + `) AS is_low,
-				MAX(REPLACE(SUBSTR(m.received_at, 1, 19), 'T', ' ')) AS latest_received,
-				` + recipientsJSONExpr + ` AS recipients_json
+			SELECT ` + columns + `
 			FROM messages m
 			INNER JOIN folders f ON m.folder_id = f.id AND ` + folderCond + `
 			INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
@@ -159,7 +173,7 @@ func chatBaseQuery(scope, section string, now time.Time) (string, []any, error) 
 // unified inbox) and section. Pinned chats sort first; the snoozed section
 // sorts by wake time. Snoozed chats appear only in the snoozed section.
 func (s *Store) ListChats(scope, section string, now time.Time, offset, limit int) ([]*Chat, error) {
-	query, args, err := chatBaseQuery(scope, section, now)
+	query, args, err := chatBaseQuery(scope, section, chatListColumns, now)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +306,7 @@ func (s *Store) threadRecipients(folderID string, keys []string) (map[string][]A
 
 // CountChats returns the number of chats ListChats would return unpaged.
 func (s *Store) CountChats(scope, section string, now time.Time) (int, error) {
-	query, args, err := chatBaseQuery(scope, section, now)
+	query, args, err := chatBaseQuery(scope, section, chatCountColumns, now)
 	if err != nil {
 		return 0, err
 	}

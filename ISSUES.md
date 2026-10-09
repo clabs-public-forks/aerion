@@ -80,38 +80,6 @@ has not yet been confirmed against the code.
   whether it is a go-imap v2 beta bug, our misuse of the streaming API, or
   a test-only artifact; production sees dropped connections too.
 
-### Chat mail
-
-Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
-
-- **CM2 low** frontend: the inbox lookup (`MessageList`, `Sidebar`), the
-  sync toggle and trash-with-undo exist as unshared copies in the classic
-  and chat components. Consolidate them, or delete the classic copies once
-  the classic components leave the tree (see Upstream independence). Within
-  the chat components, trash-with-undo is shared through
-  `components/chat/chatTriage.ts` (`trashMessages`,
-  `deleteMessagesPermanently`). Folder-by-ID lookups now go through
-  `accountStore.getFolder`; `Sidebar.svelte`'s hand-rolled tree walks
-  (`findTreeNode`, `findInbox`, `collectIds`) could share one traversal
-  helper with it.
-- **CM4 low** `internal/message/chattext.go` `ExtractChatText` reruns on
-  every conversation reload (~4 ms and 2 MB per 165 KB newsletter body, per
-  `BenchmarkExtractChatTextNewsletter`). Cache it per message if long
-  threads feel slow.
-- **CM9 low** `internal/message/chat_store.go` `CountChats` wraps the whole
-  grouped chat query in `SELECT COUNT(*)`, so every list load runs the
-  aggregation two or three times (page, count, Low count). Fine at current
-  mailbox sizes; a lighter count query or one query returning both would
-  halve the work if large inboxes feel slow.
-- **CM10 low** `components/chat/ChatBubble.svelte`: bubble mode renders
-  `msg.chat.text` even when it is empty, so an attachment-only message
-  shows an empty colored bubble above its attachment list. Skip the bubble
-  when the text is empty. Seen in the UI test on 2026-10-09.
-- **CM11 low** `components/chat/ChatList.svelte` `rows` snippet:
-  `bind:this={rowRefs[c.key]}` triggers Svelte's
-  `binding_property_non_reactive` warning in dev. Declare `rowRefs` with
-  `$state` or keep it in a plain `Map` filled from an action.
-
 ### Upstream independence
 
 This fork may eventually stop tracking upstream Aerion. Until then, some code
@@ -120,8 +88,10 @@ cleanup here, so it can be done once the fork is independent.
 
 - **U1** frontend: delete the unmounted classic `MessageList`,
   `ConversationRow` and `ConversationViewer`, kept only to avoid merge
-  conflicts, along with the copies they share with the chat components
-  (CM2).
+  conflicts. They hold unshared copies of chat-component logic (the inbox
+  lookup, the sync toggle, trash-with-undo) that go with them; the chat
+  side uses `accountStore.getFolder`/`getInbox` and
+  `components/chat/chatTriage.ts`.
 - **U2** Go sources: `gofmt -l` lists 54 files (for example
   `internal/message/store.go`, `app/compose.go`, `app/account.go`, and many
   under `extensions/` and `internal/`), mostly struct-tag alignment and
