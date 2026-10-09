@@ -78,6 +78,15 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
   `EHLO localhost` because `Hello` is never called. Gmail recorded it in
   `Received`, and it is a mild spam signal. Sending an address literal
   (`[ip]`, as Thunderbird does) avoids leaking the hostname.
+- **CM9 low** `internal/message/chat_store.go` `CountChats` wraps the whole
+  grouped chat query in `SELECT COUNT(*)`, so every list load runs the
+  aggregation two or three times (page, count, Low count). Fine at current
+  mailbox sizes; a lighter count query or one query returning both would
+  halve the work if large inboxes feel slow.
+- **CM10 low** `internal/smtp/message.go`: the Message-ID now uses the
+  sender's domain, and `domainFromEmail` falls back to `localhost` for an
+  address without exactly one `@`. Compose validates From, so this is
+  unreachable today; keep `aerion` as the fallback if that changes.
 
 ### Dependencies
 

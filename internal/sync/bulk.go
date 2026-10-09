@@ -131,6 +131,7 @@ func fetchHeaderFields(ctx context.Context, client *imapclient.Client, uids imap
 		}},
 	})
 	out := make(map[uint32][]byte)
+	var readErr error
 	for {
 		if ctx.Err() != nil {
 			_ = cmd.Close()
@@ -147,8 +148,14 @@ func fetchHeaderFields(ctx context.Context, client *imapclient.Client, uids imap
 			case imapclient.FetchItemDataUID:
 				uid = data.UID
 			case imapclient.FetchItemDataBodySection:
-				if data.Literal != nil {
-					raw, _ = io.ReadAll(data.Literal)
+				if data.Literal == nil {
+					continue
+				}
+				// A short read would classify the message from partial
+				// headers; fail the batch so its rows stay NULL.
+				var err error
+				if raw, err = io.ReadAll(data.Literal); err != nil && readErr == nil {
+					readErr = err
 				}
 			}
 		}
@@ -158,6 +165,9 @@ func fetchHeaderFields(ctx context.Context, client *imapclient.Client, uids imap
 	}
 	if err := cmd.Close(); err != nil {
 		return nil, err
+	}
+	if readErr != nil {
+		return nil, readErr
 	}
 	return out, nil
 }

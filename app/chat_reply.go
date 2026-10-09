@@ -41,6 +41,9 @@ type ChatDraft struct {
 // SendChatReply sends a chat reply, deletes its draft, and syncs Sent so the
 // reply joins the thread.
 func (a *App) SendChatReply(r ChatReply) error {
+	if chatReplyEmpty(r) {
+		return fmt.Errorf("chat reply is empty")
+	}
 	msg, err := a.buildChatReply(r)
 	if err != nil {
 		return err
@@ -73,7 +76,7 @@ func (a *App) SendChatReply(r ChatReply) error {
 // its ID. Empty text without attachments deletes the draft and returns "".
 func (a *App) SaveChatDraft(r ChatReply) (string, error) {
 	r.Text = normalizeChatText(r.Text)
-	if strings.TrimSpace(r.Text) == "" && len(r.Attachments) == 0 {
+	if chatReplyEmpty(r) {
 		if err := a.draftStore.DeleteChatLink(r.AccountID, r.ThreadKey); err != nil {
 			return "", err
 		}
@@ -257,6 +260,11 @@ func chatTextToHTML(text string) string {
 // normalizeChatText uses \n line endings and drops trailing whitespace.
 func normalizeChatText(text string) string {
 	return strings.TrimRight(strings.ReplaceAll(text, "\r\n", "\n"), " \t\r\n")
+}
+
+// chatReplyEmpty reports whether a reply has neither text nor attachments.
+func chatReplyEmpty(r ChatReply) bool {
+	return strings.TrimSpace(r.Text) == "" && len(r.Attachments) == 0
 }
 
 // chatDraftText recovers the typed text: the first n bytes of the draft's

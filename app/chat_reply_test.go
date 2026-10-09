@@ -242,3 +242,27 @@ func TestBuildChatReply(t *testing.T) {
 		t.Error("buildChatReply without a message: want error")
 	}
 }
+
+func TestChatReplyEmpty(t *testing.T) {
+	tests := []struct {
+		name string
+		r    ChatReply
+		want bool
+	}{
+		{"no text", ChatReply{}, true},
+		{"whitespace only", ChatReply{Text: " \r\n\t "}, true},
+		{"text", ChatReply{Text: "hi"}, false},
+		{"attachment only", ChatReply{Attachments: []smtp.Attachment{{Filename: "a.txt"}}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := chatReplyEmpty(tt.r); got != tt.want {
+				t.Errorf("chatReplyEmpty() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	// SendChatReply rejects an empty reply before touching any store.
+	if err := (&App{}).SendChatReply(ChatReply{AccountID: "a", MessageID: "m", Text: "  "}); err == nil {
+		t.Error("SendChatReply with empty text: want error")
+	}
+}
