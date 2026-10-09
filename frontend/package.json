@@ -69,5 +69,13 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.4"
+  },
+  "overrides": {
+    "svelte-i18n": {
+      "esbuild": "^0.28.2"
+    },
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "^7.1.6"
+    }
   }
 }

@@ -24,15 +24,3 @@ has not yet been confirmed against the code.
 
 - **C12 medium** contacts backend: EXT_RULES R1, R2, R5 and R6 (see A4).
   Architectural.
-
-### Calendar
-
-
-### Frontend
-
-
-### Dependencies
-
-- **D1** npm majors outstanding: tiptap 2 to 3, tailwindcss 3 to 4,
-  svelte-i18n and any others behind latest. `npm audit --omit=dev` still
-  reports moderate and high advisories that only these upgrades fix.
