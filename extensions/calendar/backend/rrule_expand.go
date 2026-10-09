@@ -235,17 +235,8 @@ func masterCancelled(blob string) bool {
 	if !strings.Contains(strings.ToUpper(blob), "CANCELLED") {
 		return false
 	}
-	cal, err := decodeICS(blob)
-	if err != nil {
-		return false
-	}
-	for i := range cal.Events() {
-		ev := cal.Events()[i]
-		if ev.Props.Get(ical.PropRecurrenceID) == nil {
-			return isCancelled(&ev)
-		}
-	}
-	return false
+	ev := masterEvent(blob)
+	return ev != nil && isCancelled(ev)
 }
 
 // errOverrideCancelled marks an override whose STATUS is CANCELLED: the

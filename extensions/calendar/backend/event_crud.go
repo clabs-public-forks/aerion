@@ -869,17 +869,22 @@ func extractAltDescHTML(blob string) string {
 	return propTextDecoded(ev, icsPropAltDesc)
 }
 
-// masterEvent decodes a single-event blob and returns the first VEVENT, or nil.
+// masterEvent decodes a blob and returns its first VEVENT without a
+// RECURRENCE-ID, or nil.
 func masterEvent(blob string) *ical.Event {
 	if strings.TrimSpace(blob) == "" {
 		return nil
 	}
 	cal, err := decodeICS(blob)
-	if err != nil || len(cal.Events()) == 0 {
+	if err != nil {
 		return nil
 	}
-	ev := cal.Events()[0]
-	return &ev
+	for _, ev := range cal.Events() {
+		if ev.Props.Get(ical.PropRecurrenceID) == nil {
+			return &ev
+		}
+	}
+	return nil
 }
 
 // serializeVEVENT builds a single-event VCALENDAR for events.ics_blob.
