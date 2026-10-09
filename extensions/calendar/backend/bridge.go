@@ -231,7 +231,8 @@ func (b *CalendarBridge) Calendar_SetDisplayTimezone(tz string) error {
 	}
 	changed, err := b.api.SetDisplayTimezone(tz)
 	if changed {
-		// All-day and floating times moved; have open views refetch.
+		// All-day and floating times moved: open views refetch and the alarm
+		// scheduler recomputes pending alarms.
 		_ = b.deps.Core.Events().Publish("calendar:sync-complete", map[string]any{})
 	}
 	return err
