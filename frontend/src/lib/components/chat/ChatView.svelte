@@ -5,7 +5,7 @@
   import { onMount, tick, untrack } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
-  import { Trash, DeletePermanently, MarkAsSpam, MarkAsNotSpam, MarkAsRead, MarkAsUnread, OpenURL } from '../../../../wailsjs/go/app/App'
+  import { MarkAsSpam, MarkAsNotSpam, MarkAsRead, MarkAsUnread, OpenURL } from '../../../../wailsjs/go/app/App'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   import ComposeButton from '$lib/components/common/ComposeButton.svelte'
   import { toasts } from '$lib/stores/toast'
@@ -21,7 +21,7 @@
   import { ChatThread } from './chatThread.svelte'
   import { ChatComposer as ComposerState } from './chatComposer.svelte'
   import { buildMe, buildThreadItems, isMine, replyTarget, threadPeople, type ReplyMode } from './chatFormat'
-  import { archiveChat, pinChat, setSenderLow, snoozeChat, undoLast, unsnoozeChat } from './chatTriage'
+  import { archiveChat, deleteMessagesPermanently, pinChat, setSenderLow, snoozeChat, trashMessages, undoAction, unsnoozeChat } from './chatTriage'
 
   interface Props {
     threadId?: string | null
@@ -220,7 +220,6 @@
     thread.reload()
     onActionComplete?.()
   }
-  const undoAction = () => [{ label: $_('common.undo'), onClick: () => void undoLast(afterUndo) }]
   const triageTarget = () => ({ accountId: accountId ?? '', threadKey, messageIds })
 
   async function done() {
@@ -230,20 +229,9 @@
   // deleteMessages moves to Trash (undoable), or deletes permanently in Trash.
   // wholeThread advances to the next chat; single messages reload via events.
   async function deleteMessages(ids: string[], wholeThread: boolean) {
-    try {
-      if (isTrash) {
-        await DeletePermanently(ids)
-        toasts.success($_('toast.permanentlyDeleted'))
-      } else {
-        const moved = await Trash(ids)
-        toasts.success($_(moved ? 'toast.movedToTrash' : 'toast.deletedFromFolder'), moved ? undoAction() : [])
-      }
-      focusedMessageId = null
-      if (wholeThread) onActionComplete?.(true)
-    } catch (err) {
-      console.error('Delete failed:', err)
-      toasts.error($_('toast.failedToDelete'))
-    }
+    if (!(await (isTrash ? deleteMessagesPermanently(ids) : trashMessages(ids, afterUndo)))) return
+    focusedMessageId = null
+    if (wholeThread) onActionComplete?.(true)
   }
 
   async function toggleRead() {
@@ -349,10 +337,10 @@
     try {
       if (isSpam) {
         await MarkAsNotSpam(messageIds)
-        toasts.success($_('toast.markedAsNotSpam'), undoAction())
+        toasts.success($_('toast.markedAsNotSpam'), undoAction(afterUndo))
       } else {
         const moved = await MarkAsSpam(messageIds)
-        toasts.success($_(moved ? 'toast.markedAsSpam' : 'toast.deletedFromFolder'), moved ? undoAction() : [])
+        toasts.success($_(moved ? 'toast.markedAsSpam' : 'toast.deletedFromFolder'), moved ? undoAction(afterUndo) : [])
       }
       onActionComplete?.(true)
     } catch (err) {

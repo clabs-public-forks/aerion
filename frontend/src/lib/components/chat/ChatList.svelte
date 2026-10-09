@@ -17,12 +17,11 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { contactPhotos } from '$lib/stores/contactPhotos.svelte'
   import { getLayoutMode, hideViewer, showSidebar, isSidebarHidden, toggleActiveSidebar } from '$lib/stores/layout.svelte'
-  import { toasts } from '$lib/stores/toast'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { getChatAutoAdvance, getChatShowLowGroup } from '$lib/stores/settings.svelte'
-  import { SyncFolder, CancelFolderSync, Trash, DeletePermanently } from '../../../../wailsjs/go/app/App'
+  import { SyncFolder, CancelFolderSync } from '../../../../wailsjs/go/app/App'
   import { chatPeople } from './chatFormat'
-  import { archiveChat, markChatUnread, type ChatRowActions, pinChat, setSenderLow, snoozeChat, undoLast, unsnoozeChat } from './chatTriage'
+  import { archiveChat, deleteMessagesPermanently, markChatUnread, type ChatRowActions, pinChat, setSenderLow, snoozeChat, trashMessages, unsnoozeChat } from './chatTriage'
   import type { folder } from '../../../../wailsjs/go/models'
 
   interface Props {
@@ -291,27 +290,13 @@
       showDeleteConfirm = true
       return
     }
-    Trash(messageIds)
-      .then((movedToTrash) => {
-        const msg = movedToTrash ? $_('toast.movedToTrash') : $_('toast.deletedFromFolder')
-        toasts.success(msg, movedToTrash ? [{ label: $_('common.undo'), onClick: () => void undoLast(reloadAfterUndo) }] : [])
-        handleActionComplete(true)
-      })
-      .catch((err) => {
-        console.error('Delete failed:', err)
-        toasts.error($_('toast.failedToDelete'))
-      })
+    void trashMessages(messageIds, reloadAfterUndo).then((ok) => {
+      if (ok) handleActionComplete(true)
+    })
   }
 
   async function confirmPermanentDelete() {
-    try {
-      await DeletePermanently(pendingDeleteIds)
-      toasts.success($_('toast.permanentlyDeleted'))
-      handleActionComplete(true)
-    } catch (err) {
-      console.error('Permanent delete failed:', err)
-      toasts.error($_('toast.failedToDelete'))
-    }
+    if (await deleteMessagesPermanently(pendingDeleteIds)) handleActionComplete(true)
     showDeleteConfirm = false
     pendingDeleteIds = []
   }

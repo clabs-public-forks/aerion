@@ -573,7 +573,11 @@ func (a *App) handleNewMailNotification(info sync.NewMailInfo) {
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to read notify-priority-only setting")
 	}
-	newest, err := a.messageStore.ListNewestMail(info.FolderID, info.Count)
+	limit := info.Count
+	if !onlyPriority {
+		limit = 1 // only the newest is shown
+	}
+	newest, err := a.messageStore.ListNewestMail(info.FolderID, limit)
 	if err != nil {
 		// With onlyPriority this fails closed: unclassified mail stays quiet.
 		log.Warn().Err(err).Msg("Failed to load new mail for notification")

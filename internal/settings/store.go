@@ -730,11 +730,7 @@ func (s *Store) SetChatSendKey(key string) error {
 // GetChatIncludeQuote returns whether chat replies quote the replied-to
 // message. Defaults to true.
 func (s *Store) GetChatIncludeQuote() (bool, error) {
-	value, err := s.Get(KeyChatIncludeQuote)
-	if err != nil {
-		return true, err
-	}
-	return value != "false", nil
+	return s.getBoolDefaultTrue(KeyChatIncludeQuote)
 }
 
 // SetChatIncludeQuote sets whether chat replies quote the replied-to message.
@@ -745,11 +741,7 @@ func (s *Store) SetChatIncludeQuote(include bool) error {
 // GetChatNotifyPriorityOnly returns whether new-mail notifications skip
 // low-priority mail. Defaults to true.
 func (s *Store) GetChatNotifyPriorityOnly() (bool, error) {
-	value, err := s.Get(KeyChatNotifyPriorityOnly)
-	if err != nil {
-		return true, err
-	}
-	return value != "false", nil
+	return s.getBoolDefaultTrue(KeyChatNotifyPriorityOnly)
 }
 
 // SetChatNotifyPriorityOnly sets whether new-mail notifications skip
@@ -1033,14 +1025,19 @@ func (s *Store) SetChatAutoAdvance(direction string) error {
 // GetChatShowLowGroup returns whether the All filter shows the Low priority
 // group. Defaults to true.
 func (s *Store) GetChatShowLowGroup() (bool, error) {
-	value, err := s.Get(KeyChatShowLowGroup)
-	if err != nil {
-		return true, err
-	}
-	return value != "false", nil
+	return s.getBoolDefaultTrue(KeyChatShowLowGroup)
 }
 
 // SetChatShowLowGroup sets whether the All filter shows the Low priority group.
 func (s *Store) SetChatShowLowGroup(show bool) error {
 	return s.Set(KeyChatShowLowGroup, strconv.FormatBool(show))
+}
+
+// getBoolDefaultTrue reads a boolean setting that is on unless set to "false".
+func (s *Store) getBoolDefaultTrue(key string) (bool, error) {
+	value, err := s.Get(key)
+	if err != nil {
+		return true, err
+	}
+	return value != "false", nil
 }

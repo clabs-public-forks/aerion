@@ -5,7 +5,7 @@
 import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
 import { toasts } from '$lib/stores/toast'
-import { Archive, MarkAsRead, MarkAsUnread, PinChat, SnoozeChat, UnsnoozeChat, SetSenderCategory, Undo } from '../../../../wailsjs/go/app/App'
+import { Archive, DeletePermanently, MarkAsRead, MarkAsUnread, PinChat, SnoozeChat, UnsnoozeChat, SetSenderCategory, Trash, Undo } from '../../../../wailsjs/go/app/App'
 import { displayName, type Person } from './chatFormat'
 import { formatSnoozePreset } from './chatSnooze'
 
@@ -43,8 +43,34 @@ export async function undoLast(after?: After): Promise<void> {
   }
 }
 
-function undoAction(after?: After) {
+export function undoAction(after?: After) {
   return [{ label: t('common.undo'), onClick: () => void undoLast(after) }]
+}
+
+// trashMessages moves messages to Trash, with Undo when they moved (some
+// folders delete outright).
+export async function trashMessages(ids: string[], after?: After): Promise<boolean> {
+  try {
+    const moved = await Trash(ids)
+    toasts.success(t(moved ? 'toast.movedToTrash' : 'toast.deletedFromFolder'), moved ? undoAction(after) : [])
+    return true
+  } catch (err) {
+    console.error('Delete failed:', err)
+    toasts.error(t('toast.failedToDelete'))
+    return false
+  }
+}
+
+export async function deleteMessagesPermanently(ids: string[]): Promise<boolean> {
+  try {
+    await DeletePermanently(ids)
+    toasts.success(t('toast.permanentlyDeleted'))
+    return true
+  } catch (err) {
+    console.error('Permanent delete failed:', err)
+    toasts.error(t('toast.failedToDelete'))
+    return false
+  }
 }
 
 async function run(action: () => Promise<unknown>, success: string, failure: string, undo: boolean, after?: After): Promise<boolean> {

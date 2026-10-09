@@ -52,7 +52,10 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
 - **CM2 low** frontend: the inbox lookup (`MessageList`, `Sidebar`), the
   sync toggle and trash-with-undo exist as unshared copies in the classic
   and chat components. Consolidate them, or delete the classic copies once
-  the classic components leave the tree.
+  the classic components leave the tree. Within
+  the chat components, trash-with-undo is shared through
+  `components/chat/chatTriage.ts` (`trashMessages`,
+  `deleteMessagesPermanently`).
 - **CM3 low** chat views infer `isMine` from account emails and Sent folder
   ids in the frontend; a backend `mine` flag set beside `attachChatText`
   would give one source of truth.
