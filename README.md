@@ -10,7 +10,7 @@ _Aerion_ is a cross-platform email client created by [hkdb/aerion](https://githu
 
 ## Features
 
-![screenshot](docs/ss.png)
+![Aerion chat mail view in the Nord dark theme](docs/ss.png)
 
 - Resource Efficiency - Minimal CPU, RAM, and battery consumption
 - Modern UX - Clean, intuitive interface with dark mode support
