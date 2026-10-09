@@ -406,16 +406,9 @@ func (a *API) persistThisDelete(master Event, instanceUnix int64, result PushIns
 // pattern as the legacy updateThisAndFuture).
 func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, splitUnix int64, result PushInstanceResult) error {
 	// 1. Clamp master's RRULE locally.
-	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1, master.IsAllDay)
-	clampedICS, err := reserializeMasterICS(master, clampedRRULE)
+	clampedMaster, err := clampMasterBefore(master, splitUnix, result.MasterNewETag)
 	if err != nil {
 		return err
-	}
-	clampedMaster := master
-	clampedMaster.RRuleText = clampedRRULE
-	clampedMaster.ICSBlob = clampedICS
-	if result.MasterNewETag != "" {
-		clampedMaster.ETag = result.MasterNewETag
 	}
 
 	// 2. New master for the future series — UID + identifiers from the
@@ -480,16 +473,9 @@ func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, spl
 // persistThisAndFutureDeleteLocally clamps the master locally + drops
 // future overrides. No new series row.
 func (a *API) persistThisAndFutureDeleteLocally(master Event, splitUnix int64, result PushInstanceResult) error {
-	clampedRRULE := clampRRuleUntil(master.RRuleText, splitUnix-1, master.IsAllDay)
-	clampedICS, err := reserializeMasterICS(master, clampedRRULE)
+	updated, err := clampMasterBefore(master, splitUnix, result.MasterNewETag)
 	if err != nil {
 		return err
-	}
-	updated := master
-	updated.RRuleText = clampedRRULE
-	updated.ICSBlob = clampedICS
-	if result.MasterNewETag != "" {
-		updated.ETag = result.MasterNewETag
 	}
 	return a.store.WithTx(func(tx *sql.Tx) error {
 		if _, err := tx.Exec(
@@ -1075,6 +1061,23 @@ func addEXDATE(icsBlob string, instanceUnix int64, allDay bool) (string, error) 
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+// clampMasterBefore returns master with its series ended just before
+// splitUnix: RRULE and ICS blob rewritten, and the ETag replaced when the
+// server returned a new one.
+func clampMasterBefore(master Event, splitUnix int64, newETag string) (Event, error) {
+	rrule := clampRRuleUntil(master.RRuleText, splitUnix-1, master.IsAllDay)
+	ics, err := reserializeMasterICS(master, rrule)
+	if err != nil {
+		return Event{}, err
+	}
+	master.RRuleText = rrule
+	master.ICSBlob = ics
+	if newETag != "" {
+		master.ETag = newETag
+	}
+	return master, nil
 }
 
 // clampRRuleUntil returns the RRULE text with an UNTIL=<unix> clause added,
