@@ -6,9 +6,10 @@
 
   interface Props {
     onclick: () => void
+    compact?: boolean
   }
 
-  let { onclick }: Props = $props()
+  let { onclick, compact = false }: Props = $props()
 </script>
 
-<ToolbarButton icon="mdi:pencil" label={$_('sidebar.compose')} primary {onclick} />
+<ToolbarButton icon="mdi:pencil" label={$_('sidebar.compose')} primary {compact} {onclick} />

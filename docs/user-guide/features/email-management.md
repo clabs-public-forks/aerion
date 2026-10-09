@@ -8,12 +8,13 @@ Aerion provides essential tools to manage your email efficiently.
 
 ## Chat Mail
 
-The mail section shows email as chats. Each chat is one email thread, listed by the people in it with their avatar, the subject, and the latest line.
+The mail section shows email as chats. Each chat is one email thread, listed by the people in it with their avatar and the subject. Turn off **Hide message preview** in Settings to also show the latest line.
 
 - **List filters** - All, Unread, Low priority, and Snoozed. Under All, pinned chats come first, then Chats, then a collapsed **Low priority** group for newsletters and bulk mail. The group's header offers **Archive all** (undoable) and **Mark all read**.
-- **Thread view** - Messages appear as chat bubbles, with your replies on the right. Quoted history and signatures are hidden behind "•••". Newsletters and other rich mail show as cards that expand into the full message; encrypted or signed mail, and any message after **Show original**, renders in full.
-- **Reply box** - A reply box stays docked at the bottom of the open chat. Typed text is saved as a draft. **Send & Done** sends and archives the chat; **Open in full composer** moves the draft to the full composer.
-- **Triage** - **Done** archives the chat and opens the next one. **Pin** keeps a chat at the top, **Snooze** hides it until a chosen time (or until new mail arrives), and **Mark unread** brings it back later. Each chat's ⋯ menu and row context menu can move its sender to Low priority or back to Priority.
+- **Thread view** - Messages appear as chat bubbles, with your replies on the right. Quoted history and signatures are hidden behind a faint "⋯" marker at the end of the text. Newsletters and other rich mail show as cards that expand into the full message; encrypted or signed mail, and any message after **Show original**, renders in full.
+- **Reply box** - A reply box stays docked at the bottom of the open chat. Typed text is saved as a draft. **Send & Archive** sends and archives the chat; **Open in full composer** moves the draft to the full composer.
+- **Top bar** - **Compose**, **Reply**, **Archive**, **Delete**, and **Spam** sit on the left, followed by Reply All and Forward; the chat's people and subject are centered; Snooze, Pin, Mark read/unread, and the ⋯ menu sit on the right. On a narrow pane the labelled buttons show icons only, and on phone widths the people move to their own row. **Delete** always acts on the whole chat.
+- **Triage** - **Archive** archives the chat and opens the next one. **Pin** keeps a chat at the top, **Snooze** hides it until a chosen time (or until new mail arrives), and **Mark unread** brings it back later. Each chat's ⋯ menu and row context menu can move its sender to Low priority or back to Priority.
 - **Low priority** - Mail with mailing-list or bulk headers is low priority. A thread counts as low only while every message in it is, so a person's reply lifts it into Chats. By default, low-priority mail does not raise notifications.
 
 Pin, snooze, and sender priority are stored locally on this computer and are not synced to the server or other devices. Pin is separate from the server star.

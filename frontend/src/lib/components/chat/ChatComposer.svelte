@@ -123,11 +123,11 @@
 
     <button
       class="shrink-0 h-8 px-3 rounded-full text-xs font-medium border border-border hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
-      title={$_('chat.sendAndDoneHint')}
+      title={$_('chat.sendAndArchiveHint')}
       disabled={!canSend}
       onclick={() => void composer.send(true)}
     >
-      {$_('chat.sendAndDone')}
+      {$_('chat.sendAndArchive')}
     </button>
 
     <button

@@ -1,6 +1,7 @@
 package smtp
 
 import (
+	"mime"
 	"strings"
 	"testing"
 )
@@ -160,8 +161,8 @@ func TestToRFC822_AttachmentsWithoutBody(t *testing.T) {
 
 	for _, want := range []string{
 		"multipart/mixed",
-		`filename="report.pdf"`,
-		`filename="image.png"`,
+		`filename=report.pdf`,
+		`filename=image.png`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("output missing %q", want)
@@ -192,5 +193,173 @@ func TestToRFC822_MessageIDDomain(t *testing.T) {
 		if !strings.HasPrefix(id, "<") || !strings.HasSuffix(id, tt.want) {
 			t.Errorf("from %q: Message-ID = %q, want suffix %q", tt.from, id, tt.want)
 		}
+	}
+}
+
+func TestFoldHeader(t *testing.T) {
+	refs := strings.Repeat("<0123456789abcdef0123456789abcdef@mail.example.com> ", 30)
+	tests := []struct {
+		name        string
+		field       string
+		value       string
+		unbreakable bool
+	}{
+		{"short", "Subject", "Hello", false},
+		{"empty", "To", "", false},
+		{"long references", "References", strings.TrimSpace(refs), false},
+		{"double spaces", "Subject", strings.Repeat("word  ", 30), false},
+		{"unbreakable", "X-Long", strings.Repeat("x", 120), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := foldHeader(tt.field, tt.value)
+			lines := strings.Split(got, "\r\n")
+			for i, line := range lines {
+				if len(line) > maxHeaderLineLen && !tt.unbreakable {
+					t.Errorf("line %d is %d chars and could have been folded: %q", i, len(line), line)
+				}
+				if i > 0 && strings.TrimSpace(line) == "" {
+					t.Errorf("line %d is whitespace-only", i)
+				}
+			}
+			if unfolded := strings.ReplaceAll(got, "\r\n", ""); unfolded != tt.field+": "+tt.value {
+				t.Errorf("unfolding changed the value:\n got %q\nwant %q", unfolded, tt.field+": "+tt.value)
+			}
+		})
+	}
+}
+
+func TestToRFC822_BccOnlyHasUndisclosedTo(t *testing.T) {
+	msg := &ComposeMessage{
+		From:     Address{Address: "me@example.com"},
+		Bcc:      []Address{{Address: "hidden@example.com"}},
+		Subject:  "Hi",
+		TextBody: "Hello",
+	}
+	raw, err := msg.ToRFC822()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "To: undisclosed-recipients:;\r\n") {
+		t.Errorf("expected undisclosed-recipients To header, got:\n%s", s)
+	}
+	if strings.Contains(s, "hidden@example.com") {
+		t.Error("Bcc address leaked into headers")
+	}
+}
+
+func TestToRFC822_HeaderLinesWithinLimit(t *testing.T) {
+	var refs []string
+	for i := 0; i < 40; i++ {
+		refs = append(refs, "<"+strings.Repeat("a", 40)+"@mail.example.com>")
+	}
+	var to []Address
+	for i := 0; i < 30; i++ {
+		to = append(to, Address{Name: "Recipient Name", Address: "recipient@example.com"})
+	}
+	msg := &ComposeMessage{
+		From:       Address{Address: "me@example.com"},
+		To:         to,
+		Subject:    strings.Repeat("A long subject line ", 10) + "with ünïcödé",
+		TextBody:   "Hello",
+		References: refs,
+	}
+	raw, err := msg.ToRFC822()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Encoded-words may reach 75 chars on their own, so check that every line
+	// is far below the 998-octet hard limit rather than the 78-char target.
+	header, _, _ := strings.Cut(string(raw), "\r\n\r\n")
+	for _, line := range strings.Split(header, "\r\n") {
+		if len(line) > 100 {
+			t.Errorf("header line is %d chars: %q", len(line), line)
+		}
+	}
+}
+
+func TestToRFC822_AttachmentFilenameEncoding(t *testing.T) {
+	tests := []struct {
+		name            string
+		filename        string
+		wantDisposition string
+		wantType        string
+	}{
+		{"ascii", "report.pdf", `attachment; filename=report.pdf`, `application/pdf; name=report.pdf`},
+		{"spaces", "Q3 report.pdf", `attachment; filename="Q3 report.pdf"`, `application/pdf; name="Q3 report.pdf"`},
+		{"non-ascii", "résumé.pdf", `attachment; filename*=utf-8''r%C3%A9sum%C3%A9.pdf`, `application/pdf; name="=?utf-8?b?csOpc3Vtw6kucGRm?="`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg := &ComposeMessage{
+				From:        Address{Address: "me@example.com"},
+				To:          []Address{{Address: "you@example.com"}},
+				TextBody:    "See attached",
+				Attachments: []Attachment{{Filename: tt.filename, ContentType: "application/pdf", Content: []byte("x")}},
+			}
+			raw, err := msg.ToRFC822()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := string(raw)
+			if !strings.Contains(s, "Content-Disposition: "+tt.wantDisposition+"\r\n") {
+				t.Errorf("missing disposition %q in:\n%s", tt.wantDisposition, s)
+			}
+			if !strings.Contains(s, "Content-Type: "+tt.wantType+"\r\n") {
+				t.Errorf("missing content type %q in:\n%s", tt.wantType, s)
+			}
+			for i := 0; i < len(s); i++ {
+				if s[i] > 127 {
+					t.Fatalf("raw 8-bit byte in message at offset %d", i)
+				}
+			}
+		})
+	}
+}
+
+func TestToRFC822_LongNonASCIIFilename(t *testing.T) {
+	filename := strings.Repeat("報告書", 60) + ".pdf"
+	msg := &ComposeMessage{
+		From:        Address{Address: "me@example.com"},
+		To:          []Address{{Address: "you@example.com"}},
+		TextBody:    "See attached",
+		Attachments: []Attachment{{Filename: filename, ContentType: "application/pdf; name=old.pdf", Content: []byte("x")}},
+	}
+	raw, err := msg.ToRFC822()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	for _, line := range strings.Split(s, "\r\n") {
+		if len(line) > 100 {
+			t.Errorf("line is %d chars: %q", len(line), line)
+		}
+	}
+	// Unfold the part headers and check that both parse back to the name.
+	unfolded := strings.ReplaceAll(s, "\r\n ", " ")
+	// The attachment is the last part, so take each header's last occurrence.
+	header := func(name string) string {
+		i := strings.LastIndex(unfolded, "\r\n"+name+": ")
+		if i < 0 {
+			t.Fatalf("missing %s in:\n%s", name, s)
+		}
+		v, _, _ := strings.Cut(unfolded[i+len(name)+4:], "\r\n")
+		return v
+	}
+	_, params, err := mime.ParseMediaType(header("Content-Disposition"))
+	if err != nil || params["filename"] != filename {
+		t.Errorf("disposition filename = %q, err %v", params["filename"], err)
+	}
+	ct := header("Content-Type")
+	if strings.Count(ct, "name=") != 1 {
+		t.Errorf("want one name parameter, got %q", ct)
+	}
+	_, params, err = mime.ParseMediaType(ct)
+	if err != nil {
+		t.Fatalf("content type %q: %v", ct, err)
+	}
+	if got, _ := new(mime.WordDecoder).DecodeHeader(params["name"]); got != filename {
+		t.Errorf("content type name = %q", got)
 	}
 }

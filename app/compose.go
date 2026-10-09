@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -1034,8 +1035,8 @@ func parseAddressList(s string) []smtp.Address {
 	var smtpAddrs []smtp.Address
 	if err := json.Unmarshal([]byte(s), &smtpAddrs); err == nil {
 		// Check if the addresses actually have data (not just zero values)
-		if len(smtpAddrs) > 0 && smtpAddrs[0].Address != "" {
-			return smtpAddrs
+		if addrs := slices.DeleteFunc(smtpAddrs, noAddress); len(addrs) > 0 {
+			return addrs
 		}
 	}
 
@@ -1050,9 +1051,10 @@ func parseAddressList(s string) []smtp.Address {
 				Address: strings.TrimSpace(msgAddr.Email),
 			})
 		}
-		if len(addrs) > 0 && addrs[0].Address != "" {
-			return addrs
-		}
+		// A JSON list is never a legacy comma list: entries without an
+		// address (group markers such as "undisclosed-recipients:;" synced
+		// before they were filtered) are dropped, not re-split.
+		return slices.DeleteFunc(addrs, noAddress)
 	}
 
 	// Try as comma-separated list (legacy format)
@@ -1077,6 +1079,9 @@ func parseAddressList(s string) []smtp.Address {
 	}
 	return result
 }
+
+// noAddress reports whether a has no email address (e.g. a group marker).
+func noAddress(a smtp.Address) bool { return a.Address == "" }
 
 // filterSelfAddresses removes the user's own addresses from a list
 func filterSelfAddresses(addrs []smtp.Address, selfEmails map[string]bool) []smtp.Address {
@@ -1151,7 +1156,7 @@ func addressListToJSON(addrs []smtp.Address) string {
 // sanitizeAttachmentFilename strips path separators and control characters
 // from a sender-supplied filename before it's emitted in outgoing MIME
 // headers, and caps its length. Defense-in-depth — ToRFC822 already quotes
-// the value (filename=%q), so this guards odd receivers, not our emission.
+// the value (mime.FormatMediaType), so this guards odd receivers, not our emission.
 func sanitizeAttachmentFilename(name string) string {
 	var b strings.Builder
 	for _, r := range name {

@@ -624,7 +624,7 @@
 
       <!-- Snippet (with highlighting if in search mode). Search results
            always show it so the match is visible; otherwise it follows
-           the "Show message preview" setting. -->
+           the message preview setting (shown in Settings as "Hide message preview"). -->
       {#if highlightedSnippet}
         <p class="truncate {densityClasses.text[density]} text-muted-foreground">
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->

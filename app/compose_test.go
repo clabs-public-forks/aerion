@@ -79,3 +79,30 @@ func TestQuotedHTMLReferencesCID(t *testing.T) {
 		})
 	}
 }
+
+func TestParseAddressList(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"empty", "", nil},
+		{"message JSON", `[{"name":"Al","email":"al@example.com"}]`, []string{"al@example.com"}},
+		{"smtp JSON", `[{"name":"Al","address":"al@example.com"}]`, []string{"al@example.com"}},
+		{"group markers only", `[{"name":"","email":""},{"name":"","email":""}]`, nil},
+		{"group markers around address", `[{"name":"","email":""},{"name":"Al","email":"al@example.com"}]`, []string{"al@example.com"}},
+		{"empty JSON list", `[]`, nil},
+		{"legacy comma list", "Al <al@example.com>, bo@example.com", []string{"al@example.com", "bo@example.com"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var got []string
+			for _, a := range parseAddressList(c.in) {
+				got = append(got, a.Address)
+			}
+			if strings.Join(got, ",") != strings.Join(c.want, ",") {
+				t.Errorf("parseAddressList(%q) = %v, want %v", c.in, got, c.want)
+			}
+		})
+	}
+}

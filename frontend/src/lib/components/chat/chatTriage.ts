@@ -18,7 +18,7 @@ export interface TriageChat {
 
 // Triage handlers a chat row calls, implemented by ChatList.
 export interface ChatRowActions {
-  onDone: () => void
+  onArchive: () => void
   onPin: () => void
   onSnooze: (until: Date) => void
   onUnsnooze: () => void

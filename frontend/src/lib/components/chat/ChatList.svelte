@@ -203,7 +203,7 @@
     void chatList.reload(true)
   }
 
-  async function done(c: ChatItem) {
+  async function archive(c: ChatItem) {
     if (await archiveChat(c.messageIds, reloadAfterUndo)) afterRemoval(c)
   }
 
@@ -218,7 +218,7 @@
 
   function rowActions(c: ChatItem): ChatRowActions {
     return {
-      onDone: () => void done(c),
+      onArchive: () => void archive(c),
       onPin: () => void pinChat(c, !c.isPinned, reloadAfterUndo),
       onSnooze: (until) => void snooze(c, until),
       onUnsnooze: () => void unsnoozeChat(c, reloadAfterUndo),
@@ -227,7 +227,7 @@
     }
   }
 
-  export function doneSelected() { if (selected) void done(selected) }
+  export function archiveSelected() { if (selected) void archive(selected) }
   export function pinSelected() { if (selected) void pinChat(selected, !selected.isPinned, reloadAfterUndo) }
   export function markSelectedUnread() { if (selected) void markChatUnread(selected.messageIds) }
   export function toggleSelectedSenderLow() { if (selected) toggleSenderLow(selected) }

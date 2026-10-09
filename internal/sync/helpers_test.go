@@ -3,6 +3,8 @@ package sync
 import (
 	"strings"
 	"testing"
+
+	"github.com/emersion/go-imap/v2"
 )
 
 func TestGenerateSnippet(t *testing.T) {
@@ -56,5 +58,20 @@ func TestStripHTMLTags_Empty(t *testing.T) {
 
 	if result != "" {
 		t.Errorf("stripHTMLTags('') = %q, want empty string", result)
+	}
+}
+
+func TestAddressListToJSON_SkipsGroupMarkers(t *testing.T) {
+	// "To: undisclosed-recipients:;" arrives as group start/end markers.
+	addrs := []imap.Address{
+		{Mailbox: "undisclosed-recipients"},
+		{},
+		{Name: "Al", Mailbox: "al", Host: "example.com"},
+	}
+	if got, want := addressListToJSON(addrs), `[{"name":"Al","email":"al@example.com"}]`; got != want {
+		t.Errorf("addressListToJSON = %s, want %s", got, want)
+	}
+	if got := addressListToJSON([]imap.Address{{Mailbox: "undisclosed-recipients"}, {}}); got != "[]" {
+		t.Errorf("group-only list = %s, want []", got)
 	}
 }

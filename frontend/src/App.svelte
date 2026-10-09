@@ -1452,7 +1452,7 @@
       return true
     }
     if (KEY.CHAT_DONE(e)) {
-      if (hasSelection) list!.doneSelected()
+      if (hasSelection) list!.archiveSelected()
       else if (hasConversation) viewerRef?.archive()
       return hasSelection || hasConversation
     }

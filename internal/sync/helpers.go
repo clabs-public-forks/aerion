@@ -85,12 +85,17 @@ func addressListToJSON(addrs []imap.Address) string {
 		Email string `json:"email"`
 	}
 
-	list := make([]addr, len(addrs))
-	for i, a := range addrs {
-		list[i] = addr{
-			Name:  decodeMIMEWord(a.Name),
-			Email: a.Addr(),
+	list := make([]addr, 0, len(addrs))
+	for _, a := range addrs {
+		// Group markers (e.g. "undisclosed-recipients:;") carry no address.
+		email := a.Addr()
+		if email == "" {
+			continue
 		}
+		list = append(list, addr{
+			Name:  decodeMIMEWord(a.Name),
+			Email: email,
+		})
 	}
 
 	data, _ := json.Marshal(list)

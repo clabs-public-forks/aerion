@@ -86,11 +86,11 @@ Reserve a fixed checkbox column in the message list instead of revealing it on h
 
 By default, inside the message list column, the area where the checkbox on the left of the message is located is covered by the message and on mouseover, the message will shift to the right and show that area. In mobile layout, swiping to the right will auto select the message which solves the problem of not being able to do mouse over on a mobile device. If you prefer the original design where the checkbox area is always shown with the checkboxes always visiable in mobile layout, toggle this setting on.
 
-### Show message preview
+### Hide message preview
 
-Show a line of the message body below the subject in the message list.
+Hide the line of the latest message below the subject in the chat list and the classic message list.
 
-Disabled by default, so each message in the list shows only the sender and subject. Search results always show the matching preview text, regardless of this setting, so you can see why a message matched.
+Enabled by default, so each chat in the list shows only the people and subject. Search results always show the matching preview text, regardless of this setting, so you can see why a message matched.
 
 ### Show colored circles in message list
 
@@ -234,7 +234,7 @@ Options for the chat-style mail list, thread view, and reply box.
 
 On by default. Chat replies quote the replied-to message below your text, so recipients using traditional email clients keep the context. The quote stays hidden in the chat view.
 
-### After Done, Snooze, Delete, or Move
+### After Archive, Snooze, Delete, or Move
 
 Which chat opens when the current one leaves the list (dragging a chat onto a sidebar folder does not open another): the next (older) chat, which is the default, or the previous (newer) chat.
 

@@ -112,7 +112,13 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 
 	// Write headers
 	writeHeader(&buf, "From", m.From.String())
-	writeHeader(&buf, "To", formatAddresses(m.To))
+	// An empty or missing To header is a common spam-filter signal (e.g.
+	// SpamAssassin MISSING_HEADERS), so Bcc-only mail names an empty group.
+	to := "undisclosed-recipients:;"
+	if len(m.To) > 0 {
+		to = formatAddresses(m.To)
+	}
+	writeHeader(&buf, "To", to)
 	if len(m.Cc) > 0 {
 		writeHeader(&buf, "Cc", formatAddresses(m.Cc))
 	}
@@ -187,11 +193,54 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// writeHeader writes a single header line.
-// CRLF characters are stripped from the value to prevent header injection.
+// maxHeaderLineLen is the RFC 5322 recommended header line length.
+const maxHeaderLineLen = 78
+
+// writeHeader writes a single header field, folded at whitespace so lines
+// stay within RFC 5322 limits (a long References chain or recipient list
+// otherwise exceeds the 998-octet hard limit, which servers and spam filters
+// reject). CRLF characters are stripped from the value to prevent header
+// injection.
 func writeHeader(w io.Writer, name, value string) {
 	value = strings.NewReplacer("\r\n", "", "\r", "", "\n", "").Replace(value)
-	fmt.Fprintf(w, "%s: %s\r\n", name, value)
+	fmt.Fprintf(w, "%s\r\n", foldHeader(name, value))
+}
+
+// foldHeader returns "name: value", inserting CRLF before whitespace wherever
+// a line would exceed maxHeaderLineLen. Unfolding (removing the CRLFs)
+// restores the original value. Single words longer than the limit stay whole.
+func foldHeader(name, value string) string {
+	return name + ": " + foldValue(len(name)+2, value)
+}
+
+// foldValue folds value as foldHeader does, for a value that starts at
+// column lineLen.
+func foldValue(lineLen int, value string) string {
+	var b strings.Builder
+	for i, word := range strings.Split(value, " ") {
+		if i > 0 {
+			if word != "" && lineLen+1+len(word) > maxHeaderLineLen {
+				b.WriteString("\r\n")
+				lineLen = 0
+			}
+			b.WriteString(" ")
+			lineLen++
+		}
+		b.WriteString(word)
+		lineLen += len(word)
+	}
+	return b.String()
+}
+
+// createPart starts a MIME part with its header values folded like top-level
+// headers; multipart.Writer writes part header values verbatim.
+func createPart(w *multipart.Writer, header textproto.MIMEHeader) (io.Writer, error) {
+	for name, values := range header {
+		for i, v := range values {
+			values[i] = foldValue(len(name)+2, v)
+		}
+	}
+	return w.CreatePart(header)
 }
 
 // formatAddresses formats a list of addresses for headers
@@ -205,18 +254,18 @@ func formatAddresses(addrs []Address) string {
 
 // encodeSubject encodes the subject line if needed
 func encodeSubject(subject string) string {
-	// Check if encoding is needed
-	needsEncoding := false
-	for _, r := range subject {
-		if r > 127 {
-			needsEncoding = true
-			break
+	// Encode returns subject unchanged when it needs no encoding.
+	return mime.QEncoding.Encode("utf-8", subject)
+}
+
+// isASCII reports whether s contains only 7-bit characters.
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > 127 {
+			return false
 		}
 	}
-	if needsEncoding {
-		return mime.QEncoding.Encode("utf-8", subject)
-	}
-	return subject
+	return true
 }
 
 // writeQuotedPrintable writes content using quoted-printable encoding
@@ -239,7 +288,7 @@ func writeMultipartAlternative(w *bytes.Buffer, textBody, htmlBody string) error
 	textHeader.Set("Content-Type", "text/plain; charset=utf-8")
 	textHeader.Set("Content-Transfer-Encoding", "quoted-printable")
 
-	textPart, err := mpWriter.CreatePart(textHeader)
+	textPart, err := createPart(mpWriter, textHeader)
 	if err != nil {
 		return err
 	}
@@ -250,7 +299,7 @@ func writeMultipartAlternative(w *bytes.Buffer, textBody, htmlBody string) error
 	htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
 	htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
 
-	htmlPart, err := mpWriter.CreatePart(htmlHeader)
+	htmlPart, err := createPart(mpWriter, htmlHeader)
 	if err != nil {
 		return err
 	}
@@ -284,7 +333,7 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 		altHeader := textproto.MIMEHeader{}
 		altHeader.Set("Content-Type", fmt.Sprintf("multipart/alternative; boundary=%q", altBoundary))
 
-		bodyPart, err := mpWriter.CreatePart(altHeader)
+		bodyPart, err := createPart(mpWriter, altHeader)
 		if err != nil {
 			return err
 		}
@@ -298,7 +347,7 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 		textHeader := textproto.MIMEHeader{}
 		textHeader.Set("Content-Type", "text/plain; charset=utf-8")
 		textHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-		textPart, err := altWriter.CreatePart(textHeader)
+		textPart, err := createPart(altWriter, textHeader)
 		if err != nil {
 			return err
 		}
@@ -313,7 +362,7 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 			htmlHeader := textproto.MIMEHeader{}
 			htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
 			htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-			htmlPart, err := altWriter.CreatePart(htmlHeader)
+			htmlPart, err := createPart(altWriter, htmlHeader)
 			if err != nil {
 				return err
 			}
@@ -332,7 +381,7 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 			htmlHeader := textproto.MIMEHeader{}
 			htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
 			htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-			bodyPart, err := mpWriter.CreatePart(htmlHeader)
+			bodyPart, err := createPart(mpWriter, htmlHeader)
 			if err != nil {
 				return err
 			}
@@ -342,7 +391,7 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 		textHeader := textproto.MIMEHeader{}
 		textHeader.Set("Content-Type", "text/plain; charset=utf-8")
 		textHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-		bodyPart, err := mpWriter.CreatePart(textHeader)
+		bodyPart, err := createPart(mpWriter, textHeader)
 		if err != nil {
 			return err
 		}
@@ -366,7 +415,7 @@ func writeRelatedPart(parentWriter *multipart.Writer, htmlBody string, inlineAtt
 	relHeader := textproto.MIMEHeader{}
 	relHeader.Set("Content-Type", fmt.Sprintf("multipart/related; boundary=%q", relBoundary))
 
-	relPart, err := parentWriter.CreatePart(relHeader)
+	relPart, err := createPart(parentWriter, relHeader)
 	if err != nil {
 		return err
 	}
@@ -380,7 +429,7 @@ func writeRelatedPart(parentWriter *multipart.Writer, htmlBody string, inlineAtt
 	htmlHeader := textproto.MIMEHeader{}
 	htmlHeader.Set("Content-Type", "text/html; charset=utf-8")
 	htmlHeader.Set("Content-Transfer-Encoding", "quoted-printable")
-	htmlPart, err := relWriter.CreatePart(htmlHeader)
+	htmlPart, err := createPart(relWriter, htmlHeader)
 	if err != nil {
 		return err
 	}
@@ -404,11 +453,11 @@ func writeAttachment(w *multipart.Writer, att Attachment) error {
 	}
 
 	header := textproto.MIMEHeader{}
-	header.Set("Content-Type", contentType)
+	header.Set("Content-Type", attachmentContentType(contentType, att.Filename))
 	header.Set("Content-Transfer-Encoding", "base64")
-	header.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", att.Filename))
+	header.Set("Content-Disposition", attachmentDisposition("attachment", att.Filename))
 
-	part, err := w.CreatePart(header)
+	part, err := createPart(w, header)
 	if err != nil {
 		return err
 	}
@@ -448,14 +497,14 @@ func writeInlineAttachment(w *multipart.Writer, att Attachment) error {
 	}
 
 	header := textproto.MIMEHeader{}
-	header.Set("Content-Type", contentType)
+	header.Set("Content-Type", attachmentContentType(contentType, att.Filename))
 	header.Set("Content-Transfer-Encoding", "base64")
-	header.Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", att.Filename))
+	header.Set("Content-Disposition", attachmentDisposition("inline", att.Filename))
 	if att.ContentID != "" {
 		header.Set("Content-ID", fmt.Sprintf("<%s>", att.ContentID))
 	}
 
-	part, err := w.CreatePart(header)
+	part, err := createPart(w, header)
 	if err != nil {
 		return err
 	}
@@ -472,6 +521,94 @@ func writeInlineAttachment(w *multipart.Writer, att Attachment) error {
 		return err
 	}
 	return encoder.Close()
+}
+
+// attachmentDisposition builds a Content-Disposition value. Non-ASCII
+// filenames use RFC 2231 percent-encoding (filename* with a utf-8 prefix)
+// instead of raw 8-bit bytes, which are invalid in headers without SMTPUTF8,
+// split into RFC 2231 continuations so the header can fold within line limits.
+func attachmentDisposition(disposition, filename string) string {
+	if filename != "" && !isASCII(filename) {
+		return disposition + "; " + rfc2231Param("filename", filename)
+	}
+	if v := mime.FormatMediaType(disposition, map[string]string{"filename": filename}); v != "" {
+		return v
+	}
+	return disposition
+}
+
+// attachmentContentType sets the legacy name parameter that Outlook and
+// other clients read when Content-Disposition lacks a usable filename,
+// replacing any name already present. Non-ASCII names use RFC 2047
+// encoded-words inside the quoted value; RFC 2047 does not sanction that,
+// but it is what Gmail, Outlook and Thunderbird send and read.
+func attachmentContentType(contentType, filename string) string {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || filename == "" {
+		return contentType
+	}
+	ascii := isASCII(filename)
+	delete(params, "name")
+	if ascii {
+		params["name"] = filename
+	}
+	v := mime.FormatMediaType(mediaType, params)
+	if v == "" {
+		return contentType
+	}
+	if !ascii {
+		v += "; name=\"" + mime.BEncoding.Encode("utf-8", filename) + "\""
+	}
+	return v
+}
+
+// rfc2231ChunkLen bounds each RFC 2231 continuation segment.
+const rfc2231ChunkLen = 60
+
+// rfc2231Param encodes a UTF-8 parameter value per RFC 2231 as key*=, or
+// as key*0*=, key*1*=... continuations when the encoded value is long; the
+// first segment carries the utf-8 charset prefix. Segments never split a %XX escape.
+func rfc2231Param(key, value string) string {
+	var chunks []string
+	var cur strings.Builder
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		n := 1
+		if !isAttrChar(c) {
+			n = 3
+		}
+		if cur.Len()+n > rfc2231ChunkLen {
+			chunks = append(chunks, cur.String())
+			cur.Reset()
+		}
+		if n == 1 {
+			cur.WriteByte(c)
+		} else {
+			fmt.Fprintf(&cur, "%%%02X", c)
+		}
+	}
+	chunks = append(chunks, cur.String())
+	if len(chunks) == 1 {
+		return key + "*=utf-8''" + chunks[0]
+	}
+	parts := make([]string, len(chunks))
+	for i, c := range chunks {
+		if i == 0 {
+			c = "utf-8''" + c
+		}
+		parts[i] = fmt.Sprintf("%s*%d*=%s", key, i, c)
+	}
+	return strings.Join(parts, "; ")
+}
+
+// isAttrChar reports whether c may appear unescaped in an RFC 2231
+// extended value (attribute-char: token characters except *, ' and %).
+func isAttrChar(c byte) bool {
+	switch {
+	case c >= 'A' && c <= 'Z', c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		return true
+	}
+	return strings.IndexByte("!#$&+-.^_`|~", c) >= 0
 }
 
 // base64LineWrapper wraps base64 output at 76 characters per line

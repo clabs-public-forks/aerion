@@ -23,7 +23,7 @@
 
 - Threads show as chat bubbles, with quoted history and signatures hidden
 - A docked reply box at the bottom of each conversation
-- Keyboard triage: Done, pin, snooze, and mark unread
+- Keyboard triage: archive, pin, snooze, and mark unread
 - A Low priority split that keeps newsletters and other bulk mail out of the main list
 - Pin, snooze, and sender priority are stored on this computer and are not synced to the server
 

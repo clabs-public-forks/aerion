@@ -1,8 +1,8 @@
 <script lang="ts">
   // ChatBubble — one message in the chat thread. New text renders as a
-  // bubble (quoted history behind "•••"); rich mail renders as a card; encrypted
-  // mail, mail without chat text, and "Show original" render the full
-  // sandboxed body. Right-click keeps the shared message context menu.
+  // bubble (quoted history behind a "⋯" marker after the text); rich mail
+  // renders as a card; encrypted mail, mail without chat text, and "Show
+  // original" render the full sandboxed body. Right-click keeps the shared message context menu.
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
   import { GetMessageSource } from '../../../../wailsjs/go/app/App'
@@ -198,13 +198,14 @@
             <div class="px-3.5 py-2 text-sm whitespace-pre-wrap wrap-anywhere">
               {@render text(msg.chat!.text)}
               {#if msg.chat!.hasQuoted}
+                <!-- Quiet marker at the end of the text, not a pill below it -->
                 <button
-                  class="block mt-1 px-2 leading-4 rounded-full text-base tracking-widest {item.mine ? 'bg-primary-foreground/20 hover:bg-primary-foreground/30' : 'bg-foreground/10 hover:bg-foreground/20'}"
+                  class="inline-flex align-middle ml-1.5 -my-1 px-1 rounded opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity {item.mine ? 'hover:bg-primary-foreground/20' : 'hover:bg-foreground/10'}"
                   title={showQuoted ? $_('chat.hideQuoted') : $_('chat.showQuoted')}
                   aria-label={showQuoted ? $_('chat.hideQuoted') : $_('chat.showQuoted')}
                   aria-expanded={showQuoted}
                   onclick={() => (showQuoted = !showQuoted)}
-                >•••</button>
+                ><Icon icon="mdi:dots-horizontal" class="w-4 h-4" /></button>
                 {#if showQuoted}
                   <div class="mt-2 pl-2 border-l-2 text-[13px] opacity-80 {item.mine ? 'border-primary-foreground/40' : 'border-foreground/20'}">
                     {@render text(msg.chat!.quoted ?? '')}

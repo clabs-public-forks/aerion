@@ -94,7 +94,7 @@ These act on the selected chat (the open one after `J`/`K` or a click) from the 
 |----------|--------|
 | `R` / `Enter` (open chat) | Focus the reply box |
 | `Shift+R` | Focus the reply box as Reply All |
-| `E` | Done: archive the chat and open the next one, or the previous one per Settings → Chat (undoable) |
+| `E` | Archive the chat and open the next one, or the previous one per Settings → Chat (undoable) |
 | `Shift+U` | Mark the chat unread |
 | `P` | Pin / unpin (undoable) |
 | `H` | Snooze picker: Later today, Tomorrow, This weekend, Next week, Pick date (undoable) |
@@ -104,7 +104,7 @@ These act on the selected chat (the open one after `J`/`K` or a click) from the 
 | `/` | Focus chat search |
 | `Escape` | In the reply box or open chat: back to the chat list |
 
-Hovering a chat row shows Done, Pin, Snooze and Mark unread buttons; its right-click menu adds Done, Pin, Snooze, Unsnooze and the sender priority switch to the usual message actions.
+Hovering a chat row shows Archive, Pin, Snooze and Mark unread buttons; its right-click menu adds Archive, Pin, Snooze, Unsnooze and the sender priority switch to the usual message actions.
 
 ### Chat View
 

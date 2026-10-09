@@ -76,7 +76,7 @@
 
   const me = $derived(buildMe(accountStore.accounts))
   const target = $derived(replyTarget(thread.messages, me))
-  const composer = new ComposerState({ target: () => target, onArchive: () => void done() })
+  const composer = new ComposerState({ target: () => target, onArchive: () => void archive() })
   // The docked composer shows its own draft; hide draft copies while it has one.
   const shown = $derived(composer.draftId ? thread.messages.filter((m) => !m.isDraft) : thread.messages)
   const items = $derived(
@@ -222,7 +222,7 @@
   }
   const triageTarget = () => ({ accountId: accountId ?? '', threadKey, messageIds })
 
-  async function done() {
+  export async function archive() {
     if (await archiveChat(messageIds, afterUndo)) onActionComplete?.(true)
   }
 
@@ -302,7 +302,6 @@
   export function isImagesLoaded(id: string): boolean { return imagesLoaded.has(id) }
   export function loadImages() { window.dispatchEvent(new CustomEvent('load-remote-images')) }
   export function openAlwaysLoadDropdown() { window.dispatchEvent(new CustomEvent('open-always-load-dropdown')) }
-  export function archive() { void done() }
   export function markRead() { void toggleRead() }
 
   export function reply() { replyAs('reply') }
@@ -318,11 +317,14 @@
       void deleteMessages([focusedMessageId], false)
       return
     }
-    if (isTrash) {
-      showDeleteConfirm = true
-      return
-    }
-    void deleteMessages(messageIds, true)
+    deleteChat()
+  }
+
+  // The header's Delete always acts on the whole chat, whatever bubble has
+  // focus; in Trash it asks before deleting permanently.
+  function deleteChat() {
+    if (isTrash) showDeleteConfirm = true
+    else void deleteMessages(messageIds, true)
   }
 
   export function deletePermanently() {
@@ -402,10 +404,17 @@
       snoozedUntil={chatItem?.snoozedUntil ?? null}
       isLowPriority={chatItem ? chatItem.isLowPriority : null}
       canTriage={!!accountId && !!threadKey}
+      {canReply}
+      {isTrash}
+      {isSpam}
       {showBackButton}
       {onBack}
       {onCompose}
-      onDone={done}
+      onArchive={archive}
+      onReplyChat={focusComposer}
+      onForward={forward}
+      onDelete={deleteChat}
+      onSpam={() => void spam()}
       onPin={togglePin}
       onSnooze={snooze}
       onUnsnooze={unsnooze}

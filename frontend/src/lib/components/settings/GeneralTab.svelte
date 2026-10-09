@@ -393,18 +393,18 @@
       {/if}
     </div>
 
-    <!-- Show the body preview line below the subject in the message list -->
+    <!-- Hide the latest-message line below the subject in the chat list -->
     <div class="space-y-2">
       <div class="flex items-center justify-between">
         <div>
-          <Label for="show-message-preview">{$_('settingsGeneral.showMessagePreview')}</Label>
+          <Label for="hide-message-preview">{$_('settingsGeneral.hideMessagePreview')}</Label>
           <p class="text-xs text-muted-foreground">
-            {$_('settingsGeneral.showMessagePreviewHelp')}
+            {$_('settingsGeneral.hideMessagePreviewHelp')}
           </p>
         </div>
         <Switch
-          id="show-message-preview"
-          bind:checked={showMessagePreview}
+          id="hide-message-preview"
+          bind:checked={() => !showMessagePreview, (v) => (showMessagePreview = !v)}
         />
       </div>
     </div>

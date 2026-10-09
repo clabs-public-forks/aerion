@@ -1,8 +1,9 @@
 <script lang="ts">
   // ChatRow — one chat in the chat list: people first (avatar + names), then
-  // subject, then the latest line. Hovered or selected rows show triage
-  // actions (Done, Pin, Snooze, Unread); right-click opens the shared message
-  // context menu for the whole thread, with the triage actions on top.
+  // subject, then the latest line unless Settings hides previews. Hovered or
+  // selected rows show triage actions (Archive, Pin, Snooze, Unread);
+  // right-click opens the shared message context menu for the whole thread,
+  // with the triage actions on top.
   import { tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
@@ -12,6 +13,7 @@
   import { ContextMenuItem } from '$lib/components/ui/context-menu'
   import { contactPhotos } from '$lib/stores/contactPhotos.svelte'
   import { getLayoutMode } from '$lib/stores/layout.svelte'
+  import { getShowMessagePreview } from '$lib/stores/settings.svelte'
   import type { ChatItem, ChatPerson } from '$lib/stores/chat.svelte'
   import ChatSnoozeMenu from './ChatSnoozeMenu.svelte'
   import { chatPeople, displayName } from './chatFormat'
@@ -66,6 +68,8 @@
   })
 
   const hasUnread = $derived(chat.unreadCount > 0)
+  // Search results always show the matching text.
+  const showPreview = $derived(getShowMessagePreview() || !!chat.highlightedSnippet)
   const time = $derived(formatRelativeDate(chat.latestDate))
   const snoozeTime = $derived(chat.snoozedUntil ? formatSnoozedUntil(chat.snoozedUntil) : '')
 
@@ -100,7 +104,7 @@
 {/snippet}
 
 {#snippet extraItems()}
-  <ContextMenuItem onSelect={actions.onDone}><Icon icon="mdi:check" class="mr-2 h-4 w-4" />{$_('chat.done')}</ContextMenuItem>
+  <ContextMenuItem onSelect={actions.onArchive}><Icon icon="mdi:archive-outline" class="mr-2 h-4 w-4" />{$_('viewer.archive')}</ContextMenuItem>
   <ContextMenuItem onSelect={actions.onPin}>
     <Icon icon={chat.isPinned ? 'mdi:pin-off-outline' : 'mdi:pin-outline'} class="mr-2 h-4 w-4" />{chat.isPinned ? $_('chat.unpin') : $_('chat.pin')}
   </ContextMenuItem>
@@ -113,6 +117,22 @@
     <Icon icon={chat.isLowPriority ? 'mdi:account-arrow-up-outline' : 'mdi:newspaper-variant-outline'} class="mr-2 h-4 w-4" />
     {chat.isLowPriority ? $_('chat.moveSenderToPriority') : $_('chat.moveSenderToLow')}
   </ContextMenuItem>
+{/snippet}
+
+{#snippet repliedIcon()}
+  <span title={$_('chat.youRepliedLast')}><Icon icon="mdi:reply" class="inline w-3.5 h-3.5 -mt-0.5 text-muted-foreground" /></span>
+{/snippet}
+
+{#snippet statusIcons()}
+  <span class="flex items-center gap-1 shrink-0 text-muted-foreground" aria-hidden="true">
+    {#if chat.isEncrypted}<Icon icon="mdi:lock" class="w-3.5 h-3.5" />{/if}
+    {#if chat.hasAttachments}<Icon icon="mdi:paperclip" class="w-3.5 h-3.5" />{/if}
+    {#if chat.snoozedUntil}<span title={$_('chat.snoozedUntil', { values: { time: snoozeTime } })}><Icon icon="mdi:alarm-snooze" class="w-3.5 h-3.5" /></span>{/if}
+    {#if chat.isPinned}<Icon icon="mdi:pin" class="w-3.5 h-3.5" />{/if}
+    {#if hasUnread}
+      <span class="min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold leading-5 text-center">{chat.unreadCount}</span>
+    {/if}
+  </span>
 {/snippet}
 
 {#snippet avatar(p: ChatPerson | undefined, size: number)}
@@ -170,30 +190,26 @@
         <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}">{title}</span>
         <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'}">{time}</span>
       </div>
-      <!-- Subject -->
-      <div class="truncate text-xs text-muted-foreground">
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
-        {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{chat.subject}{/if}
-      </div>
-      <!-- Latest line + status icons -->
+      <!-- Subject, with the status icons when the latest line is hidden -->
       <div class="flex items-center gap-1.5">
-        <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
-          {#if chat.lastFromMe}
-            <span title={$_('chat.youRepliedLast')}><Icon icon="mdi:reply" class="inline w-3.5 h-3.5 -mt-0.5 text-muted-foreground" /></span>
-          {/if}
+        <span class="flex-1 min-w-0 truncate text-xs {!showPreview && hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
+          {#if !showPreview && chat.lastFromMe}{@render repliedIcon()}{/if}
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
-          {#if chat.highlightedSnippet}{@html chat.highlightedSnippet}{:else}{chat.snippet}{/if}
+          {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{chat.subject}{/if}
         </span>
-        <span class="flex items-center gap-1 shrink-0 text-muted-foreground" aria-hidden="true">
-          {#if chat.isEncrypted}<Icon icon="mdi:lock" class="w-3.5 h-3.5" />{/if}
-          {#if chat.hasAttachments}<Icon icon="mdi:paperclip" class="w-3.5 h-3.5" />{/if}
-          {#if chat.snoozedUntil}<span title={$_('chat.snoozedUntil', { values: { time: snoozeTime } })}><Icon icon="mdi:alarm-snooze" class="w-3.5 h-3.5" /></span>{/if}
-          {#if chat.isPinned}<Icon icon="mdi:pin" class="w-3.5 h-3.5" />{/if}
-          {#if hasUnread}
-            <span class="min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold leading-5 text-center">{chat.unreadCount}</span>
-          {/if}
-        </span>
+        {#if !showPreview}{@render statusIcons()}{/if}
       </div>
+      {#if showPreview}
+        <!-- Latest line + status icons -->
+        <div class="flex items-center gap-1.5">
+          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
+            {#if chat.lastFromMe}{@render repliedIcon()}{/if}
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
+            {#if chat.highlightedSnippet}{@html chat.highlightedSnippet}{:else}{chat.snippet}{/if}
+          </span>
+          {@render statusIcons()}
+        </div>
+      {/if}
     </div>
 
     {#if showActions}
@@ -206,7 +222,7 @@
         onclick={(e) => e.stopPropagation()}
         onkeydown={(e) => e.stopPropagation()}
       >
-        {@render action('mdi:check', $_('chat.done'), actions.onDone)}
+        {@render action('mdi:archive-outline', $_('viewer.archive'), actions.onArchive)}
         {@render action(chat.isPinned ? 'mdi:pin-off-outline' : 'mdi:pin-outline', chat.isPinned ? $_('chat.unpin') : $_('chat.pin'), actions.onPin)}
         <ChatSnoozeMenu
           bind:this={snoozeMenu}
