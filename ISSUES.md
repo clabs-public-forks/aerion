@@ -24,3 +24,24 @@ has not yet been confirmed against the code.
 
 - **C12 medium** contacts backend: EXT_RULES R1, R2, R5 and R6 (see A4).
   Architectural.
+
+### Calendar
+
+- **C16 low** `extensions/calendar/backend/alarm.go` `RefreshAllAlarms` and
+  `alarm_scheduler.go`: the alarm refresh scales poorly with large
+  calendars. It runs one `ListOverrides` query per event. It recomputes every
+  event on each `calendar:sync-complete`, which `sync.go` publishes once per
+  source, so syncing N sources does N full refreshes. `Start` runs the first
+  refresh synchronously inside `ensureInit`, which blocks the first calendar
+  call after launch. Fixing it needs batched override loading, per-source
+  refresh, and an async initial pass.
+- **C17 low** DAV TLS trust (follow-up to S8): CardDAV and CalDAV servers
+  with self-signed certificates now need trust pinned to that exact host,
+  and the DAV setup flow has no certificate-accept prompt like the mail
+  account flow does. Such servers can't be added from the UI.
+
+### Dependencies
+
+- **D2 low** `frontend/package.json`: TypeScript is held at 6.0.x.
+  TypeScript 7 is blocked by peer ranges: `typescript-eslint` requires
+  `<6.1.0` and `svelte-check` requires `^5 || ^6`. Upgrade once both accept 7.
