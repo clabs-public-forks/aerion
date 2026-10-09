@@ -39,6 +39,11 @@ type TokenResponse struct {
 	IDToken      string `json:"id_token,omitempty"` // OpenID Connect
 }
 
+// ExpiresAt returns when the access token expires, counting ExpiresIn from now.
+func (t *TokenResponse) ExpiresAt() time.Time {
+	return time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
+}
+
 // UserInfo represents basic user information from ID token or userinfo endpoint
 type UserInfo struct {
 	Email string `json:"email"`

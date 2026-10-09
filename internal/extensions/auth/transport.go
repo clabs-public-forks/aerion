@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
 	"github.com/hkdb/aerion/internal/credentials"
@@ -116,7 +115,7 @@ func (t *bearerRefreshTransport) freshToken(sent string) (string, error) {
 		return "", fmt.Errorf("auth broker: refresh: %w", err)
 	}
 
-	expiresAt := time.Now().Add(time.Duration(refreshed.ExpiresIn) * time.Second)
+	expiresAt := refreshed.ExpiresAt()
 	// Persist the rotated refresh token too — providers like Microsoft and custom
 	// OIDC return a NEW refresh_token on refresh; dropping it breaks the next one.
 	if err := t.credStore.UpdateOAuthTokensForClientConfig(t.accountID, t.clientConfigID, refreshed.AccessToken, refreshed.RefreshToken, expiresAt); err != nil {

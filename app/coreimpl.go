@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -327,7 +326,7 @@ func (a *extensionAuth) StartIncrementalConsent(req coreapi.StartIncrementalCons
 		Provider:     baseProvider.Name,
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
-		ExpiresAt:    time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second),
+		ExpiresAt:    tokens.ExpiresAt(),
 		Scopes:       unioned,
 	}
 

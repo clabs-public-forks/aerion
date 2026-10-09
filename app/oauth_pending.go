@@ -37,7 +37,9 @@ func (a *App) setPendingCustomProvider(p *oauth2.ProviderConfig) {
 func (a *App) setPendingContactSourceOAuth(tokens *oauth2.TokenResponse, email, provider string) {
 	a.pendingOAuthMu.Lock()
 	defer a.pendingOAuthMu.Unlock()
-	a.setPendingContactSourceOAuthLocked(tokens, email, provider)
+	a.pendingContactSourceOAuthTokens = tokens
+	a.pendingContactSourceOAuthEmail = email
+	a.pendingContactSourceOAuthProvider = provider
 }
 
 func (a *App) pendingContactSourceOAuth() (*oauth2.TokenResponse, string, string) {
@@ -52,12 +54,8 @@ func (a *App) clearPendingContactSourceOAuth(tokens *oauth2.TokenResponse) {
 	a.pendingOAuthMu.Lock()
 	defer a.pendingOAuthMu.Unlock()
 	if a.pendingContactSourceOAuthTokens == tokens {
-		a.setPendingContactSourceOAuthLocked(nil, "", "")
+		a.pendingContactSourceOAuthTokens = nil
+		a.pendingContactSourceOAuthEmail = ""
+		a.pendingContactSourceOAuthProvider = ""
 	}
-}
-
-func (a *App) setPendingContactSourceOAuthLocked(tokens *oauth2.TokenResponse, email, provider string) {
-	a.pendingContactSourceOAuthTokens = tokens
-	a.pendingContactSourceOAuthEmail = email
-	a.pendingContactSourceOAuthProvider = provider
 }

@@ -205,7 +205,7 @@ func (a *App) CompleteOAuthAccountSetup(provider, email, accountName, displayNam
 	}
 
 	// Calculate token expiry
-	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
+	expiresAt := pendingTokens.ExpiresAt()
 
 	// Save OAuth tokens
 	tokens := &credentials.OAuthTokens{
@@ -389,7 +389,7 @@ func (a *App) CompleteCustomOAuthAccountSetup(config account.AccountConfig) (*ac
 		return nil, fmt.Errorf("failed to create account: %w", err)
 	}
 
-	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
+	expiresAt := pendingTokens.ExpiresAt()
 	tokens := &credentials.OAuthTokens{
 		Provider:     customOAuthProviderName,
 		AccessToken:  pendingTokens.AccessToken,
@@ -476,7 +476,7 @@ func (a *App) SavePendingOAuthTokens(accountID string) error {
 	}
 
 	// Calculate expiry time
-	expiresAt := time.Now().Add(time.Duration(pendingTokens.ExpiresIn) * time.Second)
+	expiresAt := pendingTokens.ExpiresAt()
 
 	tokens := &credentials.OAuthTokens{
 		Provider:     provider,
