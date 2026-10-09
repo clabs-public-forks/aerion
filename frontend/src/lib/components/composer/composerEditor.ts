@@ -5,60 +5,22 @@ import { Editor, Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
-import { TextStyle, Color, FontSize } from '@tiptap/extension-text-style'
+import { FontSize } from '@tiptap/extension-text-style'
 import TextAlign from '@tiptap/extension-text-align'
-import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table'
 import { parseFileUris } from './composerUtils'
+import {
+  ExtendedTextStyle,
+  ExtendedColor,
+  ExtendedTable,
+  ExtendedTableCell,
+  ExtendedTableHeader,
+} from './tiptapExtensions'
 import { get } from 'svelte/store'
 import { _ } from 'svelte-i18n'
 import { Spellcheck } from '$lib/spellcheck/plugin'
 import { syncSpellcheckLanguages } from '$lib/spellcheck/settings'
 
-/**
- * Extended TextStyle to handle legacy <font> tags from signatures/pasted content
- */
-export const ExtendedTextStyle = TextStyle.extend({
-  parseHTML() {
-    return [
-      { tag: 'span' },
-      { tag: 'font' },
-    ]
-  },
-})
-
-/**
- * Extended Color to handle legacy <font color="..."> tags
- */
-export const ExtendedColor = Color.extend({
-  addGlobalAttributes() {
-    return [
-      {
-        types: this.options.types,
-        attributes: {
-          color: {
-            default: null,
-            parseHTML: (element: HTMLElement) => {
-              const styleColor = element.style.color?.replace(/['"]+/g, '')
-              if (styleColor) return styleColor
-              if (element.tagName === 'FONT') {
-                return element.getAttribute('color')
-              }
-              return null
-            },
-            renderHTML: (attributes: Record<string, string>) => {
-              if (!attributes.color) {
-                return {}
-              }
-              return {
-                style: `color: ${attributes.color}`,
-              }
-            },
-          },
-        },
-      },
-    ]
-  },
-})
 
 /**
  * Extended Image that preserves the data-original-src attribute.
@@ -115,56 +77,6 @@ const ComposerImage = Image.extend({
   },
 })
 
-/**
- * Extended Table extensions to preserve inline style attributes
- */
-const ExtendedTable = Table.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      style: {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-        renderHTML: (attributes: Record<string, string>) => {
-          if (!attributes.style) return {}
-          return { style: attributes.style }
-        },
-      },
-    }
-  },
-})
-
-const ExtendedTableCell = TableCell.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      style: {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-        renderHTML: (attributes: Record<string, string>) => {
-          if (!attributes.style) return {}
-          return { style: attributes.style }
-        },
-      },
-    }
-  },
-})
-
-const ExtendedTableHeader = TableHeader.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      style: {
-        default: null,
-        parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-        renderHTML: (attributes: Record<string, string>) => {
-          if (!attributes.style) return {}
-          return { style: attributes.style }
-        },
-      },
-    }
-  },
-})
 
 export interface ComposerEditorHandlers {
   onUpdate?: () => void

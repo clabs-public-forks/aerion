@@ -5,103 +5,17 @@
   import StarterKit from '@tiptap/starter-kit'
   import Placeholder from '@tiptap/extension-placeholder'
   import Image from '@tiptap/extension-image'
-  import { TextStyle, Color, FontSize } from '@tiptap/extension-text-style'
+  import { FontSize } from '@tiptap/extension-text-style'
   import TextAlign from '@tiptap/extension-text-align'
-  import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
+  import { TableRow } from '@tiptap/extension-table'
   import { _ } from '$lib/i18n'
-
-  // Extended TextStyle to also handle legacy <font> tags
-  const ExtendedTextStyle = TextStyle.extend({
-    parseHTML() {
-      return [
-        { tag: 'span' },
-        { tag: 'font' },  // Handle legacy <font> tags
-      ]
-    },
-  })
-
-  // Extended Color to handle legacy <font color="..."> tags
-  const ExtendedColor = Color.extend({
-    addGlobalAttributes() {
-      return [
-        {
-          types: this.options.types,
-          attributes: {
-            color: {
-              default: null,
-              parseHTML: (element: HTMLElement) => {
-                // Check for inline style color first
-                const styleColor = element.style.color?.replace(/['"]+/g, '')
-                if (styleColor) return styleColor
-                // Check for legacy <font color="..."> attribute
-                if (element.tagName === 'FONT') {
-                  return element.getAttribute('color')
-                }
-                return null
-              },
-              renderHTML: (attributes: Record<string, string>) => {
-                if (!attributes.color) {
-                  return {}
-                }
-                return {
-                  style: `color: ${attributes.color}`,
-                }
-              },
-            },
-          },
-        },
-      ]
-    },
-  })
-
-  // Extended Table extensions to preserve inline style attributes
-  const ExtendedTable = Table.extend({
-    addAttributes() {
-      return {
-        ...this.parent?.(),
-        style: {
-          default: null,
-          parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-          renderHTML: (attributes: Record<string, string>) => {
-            if (!attributes.style) return {}
-            return { style: attributes.style }
-          },
-        },
-      }
-    },
-  })
-
-  const ExtendedTableCell = TableCell.extend({
-    addAttributes() {
-      return {
-        ...this.parent?.(),
-        style: {
-          default: null,
-          parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-          renderHTML: (attributes: Record<string, string>) => {
-            if (!attributes.style) return {}
-            return { style: attributes.style }
-          },
-        },
-      }
-    },
-  })
-
-  const ExtendedTableHeader = TableHeader.extend({
-    addAttributes() {
-      return {
-        ...this.parent?.(),
-        style: {
-          default: null,
-          parseHTML: (element: HTMLElement) => element.getAttribute('style'),
-          renderHTML: (attributes: Record<string, string>) => {
-            if (!attributes.style) return {}
-            return { style: attributes.style }
-          },
-        },
-      }
-    },
-  })
+  import {
+    ExtendedTextStyle,
+    ExtendedColor,
+    ExtendedTable,
+    ExtendedTableCell,
+    ExtendedTableHeader,
+  } from '$lib/components/composer/tiptapExtensions'
 
   // Custom extension to make Enter insert <br> instead of new paragraph
   // Optimized with direct ProseMirror transaction for better performance
