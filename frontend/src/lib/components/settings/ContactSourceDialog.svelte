@@ -9,6 +9,7 @@
   import { addToast } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { contactSourcesStore, type LinkedAccountInfo } from '$lib/stores/contactSources.svelte'
+  import ServerCertificatePrompt from '$lib/components/kit/ServerCertificatePrompt.svelte'
   // @ts-ignore - wailsjs runtime
   import { EventsOn, EventsOff } from '../../../../wailsjs/runtime/runtime'
   // @ts-ignore - wailsjs path
@@ -60,6 +61,7 @@
   let discoveredAddressbooks = $state<carddav.AddressbookInfo[]>([])
   let selectedAddressbooks = $state<Set<string>>(new Set())
   let discoveryError = $state<string | null>(null)
+  let certPrompt: ServerCertificatePrompt
   let hasDiscovered = $state(false)
 
   // OAuth state
@@ -283,6 +285,7 @@
     discoveredAddressbooks = []
     selectedAddressbooks = new Set()
 
+    let retry = false
     try {
       const addressbooks = cardDavIsOAuth
         ? await DiscoverCardDAVAddressbooksOAuth(url, selectedCustomAccountId)
@@ -296,10 +299,12 @@
       discoveryError = $_('contactSource.noAddressbooksFound')
     } catch (err) {
       console.error('Discovery failed:', err)
-      discoveryError = $_('contactSource.discoveryFailed')
+      retry = await certPrompt.offerTrust(url, err)
+      if (!retry) discoveryError = $_('contactSource.discoveryFailed')
     } finally {
       discovering = false
     }
+    if (retry) await handleDiscover()
   }
 
   function toggleAddressbook(path: string) {
@@ -872,3 +877,5 @@
     </div>
   </Dialog.Content>
 </Dialog.Root>
+
+<ServerCertificatePrompt bind:this={certPrompt} />

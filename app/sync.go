@@ -134,14 +134,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 	// Pass ctx so body fetch can also be cancelled
 	go func(syncCtx context.Context, syncDays int, cancelFn context.CancelFunc, key string) {
 		// Cleanup sync context when goroutine completes
-		defer func() {
-			a.syncMu.Lock()
-			// Only delete if it's still our cancel function (not replaced by newer sync)
-			if currentCancel, exists := a.syncContexts[key]; exists && fmt.Sprintf("%p", currentCancel) == fmt.Sprintf("%p", cancelFn) {
-				delete(a.syncContexts, key)
-			}
-			a.syncMu.Unlock()
-		}()
+		defer a.releaseSyncContext(key, cancelFn)
 
 		// Panic recovery - ensure we always emit an event so UI doesn't get stuck
 		defer func() {
@@ -405,6 +398,27 @@ func (a *App) SyncAllComplete() error {
 
 	log.Info().Msg("Complete sync of all accounts and contacts finished")
 	return nil
+}
+
+// releaseSyncContext removes key from syncContexts if it still holds
+// cancel. A newer sync may have cancelled this one and registered its own
+// cancel under the same key; that entry is left alone.
+func (a *App) releaseSyncContext(key string, cancel context.CancelFunc) {
+	a.syncMu.Lock()
+	defer a.syncMu.Unlock()
+	if current, ok := a.syncContexts[key]; ok && fmt.Sprintf("%p", current) == fmt.Sprintf("%p", cancel) {
+		delete(a.syncContexts, key)
+	}
+}
+
+// syncPeriodDays returns the account's sync period, or the 30-day default
+// when the account can't be read. 0 means all messages.
+func (a *App) syncPeriodDays(accountID string) int {
+	acc, err := a.accountStore.Get(accountID)
+	if err != nil || acc == nil {
+		return 30
+	}
+	return acc.SyncPeriodDays
 }
 
 // CancelFolderSync cancels a running sync for a specific folder

@@ -20,7 +20,7 @@
   import ChatPendingBubble from './ChatPendingBubble.svelte'
   import { ChatThread } from './chatThread.svelte'
   import { ChatComposer as ComposerState } from './chatComposer.svelte'
-  import { buildMe, buildThreadItems, isMine, replyTarget, threadPeople, type ReplyMode } from './chatFormat'
+  import { buildThreadItems, myAddresses, replyTarget, threadPeople, type ReplyMode } from './chatFormat'
   import { archiveChat, deleteMessagesPermanently, pinChat, setSenderLow, snoozeChat, trashMessages, undoAction, unsnoozeChat } from './chatTriage'
 
   interface Props {
@@ -74,15 +74,15 @@
     scroller: () => scroller,
   })
 
-  const me = $derived(buildMe(accountStore.accounts))
-  const target = $derived(replyTarget(thread.messages, me))
+  const myEmails = $derived(myAddresses(accountStore.accounts))
+  const target = $derived(replyTarget(thread.messages, myEmails))
   const composer = new ComposerState({ target: () => target, onArchive: () => void archive() })
   // The docked composer shows its own draft; hide draft copies while it has one.
   const shown = $derived(composer.draftId ? thread.messages.filter((m) => !m.isDraft) : thread.messages)
   const items = $derived(
-    buildThreadItems(focusedMessageIdInFocus ? shown.filter((m) => m.id === focusedMessageIdInFocus) : shown, me),
+    buildThreadItems(focusedMessageIdInFocus ? shown.filter((m) => m.id === focusedMessageIdInFocus) : shown),
   )
-  const people = $derived(threadPeople(thread.messages, me))
+  const people = $derived(threadPeople(thread.messages, myEmails))
   const messageIds = $derived(thread.messages.map((m) => m.id))
   const effectiveFolderType = $derived(folderType || 'inbox')
   const allRead = $derived(thread.messages.every((m) => m.isRead))
@@ -128,7 +128,7 @@
   $effect(() => {
     let latestMineAt = 0
     for (const m of thread.messages) {
-      if (!m.isDraft && isMine(m, me)) latestMineAt = Math.max(latestMineAt, new Date(m.date).getTime())
+      if (!m.isDraft && m.mine) latestMineAt = Math.max(latestMineAt, new Date(m.date).getTime())
     }
     untrack(() => composer.prune(latestMineAt))
   })

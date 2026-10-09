@@ -134,6 +134,37 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestListIDsByType(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+	want := map[string]bool{}
+	for _, acc := range []string{"acc1", "acc2"} {
+		createTestAccount(t, db, acc)
+		for _, typ := range []Type{TypeInbox, TypeSent} {
+			f := &Folder{AccountID: acc, Name: string(typ), Path: string(typ), Type: typ}
+			if err := store.Create(f); err != nil {
+				t.Fatal(err)
+			}
+			if typ == TypeSent {
+				want[f.ID] = true
+			}
+		}
+	}
+
+	ids, err := store.ListIDsByType(TypeSent)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ids) != len(want) {
+		t.Fatalf("got %d ids, want %d", len(ids), len(want))
+	}
+	for _, id := range ids {
+		if !want[id] {
+			t.Errorf("unexpected id %q", id)
+		}
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	db := openTestDB(t)
 	createTestAccount(t, db, "acc1")

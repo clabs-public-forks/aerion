@@ -873,6 +873,26 @@ func (s *Store) GetHighestUID(folderID string) (uint32, error) {
 	return 0, nil
 }
 
+// GetIDsAboveUID returns the IDs of a folder's messages whose UID is greater
+// than uid.
+func (s *Store) GetIDsAboveUID(folderID string, uid uint32) ([]string, error) {
+	rows, err := s.db.Query("SELECT id FROM messages WHERE folder_id = ? AND uid > ?", folderID, uid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query messages above UID: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan message id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // UpdateBody updates the body content of a message and marks it as fetched
 func (s *Store) UpdateBody(messageID, bodyHTML, bodyText, snippet string, hasAttachments bool) error {
 	query := `

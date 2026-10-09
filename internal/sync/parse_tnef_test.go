@@ -139,3 +139,43 @@ func contains(s []string, v string) bool {
 	}
 	return false
 }
+
+// TestParseMessageBody_EmbeddedInlineHasNoAttachments covers the paperclip
+// flag: an inline image the HTML body embeds by cid: alone doesn't set it, an
+// unreferenced one does.
+func TestParseMessageBody_EmbeddedInlineHasNoAttachments(t *testing.T) {
+	build := func(html string) []byte {
+		var sb strings.Builder
+		sb.WriteString("MIME-Version: 1.0\r\n")
+		sb.WriteString("Content-Type: multipart/related; boundary=\"REL\"\r\n\r\n")
+		sb.WriteString("--REL\r\n")
+		sb.WriteString("Content-Type: text/html\r\n\r\n" + html + "\r\n")
+		sb.WriteString("--REL\r\n")
+		sb.WriteString("Content-Type: image/png\r\n")
+		sb.WriteString("Content-Transfer-Encoding: base64\r\n")
+		sb.WriteString("Content-ID: <logo@x>\r\n\r\n")
+		sb.WriteString(b64wrap([]byte("\x89PNG fake")))
+		sb.WriteString("\r\n--REL--\r\n")
+		return []byte(sb.String())
+	}
+	e := &Engine{log: zerolog.Nop()}
+	cases := []struct {
+		name string
+		html string
+		want bool
+	}{
+		{"embedded logo", `<p>Hi</p><img src="cid:logo@x">`, false},
+		{"unreferenced inline image", `<p>Hi</p>`, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := e.parseMessageBodyInternal(build(c.html), "msg-1")
+			if len(result.Attachments) != 1 {
+				t.Fatalf("expected 1 attachment, got %d", len(result.Attachments))
+			}
+			if result.HasAttachments != c.want {
+				t.Errorf("HasAttachments = %v, want %v", result.HasAttachments, c.want)
+			}
+		})
+	}
+}

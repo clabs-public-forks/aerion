@@ -266,11 +266,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 
 	// Fetch bodies in background (same as SyncFolder does)
 	if folderID != "" {
-		// Get account's sync period
-		syncPeriodDays := 30 // default
-		if acc, accErr := a.accountStore.Get(event.AccountID); accErr == nil && acc != nil {
-			syncPeriodDays = acc.SyncPeriodDays
-		}
+		syncPeriodDays := a.syncPeriodDays(event.AccountID)
 
 		// Register IDLE sync context so manual sync can cancel it
 		a.syncMu.Lock()
@@ -355,6 +351,8 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 	if newMailInfo != nil && newMailInfo.Count > 0 {
 		a.handleNewMailNotification(*newMailInfo)
 	}
+
+	a.scheduleSentSyncAfterIdle(event.AccountID)
 }
 
 // idleFlagResyncDebounce coalesces a burst of IDLE flag-change notifications
@@ -498,6 +496,8 @@ func (a *App) reconcileInboxFlags(accountID string, attempt int) {
 		return
 	}
 
+	a.scheduleSentSyncAfterIdle(accountID)
+
 	// Update the sidebar unread badge.
 	if updated, ferr := a.folderStore.Get(folderID); ferr == nil && updated != nil {
 		wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", map[string]int{
@@ -573,11 +573,7 @@ func (a *App) handleNewMailNotification(info sync.NewMailInfo) {
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to read notify-priority-only setting")
 	}
-	limit := info.Count
-	if !onlyPriority {
-		limit = 1 // only the newest is shown
-	}
-	newest, err := a.messageStore.ListNewestMail(info.FolderID, limit)
+	newest, err := a.messageStore.ListNewMail(info.MessageIDs)
 	if err != nil {
 		// With onlyPriority this fails closed: unclassified mail stays quiet.
 		log.Warn().Err(err).Msg("Failed to load new mail for notification")

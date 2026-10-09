@@ -256,9 +256,7 @@
         </div>
 
         {#if hasAttachments}
-          <div class="w-full max-w-md">
-            <AttachmentList messageId={msg.id} encryptedAttachments={decryptedAttachments} />
-          </div>
+          <AttachmentList class="w-full max-w-md" messageId={msg.id} encryptedAttachments={decryptedAttachments} />
         {/if}
 
         {#if sourceOpen}

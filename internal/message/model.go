@@ -82,6 +82,9 @@ type Message struct {
 
 	// Chat view text; computed on read by the conversation binding, never persisted
 	Chat *ChatText `json:"chat,omitempty"`
+	// Mine marks my own message (account address or Sent folder); computed
+	// on read by the conversation binding, never persisted
+	Mine bool `json:"mine,omitempty"`
 }
 
 // Address represents an email address

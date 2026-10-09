@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -144,7 +145,7 @@ END:VEVENT`)
 				t.Fatalf("seed: %v", err)
 			}
 
-			if err := RefreshAllAlarms(store, now); err != nil {
+			if err := RefreshAllAlarms(context.Background(), store, now); err != nil {
 				t.Fatalf("RefreshAllAlarms: %v", err)
 			}
 			got := listAlarmRows(t, store, ev.ID)

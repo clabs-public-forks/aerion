@@ -611,12 +611,7 @@ func (a *App) syncSentFolder(accountID string) error {
 		return nil
 	}
 
-	// Get account to determine sync period
-	acc, _ := a.accountStore.Get(accountID)
-	syncPeriodDays := 30 // default
-	if acc != nil {
-		syncPeriodDays = acc.SyncPeriodDays
-	}
+	syncPeriodDays := a.syncPeriodDays(accountID)
 
 	// Sync progress feedback rides on the syncEngine's sync:progress callback (see app.go:438)
 	if err := a.syncEngine.SyncMessages(a.ctx, accountID, sentFolder.ID, syncPeriodDays, false); err != nil {

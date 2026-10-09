@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -162,9 +163,9 @@ func TestPendingQueue_Drain_SuccessUpdatesEventAndDeletesRow(t *testing.T) {
 	bus := &recordingEventBus{}
 
 	// httptest server that returns success on POST /calendars/primary/events.
-	var hits int
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits++
+		hits.Add(1)
 		_ = json.NewEncoder(w).Encode(googleEvent{
 			ID:      "server-event-id",
 			ICalUID: "evt-uid@aerion-google",
@@ -200,8 +201,8 @@ func TestPendingQueue_Drain_SuccessUpdatesEventAndDeletesRow(t *testing.T) {
 	if err := queue.Drain(context.Background(), srcID); err != nil {
 		t.Fatalf("Drain: %v", err)
 	}
-	if hits != 1 {
-		t.Errorf("server hits = %d, want 1", hits)
+	if hits.Load() != 1 {
+		t.Errorf("server hits = %d, want 1", hits.Load())
 	}
 
 	// Row should be gone.
@@ -238,9 +239,9 @@ func TestPendingQueue_Drain_TransportFailureKeepsRowAndBumpsAttempt(t *testing.T
 
 	// httptest server that immediately closes the connection, triggering
 	// a transport error on the client side.
-	var hits int
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hits++
+		hits.Add(1)
 		hj, ok := w.(http.Hijacker)
 		if !ok {
 			t.Fatalf("not a hijacker")
@@ -268,8 +269,8 @@ func TestPendingQueue_Drain_TransportFailureKeepsRowAndBumpsAttempt(t *testing.T
 
 	// A transport failure ends the pass after one try and does not spend
 	// the retry budget, so an offline sync can't strand the row.
-	if hits != 1 {
-		t.Errorf("server hits = %d, want 1 attempt per drain", hits)
+	if hits.Load() != 1 {
+		t.Errorf("server hits = %d, want 1 attempt per drain", hits.Load())
 	}
 	var attempt int
 	var lastError string
@@ -616,9 +617,9 @@ func TestPendingQueue_Drain_PreservesSendUpdates(t *testing.T) {
 func TestPendingQueue_Drain_HardFailureOneAttemptPerPassAndReset(t *testing.T) {
 	store := newTestStore(t)
 
-	var hits int
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hits++
+		hits.Add(1)
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -646,8 +647,8 @@ func TestPendingQueue_Drain_HardFailureOneAttemptPerPassAndReset(t *testing.T) {
 	if err := queue.Drain(context.Background(), srcID); err != nil {
 		t.Fatalf("Drain: %v", err)
 	}
-	if hits != 1 || attempt() != 1 {
-		t.Fatalf("after one drain: hits = %d, attempt = %d, want 1 and 1", hits, attempt())
+	if hits.Load() != 1 || attempt() != 1 {
+		t.Fatalf("after one drain: hits = %d, attempt = %d, want 1 and 1", hits.Load(), attempt())
 	}
 
 	for i := 1; i < pendingMaxAttempts; i++ {

@@ -40,7 +40,7 @@ func BuildMDN(originalMsg *message.Message, fromName, fromEmail string, disposit
 	}
 
 	// Generate a unique message ID
-	msgID := fmt.Sprintf("<%d.%s@%s>", time.Now().UnixNano(), "mdn", domainFromEmail(fromEmail))
+	msgID := fmt.Sprintf("<%d.%s@%s>", time.Now().UnixNano(), "mdn", domainFromEmail(fromEmail, "localhost"))
 
 	// Build the recipient (who requested the receipt)
 	recipientEmail := extractEmailAddress(originalMsg.ReadReceiptTo)
@@ -91,13 +91,13 @@ func BuildMDN(originalMsg *message.Message, fromName, fromEmail string, disposit
 	return buf.Bytes(), nil
 }
 
-// domainFromEmail extracts the domain part from an email address
-func domainFromEmail(email string) string {
-	parts := strings.Split(email, "@")
-	if len(parts) == 2 {
-		return parts[1]
+// domainFromEmail extracts the domain part from an email address, or returns
+// fallback when the address has no single, non-empty domain.
+func domainFromEmail(email, fallback string) string {
+	if _, domain, ok := strings.Cut(email, "@"); ok && domain != "" && !strings.Contains(domain, "@") {
+		return domain
 	}
-	return "localhost"
+	return fallback
 }
 
 // extractEmailAddress extracts just the email address from a potentially formatted address

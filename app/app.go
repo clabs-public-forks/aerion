@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os/exec"
 	"runtime"
@@ -324,6 +323,11 @@ type App struct {
 	ownFlagMu       goSync.Mutex
 	ownFlagChangeAt map[string]time.Time // accountID -> last own flag STORE time
 	ownExpungeAt    map[string]time.Time // accountID -> last own move/delete IMAP op time
+
+	// Throttles the Sent sync that follows IDLE inbox activity (idle_sent.go).
+	idleSentMu      goSync.Mutex
+	idleSentLast    map[string]time.Time // accountID -> last Sent sync start
+	idleSentPending map[string]bool      // accountID -> a Sent sync is scheduled
 
 	// Draft IMAP sync goroutine tracking — cancel in-flight syncDraftToIMAP
 	draftSyncContexts map[string]context.CancelFunc // keyed by draft ID
@@ -653,10 +657,9 @@ func (a *App) Startup(ctx context.Context) {
 	// enabled method call. See extensions/<name>/backend/bridge.go.
 	// Route all WebDAV (CardDAV/CalDAV) traffic through one cert-aware transport
 	// so it honors the same trust-on-first-use certificate store as IMAP/SMTP.
-	// Host-agnostic (verifies per-connection server name) since the transport is
-	// shared across every DAV source host. Installed once, before any sync runs.
-	davTransport := http.DefaultTransport.(*http.Transport).Clone()
-	davTransport.TLSClientConfig = certificate.BuildTLSConfigDynamic(a.certStore)
+	// Trust is checked per request host, since the transport is shared across
+	// every DAV source host. Installed once, before any sync runs.
+	davTransport := certificate.NewTransport(a.certStore)
 	davutil.SetDefaultBaseTransport(davTransport)
 
 	a.authBroker = extauth.NewBroker(a.credStore, a.oauth2Manager, davTransport)
@@ -772,6 +775,8 @@ func (a *App) Startup(ctx context.Context) {
 	a.syncLastRequest = make(map[string]time.Time)
 	a.ownFlagChangeAt = make(map[string]time.Time)
 	a.ownExpungeAt = make(map[string]time.Time)
+	a.idleSentLast = make(map[string]time.Time)
+	a.idleSentPending = make(map[string]bool)
 	a.draftSyncContexts = make(map[string]context.CancelFunc)
 	a.draftSyncDone = make(map[string]chan struct{})
 

@@ -2,7 +2,7 @@
 // current scope and filter, refreshed on sync and chat-state events.
 // Scope (folder selection) stays in App; ChatList passes it in via setScope.
 
-import { GetChats, GetChatCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox } from '../../../wailsjs/go/app/App'
+import { GetChats, GetChatCount, SearchChats, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox } from '../../../wailsjs/go/app/App'
 import { message } from '../../../wailsjs/go/models'
 // @ts-ignore - wailsjs runtime
 import { EventsOn } from '../../../wailsjs/runtime/runtime'
@@ -65,8 +65,8 @@ function decodeEntities(text: string): string {
   return entityParser.parseFromString(text.replaceAll('<', '&lt;'), 'text/html').documentElement.textContent || ''
 }
 
-function toItem(c: message.Chat | message.ConversationSearchResult, fallbackAccountId: string, fallbackFolderId: string): ChatItem {
-  const chat = c as Partial<message.Chat>
+function toItem(c: message.Chat | message.ChatSearchResult | message.ConversationSearchResult, fallbackAccountId: string, fallbackFolderId: string): ChatItem {
+  const chat = c as Partial<message.Chat & message.ChatSearchResult>
   const search = c as Partial<message.ConversationSearchResult>
   const accountId = c.accountId || fallbackAccountId
   return {
@@ -205,7 +205,7 @@ class ChatListStore {
       const mode = this.effectiveFilter === 'unread' ? 'unread' : ''
       const [results, total] = await Promise.all(this.isUnified
         ? [SearchUnifiedInbox(q, offset, limit, mode), GetSearchCountUnifiedInbox(q, mode)] as const
-        : [SearchConversations(accountId, folderId, q, offset, limit, mode), GetSearchCount(accountId, folderId, q, mode)] as const)
+        : [SearchChats(folderId, q, offset, limit, mode), GetSearchCount(accountId, folderId, q, mode)] as const)
       return { items: (results || []).map((r) => toItem(r, accountId, folderId)), total }
     }
     const [chats, total] = await Promise.all([GetChats(this.scopeId, this.section, offset, limit), GetChatCount(this.scopeId, this.section)])
@@ -299,6 +299,10 @@ class ChatListStore {
         if (this.inScope(d.accountId, d.folderId)) this.scheduleReload()
       }),
       EventsOn('chats:changed', (d: { accountId: string }) => {
+        if (this.inScope(d.accountId)) this.scheduleReload()
+      }),
+      // A Sent sync can change which chats were last answered by me.
+      EventsOn('sent:synced', (d: { accountId: string }) => {
         if (this.inScope(d.accountId)) this.scheduleReload()
       }),
       EventsOn('messages:readChanged', (d: { messageIds: string[]; isRead: boolean }) => {

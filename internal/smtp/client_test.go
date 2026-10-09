@@ -241,3 +241,24 @@ func TestStartTLSRequiredWhenConfigured(t *testing.T) {
 		t.Fatal("expected Login to fail after refused connection")
 	}
 }
+
+func TestEhloName(t *testing.T) {
+	tests := []struct {
+		name string
+		addr net.Addr
+		want string
+	}{
+		{"ipv4", &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 5000}, "[192.0.2.1]"},
+		{"ipv6", &net.TCPAddr{IP: net.ParseIP("2001:db8::1"), Port: 5000}, "[IPv6:2001:db8::1]"},
+		{"no ip", &net.TCPAddr{}, "localhost"},
+		{"not tcp", &net.UnixAddr{Name: "/tmp/sock", Net: "unix"}, "localhost"},
+		{"nil", nil, "localhost"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ehloName(tt.addr); got != tt.want {
+				t.Errorf("ehloName(%v) = %q, want %q", tt.addr, got, tt.want)
+			}
+		})
+	}
+}

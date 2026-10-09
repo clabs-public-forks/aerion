@@ -151,6 +151,11 @@ func (e *Engine) parseMessageBodyInternal(raw []byte, messageID string) *ParsedB
 	if mr == nil {
 		e.parseSinglePartBody(entity, result, messageID)
 	}
+	// Parts the HTML body embeds (signature logos) render in the body and are
+	// not listed as attachments, so they don't earn the paperclip either.
+	if len(result.Attachments) > 0 {
+		result.HasAttachments = len(message.FilterEmbeddedInline(result.Attachments, result.BodyHTML)) > 0
+	}
 
 	e.log.Debug().
 		Int("bodyTextLen", len(result.BodyText)).

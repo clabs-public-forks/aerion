@@ -370,6 +370,24 @@ func (s *Store) GetByType(accountID string, folderType Type) (*Folder, error) {
 	return f, nil
 }
 
+// ListIDsByType returns the IDs of every account's folders of folderType.
+func (s *Store) ListIDsByType(folderType Type) ([]string, error) {
+	rows, err := s.db.Query(`SELECT id FROM folders WHERE folder_type = ?`, folderType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list folders by type: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan folder id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // ListSubscribed returns only subscribed folders for an account.
 // Core folders (Inbox, Drafts, Sent) are always included regardless of subscription state.
 func (s *Store) ListSubscribed(accountID string) ([]*Folder, error) {

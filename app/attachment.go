@@ -21,9 +21,21 @@ import (
 // Attachment API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// GetAttachments returns all attachments for a message
+// GetAttachments returns the attachments to list for a message. Inline parts
+// the HTML body embeds by cid: (signature logos and the like) are left out:
+// they already render in the body and would otherwise show as cards.
 func (a *App) GetAttachments(messageID string) ([]*message.Attachment, error) {
-	return a.attachmentStore.GetByMessage(messageID)
+	atts, err := a.attachmentStore.GetByMessage(messageID)
+	if err != nil || !message.HasInlineCID(atts) {
+		return atts, err
+	}
+	msg, err := a.messageStore.Get(messageID)
+	if err != nil || msg == nil {
+		log := logging.WithComponent("app")
+		log.Warn().Err(err).Str("messageID", messageID).Msg("Could not load message body; listing all attachments")
+		return atts, nil
+	}
+	return message.FilterEmbeddedInline(atts, msg.BodyHTML), nil
 }
 
 // GetAttachment returns a single attachment by ID
@@ -327,8 +339,8 @@ func (a *App) OpenFolder(path string) error {
 func (a *App) SaveAllAttachments(messageID string) (string, error) {
 	log := logging.WithComponent("app")
 
-	// Get all attachments for the message
-	attachments, err := a.attachmentStore.GetByMessage(messageID)
+	// Save the listed set, so the "Save all" count matches what gets saved
+	attachments, err := a.GetAttachments(messageID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get attachments: %w", err)
 	}

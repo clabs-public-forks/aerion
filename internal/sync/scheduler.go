@@ -20,6 +20,9 @@ type NewMailInfo struct {
 	FromName    string `json:"fromName"`
 	FromEmail   string `json:"fromEmail"`
 	Count       int    `json:"count"` // Number of new messages
+	// MessageIDs are the rows this sync stored, so notifications classify
+	// exactly the new mail.
+	MessageIDs []string `json:"messageIds"`
 }
 
 // NewMailCallback is called when new mail arrives
@@ -280,8 +283,7 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account) {
 		return
 	}
 
-	// Get current message count before sync
-	previousCount := inbox.TotalCount
+	snap := s.snapshotInbox(inbox)
 
 	// Sync messages (use account's sync period setting)
 	if err := s.engine.SyncMessages(ctx, acc.ID, inbox.ID, acc.SyncPeriodDays, false); err != nil {
@@ -313,21 +315,15 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account) {
 	}
 
 	// Check if there are new messages
-	if updatedInbox != nil && updatedInbox.TotalCount > previousCount {
-		newCount := updatedInbox.TotalCount - previousCount
+	if info := s.newMail(snap, acc, updatedInbox); info != nil {
 		s.log.Info().
 			Str("account", acc.Name).
-			Int("newMessages", newCount).
+			Int("newMessages", info.Count).
 			Msg("New messages arrived")
 
 		// Notify about new mail
 		if s.newMailCallback != nil {
-			s.newMailCallback(NewMailInfo{
-				AccountID:   acc.ID,
-				AccountName: acc.Name,
-				FolderID:    inbox.ID,
-				Count:       newCount,
-			})
+			s.newMailCallback(*info)
 		}
 	}
 
@@ -502,8 +498,7 @@ func (s *Scheduler) SyncAccountInboxBlocking(accountID string) (*NewMailInfo, er
 		}
 	}
 
-	// Get current message count before sync
-	previousCount := inbox.TotalCount
+	snap := s.snapshotInbox(inbox)
 
 	// Sync messages (use account's sync period setting)
 	// IDLE-triggered inbox sync (new mail + cross-client deletions) — use the
@@ -523,16 +518,5 @@ func (s *Scheduler) SyncAccountInboxBlocking(accountID string) (*NewMailInfo, er
 		return nil, err
 	}
 
-	// Check if there are new messages
-	if updatedInbox != nil && updatedInbox.TotalCount > previousCount {
-		newCount := updatedInbox.TotalCount - previousCount
-		return &NewMailInfo{
-			AccountID:   acc.ID,
-			AccountName: acc.Name,
-			FolderID:    inbox.ID,
-			Count:       newCount,
-		}, nil
-	}
-
-	return nil, nil
+	return s.newMail(snap, acc, updatedInbox), nil
 }

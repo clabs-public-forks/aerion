@@ -131,6 +131,8 @@ export function CheckRecipientCerts(arg1:Array<string>):Promise<Record<string, b
 
 export function CheckRecipientPGPKeys(arg1:Array<string>):Promise<Record<string, boolean>>;
 
+export function CheckServerCertificate(arg1:string):Promise<app.ServerCertificateCheck>;
+
 export function ClearOAuthCreds(arg1:string):Promise<void>;
 
 export function CloseWindow():Promise<void>;
@@ -574,6 +576,8 @@ export function SaveEncryptedAttachmentAs(arg1:string,arg2:string):Promise<strin
 export function SavePendingOAuthTokens(arg1:string):Promise<void>;
 
 export function SaveUIState(arg1:appstate.UIState):Promise<void>;
+
+export function SearchChats(arg1:string,arg2:string,arg3:number,arg4:number,arg5:string):Promise<Array<message.ChatSearchResult>>;
 
 export function SearchContacts(arg1:string,arg2:number):Promise<Array<contact.Contact>>;
 

@@ -1064,6 +1064,11 @@ func (s *Store) ListOverrides(eventID string) ([]EventOverride, error) {
 		return nil, fmt.Errorf("query overrides: %w", err)
 	}
 	defer rows.Close()
+	return scanOverrides(rows)
+}
+
+// scanOverrides reads event_id, recurrence_id_unix, ics_blob rows.
+func scanOverrides(rows *sql.Rows) ([]EventOverride, error) {
 	var out []EventOverride
 	for rows.Next() {
 		var o EventOverride
@@ -1074,6 +1079,38 @@ func (s *Store) ListOverrides(eventID string) ([]EventOverride, error) {
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate overrides: %w", err)
+	}
+	return out, nil
+}
+
+// ListOverridesForCalendars returns the RECURRENCE-ID overrides of every
+// event in the given calendars, keyed by event ID, in one query.
+func (s *Store) ListOverridesForCalendars(calendarIDs []string) (map[string][]EventOverride, error) {
+	out := make(map[string][]EventOverride)
+	if len(calendarIDs) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(calendarIDs))
+	args := make([]any, len(calendarIDs))
+	for i, id := range calendarIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := s.DB().Query(fmt.Sprintf(`
+		SELECT o.event_id, o.recurrence_id_unix, o.ics_blob
+		FROM event_recurrence_overrides o
+		JOIN events e ON e.id = o.event_id
+		WHERE e.calendar_id IN (%s)`, strings.Join(placeholders, ",")), args...)
+	if err != nil {
+		return nil, fmt.Errorf("query overrides for calendars: %w", err)
+	}
+	defer rows.Close()
+	overrides, err := scanOverrides(rows)
+	if err != nil {
+		return nil, err
+	}
+	for _, o := range overrides {
+		out[o.EventID] = append(out[o.EventID], o)
 	}
 	return out, nil
 }
@@ -1307,7 +1344,16 @@ func (s *Store) ReplacePendingAlarmsTx(tx *sql.Tx, eventID string, from int64, a
 
 // ListCalendarIDs returns the IDs of every calendar across all sources.
 func (s *Store) ListCalendarIDs() ([]string, error) {
-	rows, err := s.DB().Query(`SELECT id FROM calendars`)
+	return s.queryCalendarIDs(`SELECT id FROM calendars`)
+}
+
+// ListCalendarIDsForSource returns the IDs of one source's calendars.
+func (s *Store) ListCalendarIDsForSource(sourceID string) ([]string, error) {
+	return s.queryCalendarIDs(`SELECT id FROM calendars WHERE source_id = ?`, sourceID)
+}
+
+func (s *Store) queryCalendarIDs(q string, args ...any) ([]string, error) {
+	rows, err := s.DB().Query(q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query calendar ids: %w", err)
 	}

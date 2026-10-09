@@ -19,6 +19,7 @@ package backend
 // EMAIL / PROCEDURE through different mechanisms.
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -119,13 +120,37 @@ func refreshEventAlarmsTx(tx *sql.Tx, store *Store, ev Event, overrides []EventO
 
 // RefreshAllAlarms recomputes the future pending alarms of every event in
 // one transaction. Events that fail to expand are skipped and reported in
-// the returned error; the others are still refreshed.
-func RefreshAllAlarms(store *Store, now time.Time) error {
+// the returned error; the others are still refreshed. Cancelling ctx stops
+// the pass before anything is written.
+func RefreshAllAlarms(ctx context.Context, store *Store, now time.Time) error {
 	calendarIDs, err := store.ListCalendarIDs()
 	if err != nil {
 		return err
 	}
+	return refreshCalendarAlarms(ctx, store, calendarIDs, now)
+}
+
+// RefreshSourceAlarms is RefreshAllAlarms limited to one source's events,
+// used after that source syncs.
+func RefreshSourceAlarms(ctx context.Context, store *Store, sourceID string, now time.Time) error {
+	calendarIDs, err := store.ListCalendarIDsForSource(sourceID)
+	if err != nil {
+		return err
+	}
+	return refreshCalendarAlarms(ctx, store, calendarIDs, now)
+}
+
+// refreshCalendarAlarms recomputes the future pending alarms of every event
+// in calendarIDs, loading all their overrides in one query.
+func refreshCalendarAlarms(ctx context.Context, store *Store, calendarIDs []string, now time.Time) error {
+	if len(calendarIDs) == 0 {
+		return nil
+	}
 	events, err := store.ListEventsForExpansion(calendarIDs)
+	if err != nil {
+		return err
+	}
+	overridesByEvent, err := store.ListOverridesForCalendars(calendarIDs)
 	if err != nil {
 		return err
 	}
@@ -137,11 +162,10 @@ func RefreshAllAlarms(store *Store, now time.Time) error {
 	planned := make([]eventAlarms, 0, len(events))
 	var expandErrs []error
 	for _, ev := range events {
-		overrides, err := store.ListOverrides(ev.ID)
-		if err != nil {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
-		alarms, err := upcomingAlarms(ev, overrides, now)
+		alarms, err := upcomingAlarms(ev, overridesByEvent[ev.ID], now)
 		if err != nil {
 			expandErrs = append(expandErrs, fmt.Errorf("event %s: %w", ev.ID, err))
 			continue
@@ -149,6 +173,9 @@ func RefreshAllAlarms(store *Store, now time.Time) error {
 		planned = append(planned, eventAlarms{ev.ID, alarms})
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	err = store.WithTx(func(tx *sql.Tx) error {
 		for _, p := range planned {
 			if err := store.ReplacePendingAlarmsTx(tx, p.eventID, now.Unix(), p.alarms); err != nil {

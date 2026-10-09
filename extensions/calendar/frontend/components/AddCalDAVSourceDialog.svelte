@@ -11,6 +11,7 @@
   import { GetCustomOAuthAccounts } from '$wailsjs/go/app/App.js'
   import CalendarColorPickStage from './CalendarColorPickStage.svelte'
   import { applyDefaultsAfterAdd } from '$extensions/calendar/frontend/lib/defaultsApply'
+  import ServerCertificatePrompt from '$lib/components/kit/ServerCertificatePrompt.svelte'
 
   interface Props {
     open: boolean
@@ -47,6 +48,7 @@
   // guidance (organizer email needed/invalid, missing fields) where the
   // connection did NOT fail — same alert box, but message only (#363).
   let lastErrorKind = $state<'connection' | 'prompt'>('connection')
+  let certPrompt: ServerCertificatePrompt
 
   function setPromptError(msg: string) {
     lastError = msg
@@ -190,6 +192,7 @@
     }
     submitting = true
     lastError = ''
+    let retry = false
     try {
       const sourceID = await calendarSources.addCalDAVSource(
         nameInput.trim(),
@@ -219,10 +222,13 @@
         setPromptError($_('calendar.add.organizerEmailPrompt'))
         return
       }
-      setConnectionError(msg)
+      // Untrusted (e.g. self-signed) certificate: offer to trust it, then retry.
+      retry = await certPrompt.offerTrust(urlInput.trim(), err)
+      if (!retry) setConnectionError(msg)
     } finally {
       submitting = false
     }
+    if (retry) await submit()
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -416,3 +422,5 @@
     {/if}
   </Dialog.Content>
 </Dialog.Root>
+
+<ServerCertificatePrompt bind:this={certPrompt} />

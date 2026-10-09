@@ -1813,16 +1813,18 @@
 
                       <!-- Attachments -->
                       {#if msg.hasAttachments || (pgpResults[msg.id]?.attachments?.length ?? 0) > 0 || (smimeResults[msg.id]?.attachments?.length ?? 0) > 0}
-                        <div class="border-t border-border pt-4 mt-4">
-                          <h3 class="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-                            <Icon icon="mdi:paperclip" class="w-4 h-4" />
-                            {$_('viewer.attachments')}
-                          </h3>
-                          <AttachmentList
-                            messageId={msg.id}
-                            encryptedAttachments={pgpResults[msg.id]?.attachments ?? smimeResults[msg.id]?.attachments}
-                          />
-                        </div>
+                        <AttachmentList
+                          class="border-t border-border pt-4 mt-4"
+                          messageId={msg.id}
+                          encryptedAttachments={pgpResults[msg.id]?.attachments ?? smimeResults[msg.id]?.attachments}
+                        >
+                          {#snippet header()}
+                            <h3 class="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                              <Icon icon="mdi:paperclip" class="w-4 h-4" />
+                              {$_('viewer.attachments')}
+                            </h3>
+                          {/snippet}
+                        </AttachmentList>
                       {/if}
 
                       <!-- View Source Button -->

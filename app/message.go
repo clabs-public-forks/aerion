@@ -72,7 +72,7 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 
 	// If body is already fetched, just return it
 	if msg.BodyFetched {
-		attachChatText(msg)
+		attachChatFields(msg, a.loadChatOwner())
 		return msg, nil
 	}
 
@@ -82,7 +82,7 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 		return nil, fmt.Errorf("failed to fetch message body: %w", err)
 	}
 
-	attachChatText(updatedMsg)
+	attachChatFields(updatedMsg, a.loadChatOwner())
 	return updatedMsg, nil
 }
 
@@ -139,8 +139,9 @@ func (a *App) GetConversation(threadID, folderID string) (*message.Conversation,
 	}
 
 	if conv != nil && conv.Messages != nil {
+		owner := a.loadChatOwner()
 		for i, m := range conv.Messages {
-			attachChatText(m)
+			attachChatFields(m, owner)
 			log.Debug().
 				Int("index", i).
 				Str("messageID", m.ID).

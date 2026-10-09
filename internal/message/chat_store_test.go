@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -385,37 +386,62 @@ func TestListChatsNullSubjectAndSnoozeStart(t *testing.T) {
 	}
 }
 
-func TestListNewestMail(t *testing.T) {
-	s, accountID, inboxID, _ := chatFixture(t)
+func TestListNewMail(t *testing.T) {
+	s, accountID, _, _ := chatFixture(t)
 	// Force alice low to check the sender override path.
 	if err := s.SetSenderCategory(accountID, "Alice@Example.com", SenderCategoryLow); err != nil {
 		t.Fatalf("SetSenderCategory: %v", err)
-	}
-	got, err := s.ListNewestMail(inboxID, 3)
-	if err != nil {
-		t.Fatalf("ListNewestMail: %v", err)
 	}
 	type row struct {
 		subject string
 		low     bool
 	}
-	var rows []row
-	for _, m := range got {
-		rows = append(rows, row{m.Subject, m.IsLow})
+	tests := []struct {
+		name string
+		ids  []string
+		want []row
+	}{
+		{"none", nil, nil},
+		{"highest uid first, unknown skipped", []string{"a1", "e2", "missing", "b1"},
+			[]row{{"e2", false}, {"b1", true}, {"a1", true}}},
+		{"bulk flag", []string{"d1"}, []row{{"d1", true}}},
 	}
-	// Highest UIDs in the inbox: e2 (8), e1 (7), d1 (6).
-	want := []row{{"e2", false}, {"e1", true}, {"d1", true}}
-	if !reflect.DeepEqual(rows, want) {
-		t.Errorf("ListNewestMail = %v, want %v", rows, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := s.ListNewMail(tt.ids)
+			if err != nil {
+				t.Fatalf("ListNewMail: %v", err)
+			}
+			var rows []row
+			for _, m := range got {
+				rows = append(rows, row{m.Subject, m.IsLow})
+			}
+			if !reflect.DeepEqual(rows, tt.want) {
+				t.Errorf("ListNewMail(%v) = %v, want %v", tt.ids, rows, tt.want)
+			}
+		})
 	}
-	got, err = s.ListNewestMail(inboxID, 8)
-	if err != nil {
-		t.Fatalf("ListNewestMail: %v", err)
-	}
-	for _, m := range got {
-		if m.FromEmail == "alice@example.com" && !m.IsLow {
-			t.Errorf("alice override not applied: %+v", m)
+}
+
+func TestListNewMailChunks(t *testing.T) {
+	s, accountID, inboxID, now := chatFixture(t)
+	ids := make([]string, 0, newMailChunk+20)
+	for i := range newMailChunk + 20 {
+		id := fmt.Sprintf("bulk-%d", i)
+		if err := s.Create(&Message{ID: id, AccountID: accountID, FolderID: inboxID, UID: uint32(100 + i), Subject: id, Date: now, ReceivedAt: now}); err != nil {
+			t.Fatalf("seed %s: %v", id, err)
 		}
+		ids = append(ids, id)
+	}
+	got, err := s.ListNewMail(ids)
+	if err != nil {
+		t.Fatalf("ListNewMail: %v", err)
+	}
+	if len(got) != len(ids) {
+		t.Fatalf("ListNewMail returned %d rows, want %d", len(got), len(ids))
+	}
+	if got[0].UID != uint32(100+len(ids)-1) || got[len(got)-1].UID != 100 {
+		t.Errorf("rows not sorted by UID across chunks: first %d, last %d", got[0].UID, got[len(got)-1].UID)
 	}
 }
 
@@ -443,4 +469,50 @@ func TestListChatsSentRecipients(t *testing.T) {
 		return
 	}
 	t.Errorf("s2@x missing from %v", chatKeys(chats))
+}
+
+func TestSearchChatsSentRecipients(t *testing.T) {
+	s, accountID, inboxID, now := chatFixture(t)
+	seed := []Message{
+		{ID: "q1", FolderID: "sent-1", ThreadID: "<q@x>", Subject: "quarterly report", ToList: `[{"name":"Dana","email":"dana@example.com"}]`},
+		{ID: "q2", FolderID: "sent-1", ThreadID: "<q@x>", Subject: "Re: quarterly report", ToList: `[{"name":"Dana","email":"DANA@example.com"},{"name":"Eve","email":"eve@example.com"}]`},
+		{ID: "q3", FolderID: inboxID, ThreadID: "<q@x>", Subject: "Re: quarterly report", FromEmail: "dana@example.com", ToList: `[{"name":"Me","email":"test@example.com"}]`},
+		{ID: "r1", FolderID: "sent-1", Subject: "roadmap draft", ToList: `not json`},
+	}
+	for i, m := range seed {
+		m.AccountID, m.UID, m.Date, m.ReceivedAt, m.IsRead = accountID, uint32(100+i), now, now, true
+		if m.FromEmail == "" {
+			m.FromEmail = "test@example.com"
+		}
+		if err := s.Create(&m); err != nil {
+			t.Fatalf("seed %s: %v", m.ID, err)
+		}
+	}
+
+	tests := []struct {
+		name, folder, query string
+		want                map[string][]Address // thread ID -> recipients
+	}{
+		{"sent thread merges recipients", "sent-1", "quarterly", map[string][]Address{
+			"<q@x>": {{"Dana", "dana@example.com"}, {"Eve", "eve@example.com"}},
+		}},
+		{"invalid to list", "sent-1", "roadmap", map[string][]Address{"r1": {}}},
+		{"inbox has none", inboxID, "quarterly", map[string][]Address{"<q@x>": nil}},
+		{"no match", "sent-1", "nothingmatches", map[string][]Address{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results, err := s.SearchChats(tt.folder, tt.query, 0, 50, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := make(map[string][]Address, len(results))
+			for _, r := range results {
+				got[r.ThreadID] = r.Recipients
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("recipients = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

@@ -168,6 +168,15 @@ func (c *Client) Connect() error {
 		return fmt.Errorf("failed to create SMTP client: %w", err)
 	}
 
+	// net/smtp would greet with "EHLO localhost", a mild spam signal. Greet
+	// with the local address literal instead, as Thunderbird does, which
+	// also avoids leaking the machine's hostname.
+	if err := c.client.Hello(ehloName(conn.LocalAddr())); err != nil {
+		c.client.Close()
+		c.client = nil
+		return fmt.Errorf("EHLO failed: %w", err)
+	}
+
 	// Upgrade to TLS if using STARTTLS
 	if c.config.Security == SecurityStartTLS {
 		// Never fall back to plaintext: credentials would be sent unencrypted
@@ -190,6 +199,20 @@ func (c *Client) Connect() error {
 		Msg("Connected to SMTP server")
 
 	return nil
+}
+
+// ehloName formats a local address as an RFC 5321 address literal:
+// "[192.0.2.1]" or "[IPv6:2001:db8::1]". It falls back to "localhost" when
+// the address is not an IP.
+func ehloName(addr net.Addr) string {
+	tcp, ok := addr.(*net.TCPAddr)
+	if !ok || tcp.IP == nil {
+		return "localhost"
+	}
+	if ip4 := tcp.IP.To4(); ip4 != nil {
+		return "[" + ip4.String() + "]"
+	}
+	return "[IPv6:" + tcp.IP.String() + "]"
 }
 
 // Login authenticates with the SMTP server

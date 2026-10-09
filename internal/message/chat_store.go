@@ -3,6 +3,7 @@ package message
 import (
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -86,6 +87,10 @@ const isLowExpr = `CASE sc.category WHEN 'low' THEN 1 WHEN 'priority' THEN 0 ELS
 const snoozeActiveExpr = `(cs.snoozed_until IS NOT NULL AND cs.snoozed_until > ?
 	AND COALESCE(g.latest_received, '') <= strftime('%Y-%m-%d %H:%M:%S', COALESCE(cs.snoozed_at, 0), 'unixepoch'))`
 
+// recipientsJSONExpr aggregates the To lists of a group's Sent messages for
+// parseAggregatedToListJSON; it needs the folders join as f.
+const recipientsJSONExpr = `json_group_array(json(CASE WHEN f.folder_type = 'sent' AND json_valid(m.to_list) THEN m.to_list ELSE '[]' END))`
+
 // chatBaseQuery builds the grouped chat query for a scope (a folder ID, or
 // "" for every enabled account's inbox) and section. It selects the chat
 // columns; callers add ordering and paging or wrap it in a count.
@@ -138,7 +143,7 @@ func chatBaseQuery(scope, section string, now time.Time) (string, []any, error) 
 				json_group_array(json_object('name', m.from_name, 'email', m.from_email, 'date', m.date, 'snippet', m.snippet)) AS participants_json,
 				MIN(` + isLowExpr + `) AS is_low,
 				MAX(REPLACE(SUBSTR(m.received_at, 1, 19), 'T', ' ')) AS latest_received,
-				json_group_array(json(CASE WHEN f.folder_type = 'sent' AND json_valid(m.to_list) THEN m.to_list ELSE '[]' END)) AS recipients_json
+				` + recipientsJSONExpr + ` AS recipients_json
 			FROM messages m
 			INNER JOIN folders f ON m.folder_id = f.id AND ` + folderCond + `
 			INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
@@ -212,6 +217,77 @@ func (s *Store) ListChats(scope, section string, now time.Time, offset, limit in
 		return nil, err
 	}
 	return chats, nil
+}
+
+// ChatSearchResult is a folder search result with the chat row's recipients.
+type ChatSearchResult struct {
+	ConversationSearchResult
+	// Recipients names the other side of threads in a Sent folder, as
+	// Chat.Recipients does.
+	Recipients []Address `json:"recipients,omitempty"`
+}
+
+// SearchChats runs SearchConversations for a folder and, in a Sent folder,
+// adds each thread's recipients so rows name them instead of me.
+func (s *Store) SearchChats(folderID, query string, offset, limit int, filter string) ([]*ChatSearchResult, error) {
+	found, _, err := s.SearchConversations(folderID, query, offset, limit, filter)
+	if err != nil || len(found) == 0 {
+		return nil, err
+	}
+	results := make([]*ChatSearchResult, len(found))
+	keys := make([]string, len(found))
+	unbracket := strings.NewReplacer("<", "", ">", "")
+	for i, c := range found {
+		results[i] = &ChatSearchResult{ConversationSearchResult: *c}
+		keys[i] = unbracket.Replace(c.ThreadID)
+	}
+	if found[0].FolderType != "sent" {
+		return results, nil
+	}
+	recipients, err := s.threadRecipients(folderID, keys)
+	if err != nil {
+		return nil, err
+	}
+	for i, r := range results {
+		r.Recipients = recipients[keys[i]]
+	}
+	return results, nil
+}
+
+// threadRecipients returns the Sent recipients of threads in a folder, by
+// thread key, aggregated as in the chat list.
+func (s *Store) threadRecipients(folderID string, keys []string) (map[string][]Address, error) {
+	conds := make([]string, len(keys))
+	args := []any{folderID}
+	for i, key := range keys {
+		conds[i] = threadKeyMatch("m.")
+		args = append(args, threadKeyArgs(key)...)
+	}
+	query := `
+		SELECT ` + threadKeyExpr("m.") + ` AS thread_key, ` + recipientsJSONExpr + `
+		FROM messages m
+		INNER JOIN folders f ON m.folder_id = f.id
+		WHERE m.folder_id = ? AND (` + strings.Join(conds, " OR ") + `)
+		GROUP BY thread_key`
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query thread recipients: %w", err)
+	}
+	defer rows.Close()
+
+	recipients := make(map[string][]Address, len(keys))
+	for rows.Next() {
+		var key string
+		var recipientsJSON sql.NullString
+		if err := rows.Scan(&key, &recipientsJSON); err != nil {
+			return nil, fmt.Errorf("failed to scan thread recipients: %w", err)
+		}
+		recipients[key] = parseAggregatedToListJSON(recipientsJSON.String)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate thread recipients: %w", err)
+	}
+	return recipients, nil
 }
 
 // CountChats returns the number of chats ListChats would return unpaged.
@@ -526,6 +602,7 @@ func unixArg(t *time.Time) any {
 
 // NewMail is a recently arrived message, as new-mail notifications see it.
 type NewMail struct {
+	UID       uint32
 	ThreadID  string
 	Subject   string
 	FromName  string
@@ -533,28 +610,43 @@ type NewMail struct {
 	IsLow     bool // sender override, else is_bulk
 }
 
-// ListNewestMail returns the limit messages with the highest UIDs in a
-// folder, newest first, each classified like chat rows (isLowExpr).
-func (s *Store) ListNewestMail(folderID string, limit int) ([]NewMail, error) {
-	rows, err := s.db.Query(`
-		SELECT COALESCE(m.thread_id, m.id), COALESCE(m.subject, ''), COALESCE(m.from_name, ''), COALESCE(m.from_email, ''),
-			`+isLowExpr+`
-		FROM messages m
-		INNER JOIN folders f ON f.id = m.folder_id
-		LEFT JOIN sender_category sc ON sc.account_id = f.account_id AND sc.email = LOWER(m.from_email)
-		WHERE m.folder_id = ?
-		ORDER BY m.uid DESC LIMIT ?`, folderID, limit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list newest mail: %w", err)
-	}
-	defer rows.Close()
+// newMailChunk keeps ListNewMail's IN list well under SQLite's variable limit.
+const newMailChunk = 500
+
+// ListNewMail returns the messages with the given IDs, highest UID first,
+// each classified like chat rows (isLowExpr). Unknown IDs are skipped.
+func (s *Store) ListNewMail(ids []string) ([]NewMail, error) {
 	var out []NewMail
-	for rows.Next() {
-		var nm NewMail
-		if err := rows.Scan(&nm.ThreadID, &nm.Subject, &nm.FromName, &nm.FromEmail, &nm.IsLow); err != nil {
-			return nil, fmt.Errorf("failed to scan newest mail: %w", err)
+	for start := 0; start < len(ids); start += newMailChunk {
+		chunk := ids[start:min(start+newMailChunk, len(ids))]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
 		}
-		out = append(out, nm)
+		rows, err := s.db.Query(`
+			SELECT m.uid, COALESCE(m.thread_id, m.id), COALESCE(m.subject, ''), COALESCE(m.from_name, ''), COALESCE(m.from_email, ''),
+				`+isLowExpr+`
+			FROM messages m
+			INNER JOIN folders f ON f.id = m.folder_id
+			LEFT JOIN sender_category sc ON sc.account_id = f.account_id AND sc.email = LOWER(m.from_email)
+			WHERE m.id IN (?`+strings.Repeat(", ?", len(chunk)-1)+`)`, args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list new mail: %w", err)
+		}
+		for rows.Next() {
+			var nm NewMail
+			if err := rows.Scan(&nm.UID, &nm.ThreadID, &nm.Subject, &nm.FromName, &nm.FromEmail, &nm.IsLow); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("failed to scan new mail: %w", err)
+			}
+			out = append(out, nm)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list new mail: %w", err)
+		}
 	}
-	return out, rows.Err()
+	sort.Slice(out, func(i, j int) bool { return out[i].UID > out[j].UID })
+	return out, nil
 }

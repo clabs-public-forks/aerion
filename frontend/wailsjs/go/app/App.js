@@ -226,6 +226,10 @@ export function CheckRecipientPGPKeys(arg1) {
   return window['go']['app']['App']['CheckRecipientPGPKeys'](arg1);
 }
 
+export function CheckServerCertificate(arg1) {
+  return window['go']['app']['App']['CheckServerCertificate'](arg1);
+}
+
 export function ClearOAuthCreds(arg1) {
   return window['go']['app']['App']['ClearOAuthCreds'](arg1);
 }
@@ -1112,6 +1116,10 @@ export function SavePendingOAuthTokens(arg1) {
 
 export function SaveUIState(arg1) {
   return window['go']['app']['App']['SaveUIState'](arg1);
+}
+
+export function SearchChats(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['SearchChats'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SearchContacts(arg1, arg2) {

@@ -1,10 +1,10 @@
-// Pure helpers for the chat thread view: ownership, grouping, day labels,
+// Pure helpers for the chat thread view: participants, grouping, day labels,
 // recipient parsing, and URL linkification (rendered as text segments, never HTML).
 
 import { get } from 'svelte/store'
 import { format, isThisYear, isToday, isYesterday } from 'date-fns'
 import { _ } from '$lib/i18n'
-import type { message as messageModels, folder } from '../../../../wailsjs/go/models'
+import type { message as messageModels } from '../../../../wailsjs/go/models'
 import type { AccountWithFolders } from '$lib/stores/accounts.svelte'
 
 export type ReplyMode = 'reply' | 'reply-all' | 'forward'
@@ -22,7 +22,11 @@ export function parseRecipients(raw: string | undefined): Person[] {
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((r: { name?: string; email?: string }) => ({ name: r.name || '', email: r.email || '' }))
+    // Rows synced before group syntax was dropped (e.g. "undisclosed-recipients:;")
+    // can hold entries with neither a name nor an address.
+    return parsed
+      .map((r: { name?: string; email?: string }) => ({ name: r.name || '', email: r.email || '' }))
+      .filter((p) => p.name || p.email)
   } catch {
     return []
   }
@@ -52,46 +56,30 @@ export function chatPeople(participants: Person[], myEmails: Set<string>, recipi
   return to.length > 0 ? to : all
 }
 
-// Identity used to recognize my own messages: account addresses plus each
-// account's Sent folders (covers identities and aliases sent from them).
-export interface Me {
-  emails: Set<string>
-  sentFolderIds: Set<string>
-}
-
-export function buildMe(accounts: AccountWithFolders[]): Me {
+// myAddresses lists every account address, lowercased, to leave me out of
+// participant and recipient lists. Whether a message is mine comes from the
+// backend's msg.mine flag.
+export function myAddresses(accounts: AccountWithFolders[]): Set<string> {
   const emails = new Set<string>()
-  const sentFolderIds = new Set<string>()
-  const walk = (trees: folder.FolderTree[] | undefined) => {
-    for (const t of trees ?? []) {
-      if (t.folder?.type === 'sent') sentFolderIds.add(t.folder.id)
-      walk(t.children)
-    }
-  }
   for (const a of accounts) {
     if (a.account.email) emails.add(a.account.email.toLowerCase())
-    walk(a.folders)
   }
-  return { emails, sentFolderIds }
-}
-
-export function isMine(msg: messageModels.Message, me: Me): boolean {
-  return me.sentFolderIds.has(msg.folderId) || me.emails.has((msg.fromEmail || '').toLowerCase())
+  return emails
 }
 
 // People in the thread other than me, in first-appearance order. Falls back
 // to recipients when every message is mine (e.g. a Sent-only thread).
-export function threadPeople(messages: messageModels.Message[], me: Me): Person[] {
+export function threadPeople(messages: messageModels.Message[], myEmails: Set<string>): Person[] {
   const seen = new Set<string>()
   const people: Person[] = []
   const add = (p: Person) => {
     const key = p.email.toLowerCase()
-    if (!key || seen.has(key) || me.emails.has(key)) return
+    if (!key || seen.has(key) || myEmails.has(key)) return
     seen.add(key)
     people.push(p)
   }
   for (const m of messages) {
-    if (!isMine(m, me)) add({ name: m.fromName || '', email: m.fromEmail || '' })
+    if (!m.mine) add({ name: m.fromName || '', email: m.fromEmail || '' })
   }
   if (people.length === 0) {
     for (const m of messages) {
@@ -106,19 +94,19 @@ export function threadPeople(messages: messageModels.Message[], me: Me): Person[
 // from someone else, else my latest one (replying to its recipients). Reply
 // all is the default when the answered message involves more than one other
 // person. Drafts never count.
-export function replyTarget(messages: messageModels.Message[], me: Me): { messageId: string; defaultReplyAll: boolean } | null {
+export function replyTarget(messages: messageModels.Message[], myEmails: Set<string>): { messageId: string; defaultReplyAll: boolean } | null {
   let theirs: messageModels.Message | null = null
   let last: messageModels.Message | null = null
   for (const m of messages) {
     if (m.isDraft) continue
     last = m
-    if (!isMine(m, me)) theirs = m
+    if (!m.mine) theirs = m
   }
   if (!theirs) return last ? { messageId: last.id, defaultReplyAll: true } : null
   const others = new Set<string>()
   for (const p of [{ name: '', email: theirs.fromEmail || '' }, ...parseRecipients(theirs.toList), ...parseRecipients(theirs.ccList)]) {
     const email = p.email.toLowerCase()
-    if (email && !me.emails.has(email)) others.add(email)
+    if (email && !myEmails.has(email)) others.add(email)
   }
   return { messageId: theirs.id, defaultReplyAll: others.size > 1 }
 }
@@ -148,12 +136,12 @@ export interface ThreadItem {
   groupStart: boolean
 }
 
-export function buildThreadItems(messages: messageModels.Message[], me: Me): ThreadItem[] {
+export function buildThreadItems(messages: messageModels.Message[]): ThreadItem[] {
   const items: ThreadItem[] = []
   let prev: ThreadItem | null = null
   for (const msg of messages) {
     const date = new Date(msg.date)
-    const mine = isMine(msg, me)
+    const mine = !!msg.mine
     const newDay = !prev || dayKey(prev.date) !== dayKey(date)
     const sameSender = !!prev && prev.mine === mine && (prev.msg.fromEmail || '').toLowerCase() === (msg.fromEmail || '').toLowerCase()
     const groupStart = newDay || !sameSender || date.getTime() - prev!.date.getTime() > GROUP_WINDOW_MS

@@ -14,11 +14,14 @@ package backend
 //     hourly tick or sync re-pass will pick it up.
 //
 // Writes and CalDAV syncs materialize alarms for the events they touch.
-// Refresh (on Start, sync-complete, wake and an hourly tick) recomputes
-// every event's alarms via RefreshAllAlarms (alarm.go) so recurring
-// events keep upcoming alarms, Google and Microsoft events get theirs,
-// and stale pending rows are dropped. Reevaluate then arms
-// time.AfterFunc callbacks for the pending rows inside the horizon.
+// A background worker recomputes alarms (alarm.go) so recurring events
+// keep upcoming alarms, Google and Microsoft events get theirs, and stale
+// pending rows are dropped: every event on Start, wake, the hourly tick
+// and a sync-complete without a sourceId; only the synced source's events
+// on a sync-complete that names one. Requests that arrive while a pass
+// runs are coalesced into the next pass, so Start doesn't block and a
+// burst of per-source syncs doesn't queue repeated work. Reevaluate then
+// arms time.AfterFunc callbacks for the pending rows inside the horizon.
 
 import (
 	"context"
@@ -46,15 +49,28 @@ type AlarmScheduler struct {
 	timers map[string]*time.Timer // alarmID → timer
 
 	unsubs []func()
+
+	// Refresh requests waiting for the worker, guarded by mu. refreshAll
+	// covers every source; refreshSources names single synced sources.
+	refreshAll     bool
+	refreshSources map[string]struct{}
+	refreshWake    chan struct{} // buffered(1): signals pending requests
+	workerDone     chan struct{} // closed when the worker exits; nil if not started
+
+	// evalMu serializes Reevaluate's read-then-arm so a slower call can't
+	// re-arm timers from a pending set a newer call already replaced.
+	evalMu sync.Mutex
 }
 
 func NewAlarmScheduler(store *Store, notif coreapi.Notifications, events coreapi.EventBus, log coreapi.Logger) *AlarmScheduler {
 	return &AlarmScheduler{
-		store:  store,
-		notif:  notif,
-		events: events,
-		log:    log,
-		timers: make(map[string]*time.Timer),
+		store:          store,
+		notif:          notif,
+		events:         events,
+		log:            log,
+		timers:         make(map[string]*time.Timer),
+		refreshSources: make(map[string]struct{}),
+		refreshWake:    make(chan struct{}, 1),
 	}
 }
 
@@ -68,17 +84,94 @@ func (s *AlarmScheduler) warn(format string, args ...any) {
 	s.log.Warn(fmt.Sprintf(format, args...))
 }
 
-// Start begins listening for events and arms any currently-pending
-// alarms in the 24h horizon. Safe to call once. Returns a cancel func
-// the caller (bridge ensureInit) can ignore — Stop is the canonical
-// teardown path.
+// Start subscribes to events and launches the background worker, which
+// sweeps past alarms, runs the initial full refresh and arms the pending
+// alarms in the 24h horizon. It returns without waiting for that pass.
+// Safe to call once. Returns a cancel func the caller (bridge ensureInit)
+// can ignore — Stop is the canonical teardown path.
 func (s *AlarmScheduler) Start(ctx context.Context) context.CancelFunc {
 	s.mu.Lock()
-	if s.ctx == nil {
-		s.ctx, s.cancel = context.WithCancel(ctx)
+	if s.ctx != nil {
+		cancel := s.cancel
+		s.mu.Unlock()
+		return cancel
 	}
-	runCtx := s.ctx
+	s.ctx, s.cancel = context.WithCancel(ctx)
+	runCtx, cancel := s.ctx, s.cancel
+	s.workerDone = make(chan struct{})
+	done := s.workerDone
+	s.refreshAll = true // initial pass, run by the worker
 	s.mu.Unlock()
+
+	// Ignore Subscribe errors so a missing EventBus doesn't block
+	// scheduling — the hourly tick still keeps alarms fresh.
+	if s.events != nil {
+		syncUnsub, _ := s.events.Subscribe("calendar:sync-complete", func(payload any) {
+			s.requestRefresh(syncedSourceID(payload))
+		})
+		wakeUnsub, _ := s.events.Subscribe("system:wake", func(_ any) {
+			// Sweep past alarms first; user was asleep, don't fire-after.
+			if err := s.store.MarkPastAlarmsFired(time.Now().Unix()); err != nil {
+				s.warn("mark past on wake: %v", err)
+			}
+			s.requestRefresh("")
+		})
+		s.mu.Lock()
+		s.unsubs = append(s.unsubs, syncUnsub, wakeUnsub)
+		s.mu.Unlock()
+	}
+
+	go s.run(runCtx, done)
+	return cancel
+}
+
+// syncedSourceID returns the sourceId carried by a calendar:sync-complete
+// payload, or "" (meaning every source) when it names none.
+func syncedSourceID(payload any) string {
+	m, ok := payload.(map[string]any)
+	if !ok {
+		return ""
+	}
+	id, _ := m["sourceId"].(string)
+	return id
+}
+
+// requestRefresh queues a refresh of one source's alarms, or of every
+// source when sourceID is "", and wakes the worker. Never blocks.
+func (s *AlarmScheduler) requestRefresh(sourceID string) {
+	s.mu.Lock()
+	if sourceID == "" {
+		s.refreshAll = true
+	} else {
+		s.refreshSources[sourceID] = struct{}{}
+	}
+	s.mu.Unlock()
+	select {
+	case s.refreshWake <- struct{}{}:
+	default: // a wake-up is already pending
+	}
+}
+
+// takeRefreshRequests returns and clears the queued refresh requests.
+func (s *AlarmScheduler) takeRefreshRequests() (all bool, sources []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all = s.refreshAll
+	if !all {
+		for id := range s.refreshSources {
+			sources = append(sources, id)
+		}
+	}
+	s.refreshAll = false
+	clear(s.refreshSources)
+	return all, sources
+}
+
+// run is the worker: it handles queued refresh requests one pass at a time
+// and rolls the alarm window forward every alarmRefreshInterval until ctx
+// is cancelled by Stop.
+func (s *AlarmScheduler) run(ctx context.Context, done chan struct{}) {
+	defer close(done)
 
 	// Sweep alarms that should have fired in the past so they don't
 	// notify retroactively when we arm.
@@ -86,72 +179,72 @@ func (s *AlarmScheduler) Start(ctx context.Context) context.CancelFunc {
 		s.warn("mark past alarms fired: %v", err)
 	}
 
-	// Initial arm pass + event subscriptions. Ignore Subscribe errors so a
-	// missing EventBus doesn't block scheduling — the periodic re-eval
-	// from sync.go's calendar:sync-complete event still keeps timers fresh.
-	if s.events != nil {
-		syncUnsub, _ := s.events.Subscribe("calendar:sync-complete", func(_ any) {
-			s.Refresh()
-		})
-		wakeUnsub, _ := s.events.Subscribe("system:wake", func(_ any) {
-			// Sweep past alarms first; user was asleep, don't fire-after.
-			if err := s.store.MarkPastAlarmsFired(time.Now().Unix()); err != nil {
-				s.warn("mark past on wake: %v", err)
-			}
-			s.Refresh()
-		})
-		s.mu.Lock()
-		s.unsubs = append(s.unsubs, syncUnsub, wakeUnsub)
-		s.mu.Unlock()
-	}
-
-	s.Refresh()
-	go s.refreshLoop(runCtx)
-
-	return s.cancel
-}
-
-// refreshLoop rolls the alarm window forward every alarmRefreshInterval
-// until ctx is cancelled by Stop.
-func (s *AlarmScheduler) refreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(alarmRefreshInterval)
 	defer ticker.Stop()
 	for {
+		if all, sources := s.takeRefreshRequests(); all || len(sources) > 0 {
+			s.refresh(ctx, all, sources)
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.Refresh()
+			s.requestRefresh("")
+		case <-s.refreshWake:
 		}
 	}
 }
 
-// Refresh recomputes every event's upcoming alarms, then re-arms timers.
-// Errors are logged; a partial refresh still arms what it produced.
-func (s *AlarmScheduler) Refresh() {
-	if err := RefreshAllAlarms(s.store, time.Now()); err != nil {
-		s.warn("refresh alarms: %v", err)
+// refresh recomputes upcoming alarms for every source (all) or the listed
+// sources, then re-arms timers. Errors are logged; a partial refresh still
+// arms what it produced.
+func (s *AlarmScheduler) refresh(ctx context.Context, all bool, sources []string) {
+	now := time.Now()
+	if all {
+		if err := RefreshAllAlarms(ctx, s.store, now); err != nil && ctx.Err() == nil {
+			s.warn("refresh alarms: %v", err)
+		}
+	}
+	for _, id := range sources {
+		if ctx.Err() != nil {
+			return
+		}
+		if err := RefreshSourceAlarms(ctx, s.store, id, now); err != nil && ctx.Err() == nil {
+			s.warn("refresh alarms for source %s: %v", id, err)
+		}
+	}
+	if ctx.Err() != nil {
+		return
 	}
 	if err := s.Reevaluate(); err != nil {
 		s.warn("reevaluate alarms: %v", err)
 	}
 }
 
-// Stop cancels all timers and event subscriptions.
+// Stop cancels event subscriptions, waits for the worker to exit, then
+// stops all timers.
 func (s *AlarmScheduler) Stop() {
+	s.mu.Lock()
+	unsubs := s.unsubs
+	s.unsubs = nil
+	cancel, done := s.cancel, s.workerDone
+	s.cancel, s.ctx, s.workerDone = nil, nil, nil
+	s.mu.Unlock()
+
+	for _, u := range unsubs {
+		u()
+	}
+	if cancel != nil {
+		cancel()
+	}
+	if done != nil {
+		<-done
+	}
+
 	s.mu.Lock()
 	for id, t := range s.timers {
 		t.Stop()
 		delete(s.timers, id)
-	}
-	for _, u := range s.unsubs {
-		u()
-	}
-	s.unsubs = nil
-	if s.cancel != nil {
-		s.cancel()
-		s.cancel = nil
-		s.ctx = nil
 	}
 	s.mu.Unlock()
 }
@@ -160,6 +253,8 @@ func (s *AlarmScheduler) Stop() {
 // longer matching pending rows (deletes / dismissals), and arms a
 // time.AfterFunc for each new row. Idempotent — safe to call repeatedly.
 func (s *AlarmScheduler) Reevaluate() error {
+	s.evalMu.Lock()
+	defer s.evalMu.Unlock()
 	now := time.Now().Unix()
 	pending, err := s.store.PendingAlarmsInRange(now, now+int64(alarmHorizon.Seconds()))
 	if err != nil {

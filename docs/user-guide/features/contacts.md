@@ -68,7 +68,7 @@ Sync contacts from your Microsoft/Outlook account. This can be:
 3. Enter your username and password
 4. Click **Add**
 
-Aerion will discover available address books on the server.
+Aerion will discover available address books on the server. If the server presents a certificate Aerion doesn't trust (for example, a self-signed one), Aerion shows the certificate details; accept it to trust it for that host and continue.
 
 ### Google Contacts Setup
 

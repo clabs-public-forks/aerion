@@ -33,6 +33,12 @@ func (a *App) GetChatCount(scope, section string) (int, error) {
 	return a.messageStore.CountChats(scope, section, time.Now())
 }
 
+// SearchChats searches a folder like SearchConversations, adding Sent
+// recipients so chat rows name the other side.
+func (a *App) SearchChats(folderID, query string, offset, limit int, filter string) ([]*message.ChatSearchResult, error) {
+	return a.messageStore.SearchChats(folderID, query, offset, limit, filter)
+}
+
 // PinChat pins or unpins a thread. Undoable.
 func (a *App) PinChat(accountID, threadKey string, pinned bool) error {
 	desc := "Unpin chat"

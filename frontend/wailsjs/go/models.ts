@@ -840,6 +840,40 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class ServerCertificateCheck {
+	    certificateRequired: boolean;
+	    host?: string;
+	    certificate?: certificate.CertificateInfo;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerCertificateCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.certificateRequired = source["certificateRequired"];
+	        this.host = source["host"];
+	        this.certificate = this.convertValues(source["certificate"], certificate.CertificateInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 
@@ -2099,6 +2133,7 @@ export namespace message {
 	    // Go type: time
 	    receivedAt: any;
 	    chat?: ChatText;
+	    mine?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Message(source);
@@ -2148,6 +2183,7 @@ export namespace message {
 	        this.hasPGP = source["hasPGP"];
 	        this.receivedAt = this.convertValues(source["receivedAt"], null);
 	        this.chat = this.convertValues(source["chat"], ChatText);
+	        this.mine = source["mine"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2221,6 +2257,79 @@ export namespace message {
 	        this.snoozedUntil = this.convertValues(source["snoozedUntil"], null);
 	        this.isLowPriority = source["isLowPriority"];
 	        this.lastFromMe = source["lastFromMe"];
+	        this.recipients = this.convertValues(source["recipients"], Address);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ChatSearchResult {
+	    threadId: string;
+	    subject: string;
+	    snippet: string;
+	    messageCount: number;
+	    unreadCount: number;
+	    hasAttachments: boolean;
+	    isStarred: boolean;
+	    // Go type: time
+	    latestDate: any;
+	    participants: Address[];
+	    messageIds: string[];
+	    isEncrypted: boolean;
+	    messages?: Message[];
+	    accountId?: string;
+	    accountName?: string;
+	    accountColor?: string;
+	    folderId?: string;
+	    highlightedSubject: string;
+	    highlightedSnippet: string;
+	    highlightedFromName: string;
+	    folderName: string;
+	    folderType: string;
+	    recipients?: Address[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ChatSearchResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.threadId = source["threadId"];
+	        this.subject = source["subject"];
+	        this.snippet = source["snippet"];
+	        this.messageCount = source["messageCount"];
+	        this.unreadCount = source["unreadCount"];
+	        this.hasAttachments = source["hasAttachments"];
+	        this.isStarred = source["isStarred"];
+	        this.latestDate = this.convertValues(source["latestDate"], null);
+	        this.participants = this.convertValues(source["participants"], Address);
+	        this.messageIds = source["messageIds"];
+	        this.isEncrypted = source["isEncrypted"];
+	        this.messages = this.convertValues(source["messages"], Message);
+	        this.accountId = source["accountId"];
+	        this.accountName = source["accountName"];
+	        this.accountColor = source["accountColor"];
+	        this.folderId = source["folderId"];
+	        this.highlightedSubject = source["highlightedSubject"];
+	        this.highlightedSnippet = source["highlightedSnippet"];
+	        this.highlightedFromName = source["highlightedFromName"];
+	        this.folderName = source["folderName"];
+	        this.folderType = source["folderType"];
 	        this.recipients = this.convertValues(source["recipients"], Address);
 	    }
 	

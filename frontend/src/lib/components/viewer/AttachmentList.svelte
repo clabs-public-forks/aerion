@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
+  import type { Snippet } from 'svelte'
   import { GetAttachments, SaveAttachmentAs, SaveAllAttachments, OpenAttachment, SaveEncryptedAttachmentAs, OpenEncryptedAttachment, SaveAllEncryptedAttachments, OpenFile, OpenFolder } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
   import { message as messageModels } from '../../../../wailsjs/go/models'
@@ -18,18 +19,25 @@
   interface Props {
     messageId: string
     encryptedAttachments?: DecryptedAttachment[]
+    // Wrapper class and heading, rendered only while there is something to
+    // show, so a message whose parts are all embedded in the body (and so
+    // filtered out by GetAttachments) gets no empty section
+    class?: string
+    header?: Snippet
   }
 
-  let { messageId, encryptedAttachments }: Props = $props()
+  let { messageId, encryptedAttachments, class: className = '', header }: Props = $props()
 
   // State
   let attachments = $state<messageModels.Attachment[]>([])
-  let loading = $state(false)
   let downloadingIds = $state<Set<string>>(new Set())
   let savingAll = $state(false)
 
   // Determine if we're in encrypted mode
   let isEncrypted = $derived(encryptedAttachments != null && encryptedAttachments.length > 0)
+  // Stays hidden while loading, so a message whose parts are all embedded
+  // doesn't flash an empty heading before GetAttachments filters them out
+  let visible = $derived(isEncrypted || attachments.length > 0)
 
   // Load attachments when messageId changes (only for non-encrypted)
   $effect(() => {
@@ -45,15 +53,13 @@
   })
 
   async function loadAttachments(msgId: string) {
-    loading = true
+    attachments = []
     try {
       const result = await GetAttachments(msgId)
-      attachments = result || []
+      // Drop a response for a message the viewer has already moved past
+      if (msgId === messageId) attachments = result || []
     } catch (err) {
       console.error('Failed to load attachments:', err)
-      attachments = []
-    } finally {
-      loading = false
     }
   }
 
@@ -186,12 +192,10 @@
   }
 </script>
 
-{#if loading && !isEncrypted}
-  <div class="flex items-center gap-2 text-sm text-muted-foreground">
-    <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-    Loading attachments...
-  </div>
-{:else if isEncrypted && encryptedAttachments && encryptedAttachments.length > 0}
+{#if visible}
+<div class={className}>
+{@render header?.()}
+{#if isEncrypted && encryptedAttachments && encryptedAttachments.length > 0}
   <div class="space-y-2">
     {#each encryptedAttachments as att (att.filename)}
       {@const isDownloading = downloadingIds.has(att.filename)}
@@ -308,4 +312,6 @@
       </button>
     {/if}
   </div>
+{/if}
+</div>
 {/if}

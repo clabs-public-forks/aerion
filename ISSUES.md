@@ -27,28 +27,63 @@ has not yet been confirmed against the code.
 
 ### Calendar
 
-- **C16 low** `extensions/calendar/backend/alarm.go` `RefreshAllAlarms` and
-  `alarm_scheduler.go`: the alarm refresh scales poorly with large
-  calendars. It runs one `ListOverrides` query per event. It recomputes every
-  event on each `calendar:sync-complete`, which `sync.go` publishes once per
-  source, so syncing N sources does N full refreshes. `Start` runs the first
-  refresh synchronously inside `ensureInit`, which blocks the first calendar
-  call after launch. Fixing it needs batched override loading, per-source
-  refresh, and an async initial pass.
-- **C17 low** DAV TLS trust (follow-up to S8): CardDAV and CalDAV servers
-  with self-signed certificates now need trust pinned to that exact host,
-  and the DAV setup flow has no certificate-accept prompt like the mail
-  account flow does. Such servers can't be added from the UI.
+- **C17 low** DAV certificate follow-ups: the setup dialogs now offer the
+  certificate-accept prompt, but a certificate that changes on an existing
+  CardDAV/CalDAV source's background sync only fails the sync (mail sync
+  prompts), and certificates accepted permanently for DAV hosts don't show in
+  the account Security tab's trusted-certificate list, which lists mail hosts
+  only. Deeper fix: stamp the host on `certificate.Error` in
+  `certificate.Transport` and return it structurally from the DAV bindings,
+  replacing the frontend's error-string regex and the second `Probe` request
+  (which also misses certificates only discovery redirects reach).
+
+### Mail sync
+
+- **M1 low** `internal/sync/parse.go` `parseMessageBodyInternal`: inline
+  parts the HTML body embeds no longer set `has_attachments`, but only for
+  bodies parsed from now on. Messages fetched earlier keep a paperclip for
+  signature logos the attachment list hides, because bodies are not
+  re-fetched. A one-off migration recomputing the flag from stored
+  attachments and `body_html` would fix them.
+  Deeper fix: persist an `embedded` flag on attachment rows at parse time so
+  `has_attachments` and `GetAttachments` share one stored answer, dropping
+  the read-time `body_html` load and the `AttachmentList` visibility gate.
+- **M3 low** `app/idle_sent.go` `syncSentAfterIdle` emits `folder:synced`
+  and `sent:synced` even when the Sent sync stored nothing, so chat lists and
+  open threads reload up to every 30 s per account during inbox flag
+  activity. Snapshot Sent's highest UID before the sync, as `newmail.go`
+  does for the inbox, and emit `sent:synced` only on change. Aerion's own
+  read and star actions echo back as IDLE flag events, so ordinary use
+  also triggers these Sent syncs.
+- **M4 low** `app/sync.go`, `app/background.go`, `app/idle_sent.go`: three
+  hand-written copies of the folder-sync slot bookkeeping (busy check,
+  cancel registration). The IDLE inbox body fetch in `background.go` deletes
+  its key without the ownership check `releaseSyncContext` does. One
+  `beginFolderSync` helper with a per-call token would replace them.
+- **M5 low** `internal/message/embedded.go` `embeddedCIDs` and
+  `app/compose.go` `quotedHTMLReferencesCID` answer the same cid question
+  with different matching (whole reference vs. substring), so a reply can
+  re-attach a part the viewer hides. Unify them; compose's loose match is
+  deliberate, so this changes reply behavior.
+- **M6 low** `app/idle_sent.go`: Sent activity from other clients is
+  inferred from inbox IDLE events, so a new (non-reply) message sent
+  elsewhere reaches Sent and its chat thread only on the next scheduled
+  sync. Deeper fix: IDLE on the Sent folder too (a second connection, or a
+  folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
+  which would also retire the 30 s throttle state; cheaper: a shorter Sent
+  poll interval.
+- **M2 low, unverified** `internal/sync/fetch.go:188`
+  `fetchMessageBodiesBatch`: `go test -race ./internal/sync/` fails in
+  `TestFetchMessageBodiesBatch_IncompleteBodies`. `msg.Next()` discards an
+  unread literal on the caller's goroutine while go-imap's read goroutine
+  reads the same buffer, when the connection drops mid-literal. Decide
+  whether it is a go-imap v2 beta bug, our misuse of the streaming API, or
+  a test-only artifact; production sees dropped connections too.
 
 ### Chat mail
 
 Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
 
-- **CM1 low** `app/background.go` `handleNewMailNotification`: sync reports
-  only a new-mail count, so priority-only notifications classify the `count`
-  highest-UID inbox rows. A sync that also stores older mail with higher
-  UIDs (moves, UIDVALIDITY reset) can misclassify that window. The fix is
-  for `sync.NewMailInfo` to carry the new message IDs.
 - **CM2 low** frontend: the inbox lookup (`MessageList`, `Sidebar`), the
   sync toggle and trash-with-undo exist as unshared copies in the classic
   and chat components. Consolidate them, or delete the classic copies once
@@ -56,47 +91,23 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
   the chat components, trash-with-undo is shared through
   `components/chat/chatTriage.ts` (`trashMessages`,
   `deleteMessagesPermanently`).
-- **CM3 low** chat views infer `isMine` from account emails and Sent folder
-  ids in the frontend; a backend `mine` flag set beside `attachChatText`
-  would give one source of truth.
 - **CM4 low** `internal/message/chattext.go` `ExtractChatText` reruns on
   every conversation reload (~4 ms and 2 MB per 165 KB newsletter body, per
   `BenchmarkExtractChatTextNewsletter`). Cache it per message if long
   threads feel slow.
-- **CM5 low** chat search results in Sent Mail name me instead of the
-  recipients: `ConversationSearchResult` (upstream `store.go`) has no
-  `recipients`, so the Sent-row fallback in `chatPeople` covers chats only.
-  Add recipients to search results, or reuse the chat recipients query.
-- **CM6 low** `viewer/AttachmentList.svelte` (chat and classic): Outlook
-  signature images and other `Content-Disposition: inline` parts show as
-  attachment cards, about a dozen per message on one real thread. Hiding
-  parts that the HTML body references by `cid:` would cut the noise in both
-  views.
-- **CM7 low** `app/background.go` IDLE handler: an IDLE push syncs INBOX
-  only, so mail sent from another client (e.g. the Gmail web UI) reaches
-  Sent, and the chat thread, only on the next scheduled sync (30 min by
-  default) or a manual sync. Syncing Sent after an IDLE-triggered INBOX sync,
-  or a shorter Sent interval, would show replies from other clients sooner.
-- **CM8 low** `internal/smtp/client.go`: `net/smtp` greets with
-  `EHLO localhost` because `Hello` is never called. Gmail recorded it in
-  `Received`, and it is a mild spam signal. Sending an address literal
-  (`[ip]`, as Thunderbird does) avoids leaking the hostname.
 - **CM9 low** `internal/message/chat_store.go` `CountChats` wraps the whole
   grouped chat query in `SELECT COUNT(*)`, so every list load runs the
   aggregation two or three times (page, count, Low count). Fine at current
   mailbox sizes; a lighter count query or one query returning both would
   halve the work if large inboxes feel slow.
-- **CM10 low** `internal/smtp/message.go`: the Message-ID now uses the
-  sender's domain, and `domainFromEmail` falls back to `localhost` for an
-  address without exactly one `@`. Compose validates From, so this is
-  unreachable today; keep `aerion` as the fallback if that changes.
-- **CM11 low** stored `to_list`/`cc_list` rows synced before `e8e7822` can
-  hold address-less entries (`{"name":"","email":""}`) from group syntax
-  such as `To: undisclosed-recipients:;`. Sync now drops them, and
-  `parseAddressList` and the chat people/reply logic skip them, but the chat
-  bubble's To/Cc tooltip (`ChatBubble.svelte`, via `parseRecipients`) still
-  shows blank entries. A one-time migration stripping empty-email entries,
-  or a filter in `parseRecipients`, would remove them.
+- **CM10 low** `components/chat/ChatBubble.svelte`: bubble mode renders
+  `msg.chat.text` even when it is empty, so an attachment-only message
+  shows an empty colored bubble above its attachment list. Skip the bubble
+  when the text is empty. Seen in the UI test on 2026-10-09.
+- **CM11 low** `components/chat/ChatList.svelte:336`
+  `bind:this={rowRefs[c.key]}` triggers Svelte's
+  `binding_property_non_reactive` warning in dev. Declare `rowRefs` with
+  `$state` or keep it in a plain `Map` filled from an action.
 
 ### Upstream independence
 
