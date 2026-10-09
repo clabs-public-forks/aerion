@@ -26,9 +26,9 @@ import path from 'path'
 // Aliases are grouped as:
 //   - SHARED — used by kit primitives or multiple extensions
 //   - PER-EXTENSION — used by exactly one extension today; comment names it
-const EXTENSIONS_DIR = path.resolve(__dirname, '../extensions')
-const WAILSJS_DIR = path.resolve(__dirname, './wailsjs')
-const NODE_MODULES_DIR = path.resolve(__dirname, './node_modules')
+const EXTENSIONS_DIR = path.resolve(import.meta.dirname, '../extensions')
+const WAILSJS_DIR = path.resolve(import.meta.dirname, './wailsjs')
+const NODE_MODULES_DIR = path.resolve(import.meta.dirname, './node_modules')
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -61,12 +61,11 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    minify: 'esbuild',
     sourcemap: false,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
-        main: path.resolve(__dirname, 'index.html'),
-        composer: path.resolve(__dirname, 'composer.html'),
+        main: path.resolve(import.meta.dirname, 'index.html'),
+        composer: path.resolve(import.meta.dirname, 'composer.html'),
       },
     },
   },
