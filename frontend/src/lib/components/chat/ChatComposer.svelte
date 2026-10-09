@@ -1,21 +1,22 @@
 <script lang="ts">
-  // ChatComposer — the reply box docked under a chat: autosizing text,
-  // reply / reply-all chip, attachments, Expand to the full composer, Send and
-  // Send & Done. State and saving live in the ChatComposer controller.
+  // ChatComposer — the reply box docked under a chat: attachments, autosizing
+  // text, the reply / reply-all chip and Send. Expand to the full composer
+  // lives on the chat's top bar. State and saving live in the ChatComposer
+  // controller.
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
   import { toasts } from '$lib/stores/toast'
   import { getChatSendKey } from '$lib/stores/settings.svelte'
   import type { ChatComposer } from './chatComposer.svelte'
+  import { displayName } from './chatFormat'
 
   interface Props {
     composer: ChatComposer
     disabled?: boolean
-    onExpand: () => void
     onEscape?: () => void
   }
 
-  let { composer, disabled = false, onExpand, onEscape }: Props = $props()
+  let { composer, disabled = false, onEscape }: Props = $props()
 
   const MAX_HEIGHT_PX = 200
 
@@ -23,6 +24,16 @@
   const ctrlSends = $derived(getChatSendKey() === 'ctrl-enter')
   const sendHint = $derived(ctrlSends ? $_('chat.sendHintCtrl') : $_('chat.sendHintEnter'))
   const canSend = $derived(!disabled && !composer.isEmpty)
+
+  // Name who the reply goes to, so the reply mode is never a guess.
+  const MAX_NAMES = 3
+  const MAX_TITLE_EMAILS = 10
+  const listed = (items: string[], max: number) =>
+    items.length > max ? `${items.slice(0, max).join(', ')} ${$_('chat.andMore', { values: { count: items.length - max } })}` : items.join(', ')
+  const people = $derived(composer.recipients)
+  const placeholder = $derived(people.length > 0 ? $_('chat.replyTo', { values: { names: listed(people.map(displayName), MAX_NAMES) } }) : $_('chat.typeReply'))
+  // The textarea's title doubles as its accessible description.
+  const title = $derived(people.length > 0 ? `${listed(people.map((p) => p.email), MAX_TITLE_EMAILS)}\n${sendHint}` : sendHint)
 
   // Grow with the text up to MAX_HEIGHT_PX, then scroll.
   $effect(() => {
@@ -49,7 +60,7 @@
     const modifier = e.ctrlKey || e.metaKey
     if (ctrlSends ? !modifier : e.shiftKey || modifier) return
     e.preventDefault()
-    if (canSend) void composer.send(false)
+    if (canSend) void composer.send()
   }
 
   async function attach() {
@@ -89,8 +100,29 @@
   {/if}
 
   <div class="flex items-end gap-1.5">
+    <button class="shrink-0 p-1.5 rounded-full hover:bg-muted" title={$_('chat.attach')} aria-label={$_('chat.attach')} {disabled} onclick={attach}>
+      <Icon icon="mdi:paperclip" class="w-5 h-5 text-muted-foreground" />
+    </button>
+
+    <textarea
+      bind:this={textarea}
+      class="flex-1 min-w-0 resize-none rounded-2xl border border-border bg-muted/40 px-3.5 py-1.5 text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-primary/40 scrollbar-thin"
+      rows="1"
+      {placeholder}
+      aria-label={$_('viewer.reply')}
+      {title}
+      spellcheck="true"
+      {disabled}
+      value={composer.text}
+      oninput={(e) => composer.setText(e.currentTarget.value)}
+      onkeydown={handleKeyDown}
+      onblur={() => void composer.flush()}
+    ></textarea>
+
     <button
-      class="shrink-0 h-8 px-2 rounded-full text-xs font-medium border border-border hover:bg-muted flex items-center gap-1"
+      class="shrink-0 h-8 px-3 rounded-full text-xs font-medium border disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1 {composer.replyAll
+        ? 'border-primary/60 bg-primary/15 text-primary hover:bg-primary/25'
+        : 'border-border hover:bg-muted'}"
       title={$_('chat.replyModeHint')}
       aria-pressed={composer.replyAll}
       {disabled}
@@ -100,46 +132,16 @@
       {composer.replyAll ? $_('viewer.replyAll') : $_('viewer.reply')}
     </button>
 
-    <button class="shrink-0 p-1.5 rounded-full hover:bg-muted" title={$_('chat.attach')} aria-label={$_('chat.attach')} {disabled} onclick={attach}>
-      <Icon icon="mdi:paperclip" class="w-5 h-5 text-muted-foreground" />
-    </button>
-
-    <textarea
-      bind:this={textarea}
-      class="flex-1 min-w-0 resize-none rounded-2xl border border-border bg-muted/40 px-3.5 py-1.5 text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-primary/40 scrollbar-thin"
-      rows="1"
-      placeholder={$_('chat.typeReply')}
-      aria-label={$_('chat.typeReply')}
-      title={sendHint}
-      spellcheck="true"
-      {disabled}
-      value={composer.text}
-      oninput={(e) => composer.setText(e.currentTarget.value)}
-      onkeydown={handleKeyDown}
-      onblur={() => void composer.flush()}
-    ></textarea>
-
-    <button class="shrink-0 p-1.5 rounded-full hover:bg-muted" title={$_('chat.expand')} aria-label={$_('chat.expand')} {disabled} onclick={onExpand}>
-      <Icon icon="mdi:arrow-expand" class="w-5 h-5 text-muted-foreground" />
-    </button>
-
-    <button
-      class="shrink-0 h-8 px-3 rounded-full text-xs font-medium border border-border hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
-      title={$_('chat.sendAndArchiveHint')}
-      disabled={!canSend}
-      onclick={() => void composer.send(true)}
-    >
-      {$_('chat.sendAndArchive')}
-    </button>
-
-    <button
-      class="shrink-0 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
-      title={`${$_('chat.send')} (${sendHint})`}
-      aria-label={$_('chat.send')}
-      disabled={!canSend}
-      onclick={() => void composer.send(false)}
-    >
-      <Icon icon="mdi:send" class="w-4 h-4" />
-    </button>
+    <!-- The wrapper carries the tooltip, which a disabled button may not show. -->
+    <span class="shrink-0" title={`${$_('chat.send')} (${sendHint})`}>
+      <button
+        class="h-8 w-8 rounded-full border flex items-center justify-center transition-colors border-primary bg-primary text-primary-foreground enabled:hover:bg-primary/90 disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:cursor-not-allowed"
+        aria-label={$_('chat.send')}
+        disabled={!canSend}
+        onclick={() => void composer.send()}
+      >
+        <Icon icon="mdi:send" class="w-4 h-4" />
+      </button>
+    </span>
   </div>
 </div>

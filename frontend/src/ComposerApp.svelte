@@ -10,7 +10,7 @@
   import { addToast } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { createComposerWindowApi } from '$lib/composerApi'
-  import { getShowTitleBar, getNativeTitleBar, setShowTitleBar, setNativeTitleBar, setDarkComposerBody } from '$lib/stores/settings.svelte'
+  import { getShowTitleBar, getNativeTitleBar, setShowTitleBar, setNativeTitleBar, setDarkComposerBody, DEFAULT_THEME } from '$lib/stores/settings.svelte'
   import { initTheme, handleThemeChanged, type ThemeMode } from '$lib/stores/theme.svelte'
   // @ts-ignore - wailsjs imports
   import { GetComposeMode, PrepareReply, GetDraft, CloseWindow, GetThemeMode, GetSystemTheme, GetShowTitleBar, GetNativeTitleBar, GetDarkComposerBody, RefreshWindowConstraints, NotifyStartupComplete } from '../wailsjs/go/app/ComposerApp.js'
@@ -76,7 +76,7 @@
       await initTheme(savedThemeMode, GetSystemTheme)
     } catch (err) {
       console.error('Failed to load theme mode:', err)
-      await initTheme('system', GetSystemTheme)
+      await initTheme(DEFAULT_THEME, GetSystemTheme)
     }
 
     // Show window after theme is applied (prevents white flash on startup)

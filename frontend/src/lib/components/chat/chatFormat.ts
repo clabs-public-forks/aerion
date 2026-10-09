@@ -90,11 +90,16 @@ export function threadPeople(messages: messageModels.Message[], myEmails: Set<st
   return people
 }
 
+export interface ReplyTarget {
+  messageId: string
+  defaultReplyAll: boolean
+}
+
 // replyTarget picks the message a chat reply answers: the latest message
 // from someone else, else my latest one (replying to its recipients). Reply
 // all is the default when the answered message involves more than one other
 // person. Drafts never count.
-export function replyTarget(messages: messageModels.Message[], myEmails: Set<string>): { messageId: string; defaultReplyAll: boolean } | null {
+export function replyTarget(messages: messageModels.Message[], myEmails: Set<string>): ReplyTarget | null {
   let theirs: messageModels.Message | null = null
   let last: messageModels.Message | null = null
   for (const m of messages) {
@@ -109,6 +114,59 @@ export function replyTarget(messages: messageModels.Message[], myEmails: Set<str
     if (email && !myEmails.has(email)) others.add(email)
   }
   return { messageId: theirs.id, defaultReplyAll: others.size > 1 }
+}
+
+export interface ReplyRecipients {
+  reply: Person[]
+  all: Person[]
+}
+
+// replyRecipients lists who a reply and a reply all to the message reach,
+// mirroring PrepareReply in app/compose.go: Reply-To or the sender, plus the
+// To and Cc lists for reply all, without selfEmails (the account's identity
+// addresses, lowercased). Either falls back to the sender when nobody else is
+// left, or to nobody when the sender has no address. A bare address picks up
+// the name the thread uses for it elsewhere.
+export function replyRecipients(messages: messageModels.Message[], messageId: string, selfEmails: Set<string>): ReplyRecipients | null {
+  const m = messages.find((x) => x.id === messageId)
+  if (!m) return null
+  const fromEmail = (m.fromEmail || '').trim()
+  const replyTo = (m.replyTo || '').trim()
+  const sender: Person[] =
+    replyTo && replyTo.toLowerCase() !== fromEmail.toLowerCase()
+      ? [{ name: '', email: replyTo }]
+      : [{ name: m.fromName || '', email: replyTo || fromEmail }]
+  const others = (list: Person[]) => {
+    const seen = new Set<string>()
+    return list.filter((p) => {
+      const key = p.email.toLowerCase()
+      if (!key || selfEmails.has(key) || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+  let reply = others(sender)
+  let all = others([...sender, ...parseRecipients(m.toList), ...parseRecipients(m.ccList)])
+  const fallback = sender.filter((p) => p.email)
+  if (reply.length === 0) reply = fallback
+  if (all.length === 0) all = fallback
+  const names = threadNames(messages, new Set([...reply, ...all].filter((p) => !p.name).map((p) => p.email.toLowerCase())))
+  const named = (list: Person[]) => list.map((p) => (p.name ? p : { ...p, name: names.get(p.email.toLowerCase()) ?? '' }))
+  return { reply: named(reply), all: named(all) }
+}
+
+// threadNames finds the names the thread gives the wanted addresses, stopping
+// once all are found.
+function threadNames(messages: messageModels.Message[], wanted: Set<string>): Map<string, string> {
+  const names = new Map<string, string>()
+  for (const m of messages) {
+    if (names.size === wanted.size) break
+    for (const p of [{ name: m.fromName || '', email: m.fromEmail || '' }, ...parseRecipients(m.toList), ...parseRecipients(m.ccList)]) {
+      const key = p.email.toLowerCase()
+      if (p.name && wanted.has(key) && !names.has(key)) names.set(key, p.name)
+    }
+  }
+  return names
 }
 
 function dayKey(d: Date): string {

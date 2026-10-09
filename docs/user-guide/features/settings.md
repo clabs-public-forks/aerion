@@ -61,7 +61,7 @@ Choose your visual theme:
 - **Catppuccin (Macchiato)** - Catppuccin Macchiato theme colors
 - **Catppuccin (Mocha)** - Catppuccin Mocha theme colors
 - **Github (Dark)** - Github dark theme colors
-- **Nord (Dark)** - Nord dark theme colors
+- **Nord (Dark)** (Default) - Nord dark theme colors
 - **Pop! (Dark)** - Pop!/Cosmic dark theme colors
 - **VS Code (Dark)** - VS Code dark theme colors
 - **Yaru (Dark)** - Yaru dark theme colors

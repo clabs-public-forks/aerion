@@ -5,7 +5,7 @@
   import { onMount, tick, untrack } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
-  import { MarkAsSpam, MarkAsNotSpam, MarkAsRead, MarkAsUnread, OpenURL } from '../../../../wailsjs/go/app/App'
+  import { GetIdentities, MarkAsSpam, MarkAsNotSpam, MarkAsRead, MarkAsUnread, OpenURL } from '../../../../wailsjs/go/app/App'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   import ComposeButton from '$lib/components/common/ComposeButton.svelte'
   import { toasts } from '$lib/stores/toast'
@@ -20,7 +20,7 @@
   import ChatPendingBubble from './ChatPendingBubble.svelte'
   import { ChatThread } from './chatThread.svelte'
   import { ChatComposer as ComposerState } from './chatComposer.svelte'
-  import { buildThreadItems, myAddresses, replyTarget, threadPeople, type ReplyMode } from './chatFormat'
+  import { buildThreadItems, myAddresses, replyRecipients, replyTarget, threadPeople, type ReplyMode } from './chatFormat'
   import { archiveChat, deleteMessagesPermanently, pinChat, setSenderLow, snoozeChat, trashMessages, undoAction, unsnoozeChat } from './chatTriage'
 
   interface Props {
@@ -76,7 +76,11 @@
 
   const myEmails = $derived(myAddresses(accountStore.accounts))
   const target = $derived(replyTarget(thread.messages, myEmails))
-  const composer = new ComposerState({ target: () => target, onArchive: () => void archive() })
+  // The account's identity addresses, which PrepareReply leaves out of a
+  // reply; null until loaded.
+  let identityEmails = $state<Set<string> | null>(null)
+  const recipients = $derived(target ? replyRecipients(thread.messages, target.messageId, identityEmails ?? myEmails) : null)
+  const composer = new ComposerState({ target: () => target, recipients: () => recipients })
   // The docked composer shows its own draft; hide draft copies while it has one.
   const shown = $derived(composer.draftId ? thread.messages.filter((m) => !m.isDraft) : thread.messages)
   const items = $derived(
@@ -106,6 +110,23 @@
     const key = threadId ? threadKey : null
     const account = accountId
     untrack(() => void composer.open(account, key))
+  })
+
+  $effect(() => {
+    const account = accountId
+    identityEmails = null
+    if (!account) return
+    let stale = false
+    GetIdentities(account)
+      .then((ids) => {
+        if (!stale) identityEmails = new Set(ids.map((id) => id.email.trim().toLowerCase()))
+      })
+      .catch((err) => {
+        if (!stale) console.error('Failed to load identities:', err)
+      })
+    return () => {
+      stale = true
+    }
   })
 
   const canReply = $derived(!!target && !!accountId && !!threadKey)
@@ -413,6 +434,7 @@
       onArchive={archive}
       onReplyChat={focusComposer}
       onForward={forward}
+      onExpand={() => void expand()}
       onDelete={deleteChat}
       onSpam={() => void spam()}
       onPin={togglePin}
@@ -459,7 +481,7 @@
       </div>
     </div>
 
-    <ChatComposer bind:this={composerRef} {composer} disabled={!canReply} onExpand={expand} {onEscape} />
+    <ChatComposer bind:this={composerRef} {composer} disabled={!canReply} {onEscape} />
   {/if}
 </div>
 

@@ -24,10 +24,13 @@ export type ThemeMode =
   | 'yaru-light' | 'yaru-dark'
   | 'vs-code-light' | 'vs-code-dark'
 
+// Mirrors the default in internal/settings/store.go.
+export const DEFAULT_THEME: ThemeMode = 'nord-dark'
+
 // Module-level reactive state
 let messageListDensity = $state<MessageListDensity>('standard')
 let messageListSortOrder = $state<MessageListSortOrder>('newest')
-let themeMode = $state<ThemeMode>('system')
+let themeMode = $state<ThemeMode>(DEFAULT_THEME)
 let showTitleBar = $state<boolean>(true)
 let runBackground = $state<boolean>(false)
 let startHidden = $state<boolean>(false)
@@ -323,7 +326,7 @@ export async function loadSettings(): Promise<ThemeMode> {
     ])
     messageListDensity = (density as MessageListDensity) || 'standard'
     messageListSortOrder = (sortOrder as MessageListSortOrder) || 'newest'
-    themeMode = (theme as ThemeMode) || 'system'
+    themeMode = (theme as ThemeMode) || DEFAULT_THEME
     showTitleBar = titleBar ?? true // Default to true
     runBackground = runBg ?? false
     startHidden = startHid ?? false
@@ -357,6 +360,6 @@ export async function loadSettings(): Promise<ThemeMode> {
     return themeMode
   } catch (err) {
     console.error('Failed to load settings:', err)
-    return 'system'
+    return DEFAULT_THEME
   }
 }

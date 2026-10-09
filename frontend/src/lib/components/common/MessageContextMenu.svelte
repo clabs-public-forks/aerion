@@ -43,6 +43,10 @@
     children?: Snippet
     // Items shown above the standard ones (chat triage actions).
     extraItems?: Snippet
+    // Replace the built-in Spam and Read/Unread actions, so a caller with its
+    // own undo and refresh handling behaves the same from the menu.
+    onSpam?: () => void
+    onToggleRead?: () => void
   }
 
   let {
@@ -57,6 +61,8 @@
     onOpenChange,
     children,
     extraItems,
+    onSpam,
+    onToggleRead,
   }: Props = $props()
 
   // Accounts list — passed to FolderPickerDialog for its account dropdown.
@@ -344,7 +350,7 @@
       <Icon icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'} class="mr-2 h-4 w-4" />
       {$_(isTrashFolder ? 'contextMenu.deletePermanently' : 'contextMenu.delete')}
     </ContextMenuItem>
-    <ContextMenuItem onSelect={handleSpam}>
+    <ContextMenuItem onSelect={onSpam ?? handleSpam}>
       <Icon icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'} class="mr-2 h-4 w-4" />
       {$_(isSpamFolder ? 'contextMenu.markAsNotSpam' : 'contextMenu.markAsSpam')}
     </ContextMenuItem>
@@ -373,7 +379,7 @@
       />
       {$_(isStarred ? 'contextMenu.removeStar' : 'contextMenu.star')}
     </ContextMenuItem>
-    <ContextMenuItem onSelect={handleToggleRead}>
+    <ContextMenuItem onSelect={onToggleRead ?? handleToggleRead}>
       <Icon
         icon={isRead ? 'mdi:email-outline' : 'mdi:email-open-outline'}
         class="mr-2 h-4 w-4"

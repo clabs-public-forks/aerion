@@ -209,7 +209,7 @@
                   aria-label={showQuoted ? $_('chat.hideQuoted') : $_('chat.showQuoted')}
                   aria-expanded={showQuoted}
                   onclick={() => (showQuoted = !showQuoted)}
-                ><Icon icon="mdi:dots-horizontal" class="w-4 h-4" /></button>
+                ><Icon icon="mdi:format-quote-close" class="w-4 h-4" /></button>
                 {#if showQuoted}
                   <div class="mt-2 pl-2 border-l-2 text-[13px] opacity-80 {item.mine ? 'border-primary-foreground/40' : 'border-foreground/20'}">
                     {@render text(msg.chat!.quoted ?? '')}

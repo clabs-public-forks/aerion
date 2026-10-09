@@ -5,16 +5,11 @@
 // @ts-ignore - wailsjs path
 import { SaveChatDraft, GetChatDraft, SendChatReply, ReleaseChatDraft, PickAttachmentFiles } from '../../../../wailsjs/go/app/App'
 import { app, smtp } from '../../../../wailsjs/go/models'
+import type { Person, ReplyRecipients, ReplyTarget } from './chatFormat'
 
 const SAVE_DELAY_MS = 600
 // A sent bubble that never shows up in the thread (Sent sync failed) goes away after this.
 const SENT_BUBBLE_MAX_MS = 5 * 60 * 1000
-
-// The message a reply answers and whether reply-all is the natural default.
-export interface ReplyTarget {
-  messageId: string
-  defaultReplyAll: boolean
-}
 
 export interface PendingSend {
   id: number
@@ -25,7 +20,6 @@ export interface PendingSend {
   error: string
   sentAt: number
   reply: app.ChatReply
-  archive: boolean
 }
 
 interface Snapshot {
@@ -41,8 +35,8 @@ interface Snapshot {
 interface Options {
   // Latest reply target of the open chat; null while the thread loads.
   target: () => ReplyTarget | null
-  // Called after a Send & Done reply was sent.
-  onArchive: () => void
+  // Who the target's reply and reply all reach; null while unknown.
+  recipients: () => ReplyRecipients | null
 }
 
 let nextPendingId = 1
@@ -91,6 +85,13 @@ export class ChatComposer {
 
   get replyAll(): boolean {
     return this.replyAllChoice ?? this.#opts.target()?.defaultReplyAll ?? false
+  }
+
+  // Who a send would reach in the current reply mode.
+  get recipients(): Person[] {
+    const r = this.#opts.recipients()
+    if (!r) return []
+    return this.replyAll ? r.all : r.reply
   }
 
   get isEmpty(): boolean {
@@ -172,8 +173,8 @@ export class ChatComposer {
     return this.#saving
   }
 
-  // send sends the box's content as a reply; archive marks it Send & Done.
-  async send(archive: boolean) {
+  // send sends the box's content as a reply.
+  async send() {
     const snap = this.#snapshot(this.#opts.target()?.messageId)
     if (!snap || this.isEmpty) return
     // Clear the box now; a save already running still lands before the send.
@@ -199,7 +200,6 @@ export class ChatComposer {
       error: '',
       sentAt: Date.now(),
       reply,
-      archive,
     }
     this.pending = [...this.pending, p]
     await this.#deliver(p.id)
@@ -257,7 +257,6 @@ export class ChatComposer {
     try {
       await SendChatReply(p.reply)
       update({ status: 'sent', sentAt: Date.now() })
-      if (p.archive && p.key === this.key) this.#opts.onArchive()
     } catch (err) {
       console.error('Chat reply failed:', err)
       update({ status: 'failed', error: String(err) })

@@ -124,7 +124,7 @@ const (
 )
 
 // DefaultThemeMode is the default theme mode
-const DefaultThemeMode = ThemeModeSystem
+const DefaultThemeMode = ThemeModeNordDark
 
 // Composer mode values
 const (

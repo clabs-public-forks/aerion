@@ -191,9 +191,10 @@
         <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}">{title}</span>
         <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'}">{time}</span>
       </div>
-      <!-- Subject, with the status icons when the latest line is hidden -->
-      <div class="flex items-center gap-1.5">
-        <span class="flex-1 min-w-0 truncate text-xs {!showPreview && hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
+      <!-- Subject (up to two lines, always reserved so rows share a height),
+           with the status icons on its first line when the latest line is hidden -->
+      <div class="flex items-start gap-1.5">
+        <span class="flex-1 min-w-0 line-clamp-2 break-words text-xs leading-5 min-h-10 {!showPreview && hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
           {#if !showPreview && chat.lastFromMe}{@render repliedIcon()}{/if}
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{subject}{/if}
