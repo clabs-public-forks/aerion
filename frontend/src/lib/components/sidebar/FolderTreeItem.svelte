@@ -39,6 +39,7 @@
     trash: 'mdi:delete-outline',
     archive: 'mdi:archive-outline',
     spam: 'mdi:alert-octagon-outline',
+    starred: 'mdi:star-outline',
     all: 'mdi:email-multiple-outline',
     folder: 'mdi:folder-outline',
   }

@@ -90,7 +90,10 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
   the classic components leave the tree (see Upstream independence). Within
   the chat components, trash-with-undo is shared through
   `components/chat/chatTriage.ts` (`trashMessages`,
-  `deleteMessagesPermanently`).
+  `deleteMessagesPermanently`). Folder-by-ID lookups now go through
+  `accountStore.getFolder`; `Sidebar.svelte`'s hand-rolled tree walks
+  (`findTreeNode`, `findInbox`, `collectIds`) could share one traversal
+  helper with it.
 - **CM4 low** `internal/message/chattext.go` `ExtractChatText` reruns on
   every conversation reload (~4 ms and 2 MB per 165 KB newsletter body, per
   `BenchmarkExtractChatTextNewsletter`). Cache it per message if long
@@ -104,7 +107,7 @@ Deferred from the chat mail feature (`feat/chat-mail`, M9 review).
   `msg.chat.text` even when it is empty, so an attachment-only message
   shows an empty colored bubble above its attachment list. Skip the bubble
   when the text is empty. Seen in the UI test on 2026-10-09.
-- **CM11 low** `components/chat/ChatList.svelte:336`
+- **CM11 low** `components/chat/ChatList.svelte` `rows` snippet:
   `bind:this={rowRefs[c.key]}` triggers Svelte's
   `binding_property_non_reactive` warning in dev. Declare `rowRefs` with
   `$state` or keep it in a plain `Map` filled from an action.

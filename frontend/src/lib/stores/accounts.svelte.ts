@@ -506,6 +506,20 @@ class AccountStore {
   }
 
   /**
+   * Get a folder by ID from an account's folder tree
+   */
+  getFolder(accountId: string, folderId: string): folder.Folder | undefined {
+    const find = (trees: folder.FolderTree[]): folder.Folder | undefined => {
+      for (const t of trees) {
+        if (t.folder?.id === folderId) return t.folder
+        const hit = t.children && find(t.children)
+        if (hit) return hit
+      }
+    }
+    return find(this.getAccount(accountId)?.folders ?? [])
+  }
+
+  /**
    * Check if any account is syncing
    */
   get isAnySyncing(): boolean {

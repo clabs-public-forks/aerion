@@ -29,7 +29,9 @@
     void composer.text
     if (!textarea) return
     textarea.style.height = 'auto'
-    textarea.style.height = `${Math.min(textarea.scrollHeight, MAX_HEIGHT_PX)}px`
+    // border-box sizing: scrollHeight excludes the border, so add it back.
+    const border = textarea.offsetHeight - textarea.clientHeight
+    textarea.style.height = `${Math.min(textarea.scrollHeight + border, MAX_HEIGHT_PX)}px`
   })
 
   export function focus() {

@@ -73,11 +73,12 @@
   const time = $derived(formatRelativeDate(chat.latestDate))
   const snoozeTime = $derived(chat.snoozedUntil ? formatSnoozedUntil(chat.snoozedUntil) : '')
 
+  const subject = $derived(chat.subject || $_('viewer.noSubject'))
   // Screen-reader summary of the row's visual signals.
   const ariaLabel = $derived(
     [
       title,
-      chat.subject,
+      subject,
       hasUnread ? $_('chat.unreadCount', { values: { count: chat.unreadCount } }) : '',
       chat.isPinned ? $_('chat.pinnedLabel') : '',
       snoozeTime ? $_('chat.snoozedUntil', { values: { time: snoozeTime } }) : '',
@@ -195,7 +196,7 @@
         <span class="flex-1 min-w-0 truncate text-xs {!showPreview && hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
           {#if !showPreview && chat.lastFromMe}{@render repliedIcon()}{/if}
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
-          {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{chat.subject}{/if}
+          {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{subject}{/if}
         </span>
         {#if !showPreview}{@render statusIcons()}{/if}
       </div>

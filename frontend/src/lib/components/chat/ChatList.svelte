@@ -274,7 +274,7 @@
         return
       }
       await SyncFolder(accountId, folderId)
-      await chatList.reload(true)
+      await Promise.all([chatList.reload(true), neverSynced && accountStore.loadFolders(accountId)])
     } catch (err) {
       console.error('Sync failed:', err)
     }
@@ -317,6 +317,13 @@
   const inboxZero = $derived(
     chatList.filter === 'all' && !chatList.isSearch && (chatList.isUnified || folderType === 'inbox'),
   )
+
+  // Only core folders auto-sync, so other folders stay empty until synced once.
+  const neverSynced = $derived.by(() => {
+    if (chatList.isUnified || chatList.isSearch || !accountId || !folderId) return false
+    const f = accountStore.getFolder(accountId, folderId)
+    return !!f && !f.lastSync
+  })
 
   const emptyText = $derived.by(() => {
     if (chatList.isSearch) return $_('chat.noResults', { values: { query: chatList.query.trim() } })
@@ -398,6 +405,13 @@
           <Icon icon="mdi:check-circle-outline" class="w-12 h-12 text-primary" />
           <p class="text-base font-medium text-foreground">{$_('chat.inboxZero')}</p>
           <p class="text-sm">{$_('chat.inboxZeroHint')}</p>
+        {:else if neverSynced && syncBusy}
+          <Icon icon="mdi:loading" class="w-10 h-10 animate-spin" />
+          <p>{$_('sidebar.syncing')}</p>
+        {:else if neverSynced}
+          <Icon icon="mdi:cloud-sync-outline" class="w-10 h-10" />
+          <p>{$_('chat.notSynced')}</p>
+          <button class="text-sm text-primary hover:underline" onclick={toggleFolderSync}>{$_('chat.syncNow')}</button>
         {:else}
           <Icon icon="mdi:chat-outline" class="w-10 h-10" />
           <p>{emptyText}</p>

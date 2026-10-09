@@ -106,6 +106,8 @@
     "chats": "Chats",
     "lowPriorityGroup": "Low priority ({count})",
     "noChats": "No chats here",
+    "notSynced": "This folder hasn't been synced yet",
+    "syncNow": "Sync now",
     "noUnread": "You're all caught up",
     "noLow": "No low-priority mail",
     "noSnoozed": "No snoozed chats",
