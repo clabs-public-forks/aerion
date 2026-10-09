@@ -109,13 +109,14 @@ func (p microsoftProvider) QueryFreeBusy(ctx context.Context, src Source, emails
 }
 
 // parseGraphScheduleTime: Graph's dateTime field is "YYYY-MM-DDTHH:MM:SS"
-// without zone offset; the sibling timeZone field carries the IANA name.
+// without zone offset; the sibling timeZone field carries the zone (IANA or
+// Windows name).
 // Falls back to UTC when either is malformed.
 func parseGraphScheduleTime(dt, tz string) (time.Time, bool) {
 	if dt == "" {
 		return time.Time{}, false
 	}
-	loc, err := time.LoadLocation(tz)
+	loc, err := loadTZ(tz)
 	if err != nil || loc == nil {
 		loc = time.UTC
 	}

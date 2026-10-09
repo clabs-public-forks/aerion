@@ -3,15 +3,34 @@ package backend
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emersion/go-ical"
 )
 
+// tzCache memoizes loadTZ by TZID: time.LoadLocation reads zoneinfo from
+// disk on every call, and every blob decode resolves its TZIDs.
+var tzCache sync.Map // string -> tzResult
+
+type tzResult struct {
+	loc *time.Location
+	err error
+}
+
 // loadTZ resolves an iCalendar TZID to a location. Besides IANA names it
 // accepts Windows zone names (Outlook, Exchange) and IANA names behind a
 // vendor prefix such as "/mozilla.org/20050126_1/Europe/Berlin".
 func loadTZ(tzid string) (*time.Location, error) {
+	if r, ok := tzCache.Load(tzid); ok {
+		return r.(tzResult).loc, r.(tzResult).err
+	}
+	loc, err := resolveTZ(tzid)
+	tzCache.Store(tzid, tzResult{loc, err})
+	return loc, err
+}
+
+func resolveTZ(tzid string) (*time.Location, error) {
 	name := strings.Trim(strings.TrimSpace(tzid), `"`)
 	if name == "" {
 		return nil, fmt.Errorf("empty TZID")
@@ -76,13 +95,12 @@ func normalizeTZIDs(c *ical.Component) {
 			if tzid == "" {
 				continue
 			}
-			if _, err := time.LoadLocation(tzid); err == nil {
-				continue
-			}
-			if l, err := loadTZ(tzid); err == nil {
-				props[i].Params.Set(ical.ParamTimezoneID, l.String())
-			} else {
+			l, err := loadTZ(tzid)
+			switch {
+			case err != nil:
 				props[i].Params.Del(ical.ParamTimezoneID)
+			case l.String() != tzid:
+				props[i].Params.Set(ical.ParamTimezoneID, l.String())
 			}
 		}
 	}

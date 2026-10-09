@@ -520,7 +520,7 @@ func setICSTimeFromGoogle(ev *ical.Event, propName string, tp *googleTimePoint) 
 		ev.Props.SetDateTime(propName, parsed.UTC())
 		return nil
 	}
-	loc, lerr := time.LoadLocation(tp.TimeZone)
+	loc, lerr := loadTZ(tp.TimeZone)
 	if lerr != nil {
 		// Unknown tz — fall back to UTC; sync still works.
 		ev.Props.SetDateTime(propName, parsed.UTC())
