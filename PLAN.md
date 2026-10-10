@@ -185,7 +185,7 @@ Validation:
 ## Progress
 
 - [x] M1 — Chat list row and header (visual checks outstanding: dev mode forces Nord Dark on the real mailbox, so row heights, light-theme hover and screenshots need the owner)
-- [ ] M2 — Selection follows pane focus
+- [x] M2 — Selection follows pane focus (contrast verified by script, lowest ratio 4.61 across all 28 theme variants after `_selection.css`; screenshots and the click-to-switch check not done, no display in this session, so the owner needs to check them)
 - [ ] M3 — ChatView extraction
 - [ ] M4 — Reading pane polish
 - [ ] M5 — Themed status tokens
@@ -197,6 +197,8 @@ Validation:
 - `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.
 
 ## Decision Log
+
+- M2: `--primary`/`--primary-foreground` and the 80% text both reach 4.5:1 in only 7 of the 28 theme variants (lowest 2.01, breeze). Rather than retune every theme's primary, which colors buttons everywhere, a new `--selection`/`--selection-foreground` pair (`themes/_selection.css`, falling back to the primary tokens in `app.css`) overrides 21 variants with a shifted lightness and a pure white or black foreground.
 
 - Apple Mail is the reference for principles only. Theme tokens and kit
   components stay; no macOS-specific chrome.
