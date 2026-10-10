@@ -192,6 +192,7 @@ Validation:
 
 ## Surprises & Discoveries
 
+- Sender chats by default: the chat list always takes the window pass over the whole scope now (the `hasSenderChats` shortcut is gone), and pins or snoozes set on single threads before the upgrade are hidden inside their sender's chat until that sender is split. Neither checked on a large real mailbox.
 - Visual pass 2026-10-10 (dev server, Nord Dark only, real mailbox; widths 668/900/1100px via an iframe because the Chrome window could not be resized): list, selection switching, header subject, day separators, remote-images banner and card expand look right. Fixed: toolbar and header buttons lacked focus-visible rings (Compose's ring was invisible on primary, now offset); no divider under the reading-pane subject, so scrolled messages clipped flush; `ChatRichCard`'s `block` overrode `line-clamp-3` (16-line preview) and the toggle plus `pr-20` squeezed it to a 162px column. Still unchecked: light themes, signed/encrypted/bad-signature messages (none in the mailbox), measured row heights.
 
 - M5 review: `viewer/ConversationViewer.svelte` (classic, unmounted) still has hard-coded blue/green/amber banners and its own status mapping; left out of scope (ISSUES.md U1). The solid-button pairing (`bg-*-foreground` with `text-background`) is covered by the contrast script rows tagged `btn` (≥ 5.17).
@@ -204,6 +205,7 @@ Validation:
 
 - Owner request 2026-10-10: the list header no longer shows the message/unread counts subtitle (M1 item 5 reverted; `chat.listCounts` removed).
 - Owner request 2026-10-10: the reading pane's flex basis is 30rem (was 20rem), so the list gives way before the reading pane drops below 480px; before, the list kept 420px while the pane shrank to 320px (checked with a headless Chromium layout of the same CSS).
+- Owner request 2026-10-10: sender chats are on by default. Migration 50 adds `sender_chat.combined` (default 1, so earlier opt-ins stay combined); a row now records a per-sender choice and **Show as separate threads** stores 0. Threads started from the account's own addresses (account email and identities) or with no sender stay thread chats, so Sent folders are unaffected. No global setting yet.
 - M5: tokens live in one `_status.css` keyed on `:root` / `.dark` rather than in each of the 28 theme blocks (themes may still override them); `-foreground` is the tinted-banner text color, also used as a solid button background with `text-background`. Bad banners use `--destructive` for tint and border with `text-foreground` text, since several themes' destructive reds fail 4.5:1 as text. EXT_RULES.md has no theming rules and no extension code was touched.
 
 - M4 baseline (from code, not measured): group gap `mt-3` (12px), same-sender `mt-0.5`; header block `pt-3 pb-1` with a 32px avatar row and `text-sm` title. Target: same gaps plus `pt-3` and a 1px hairline above full-body groups; header title `text-base`.

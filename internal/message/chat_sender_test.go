@@ -53,6 +53,7 @@ func senderChatFixture(t *testing.T) (*Store, string, string, time.Time) {
 			t.Fatalf("seed %s: %v", m.id, err)
 		}
 	}
+	splitSenders(t, s)
 	return s, accountID, inboxID, now
 }
 
@@ -433,5 +434,62 @@ func TestSenderChatSearchUnifiedInbox(t *testing.T) {
 				t.Errorf("results = %v, want %v", got, want)
 			}
 		})
+	}
+}
+
+// TestSenderChatDefault checks that senders combine without a sender_chat
+// row, except the account's own addresses and mail without a sender.
+func TestSenderChatDefault(t *testing.T) {
+	s, accountID, inboxID := newBodyFailedTestStore(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	if _, err := s.db.Exec(`INSERT INTO identities (id, account_id, email, name) VALUES ('id-1', ?, 'Alias@Example.com', 'Alias')`, accountID); err != nil {
+		t.Fatalf("seed identity: %v", err)
+	}
+	seed := []struct{ id, thread, from string }{
+		{"b1", "", "bob@example.com"},
+		{"b2", "<b@x>", "Bob@Example.com"},
+		{"m1", "", "test@example.com"},
+		{"m2", "", "alias@example.com"},
+		{"e1", "", ""},
+	}
+	for i, m := range seed {
+		err := s.Create(&Message{
+			ID: m.id, AccountID: accountID, FolderID: inboxID, UID: uint32(i + 1),
+			ThreadID: m.thread, Subject: m.id, FromEmail: m.from,
+			Date: now.Add(-time.Duration(i) * time.Hour), ReceivedAt: now,
+		})
+		if err != nil {
+			t.Fatalf("seed %s: %v", m.id, err)
+		}
+	}
+
+	chats, err := s.ListChats("", ChatSectionAll, now, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := chatKeys(chats)
+	sort.Strings(keys)
+	if want := []string{"e1", "m1", "m2", SenderChatKey("bob@example.com")}; !reflect.DeepEqual(keys, want) {
+		t.Errorf("chats = %v, want %v", keys, want)
+	}
+
+	for email, want := range map[string]bool{"bob@example.com": true, "TEST@example.com": false, "alias@example.com": false, "": false} {
+		if got, err := s.IsSenderChat(accountID, email); err != nil || got != want {
+			t.Errorf("IsSenderChat(%q) = %v, %v; want %v", email, got, err, want)
+		}
+	}
+
+	if err := s.SetSenderChat(accountID, "bob@example.com", false); err != nil {
+		t.Fatal(err)
+	}
+	if on, err := s.IsSenderChat(accountID, "bob@example.com"); err != nil || on {
+		t.Errorf("after split: IsSenderChat = %v, %v; want false", on, err)
+	}
+	chats, err = s.ListChats("", ChatSectionAll, now, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(chats); got != 5 {
+		t.Errorf("after split: %d chats, want 5: %v", got, chatKeys(chats))
 	}
 }
