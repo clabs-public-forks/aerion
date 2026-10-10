@@ -46,6 +46,7 @@ has not yet been confirmed against the code.
   folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
   which would also retire the 30 s throttle state; cheaper: a shorter Sent
   poll interval.
+
 ### Upstream independence
 
 This fork may eventually stop tracking upstream Aerion. Until then, some code
