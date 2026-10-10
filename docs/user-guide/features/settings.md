@@ -311,7 +311,7 @@ For non-OAuth accounts:
     - Sent folder
     - Drafts folder
     - Trash folder
-    - Archive folder
+    - Archive folder (if none is mapped or detected, as on Gmail, Archive moves messages out of the Inbox to All Mail)
     - Spam folder
 - **Folder sync subscriptions** - Configure additional folders to be synced automatically
     - Manage folder sync - This is disabled by default. Enable it to see the UI to configure which folders to auto-sync

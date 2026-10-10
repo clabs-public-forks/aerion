@@ -802,11 +802,73 @@ func (a *App) Archive(messageIDs []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get archive folder: %w", err)
 	}
+	// Servers such as Gmail have no Archive folder: archiving there means
+	// leaving the Inbox, which a move to All Mail does.
+	if archiveFolder == nil {
+		archiveFolder, err = a.GetSpecialFolder(messages[0].AccountID, folder.TypeAll)
+		if err != nil {
+			return fmt.Errorf("failed to get all mail folder: %w", err)
+		}
+	}
 	if archiveFolder == nil {
 		return fmt.Errorf("no archive folder configured")
 	}
 
-	return a.MoveToFolder(messageIDs, archiveFolder.ID)
+	ids, err := a.archivableIDs(messageIDs, archiveFolder)
+	if err != nil {
+		return err
+	}
+	// MoveToFolder treats an empty list (all already archived) as a no-op.
+	return a.MoveToFolder(ids, archiveFolder.ID)
+}
+
+// archivableIDs returns the IDs of messages that archiving to dest moves.
+// Messages already in dest stay, since moving a message onto its own folder
+// expunges it. With All Mail as dest, Sent and Drafts copies stay too: All
+// Mail holds them already, and on Gmail the move would strip their label.
+// A message whose folder cannot be resolved stays rather than risk that.
+func (a *App) archivableIDs(messageIDs []string, dest *folder.Folder) ([]string, error) {
+	infos, err := a.messageStore.GetMessageUIDsAndFolder(messageIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message folders: %w", err)
+	}
+	ids := make([]string, 0, len(messageIDs))
+	folderTypes := map[string]folder.Type{}
+	for _, id := range messageIDs {
+		info, ok := infos[id]
+		if !ok || info.FolderID == dest.ID {
+			continue
+		}
+		if dest.Type == folder.TypeAll {
+			t, cached := folderTypes[info.FolderID]
+			if !cached {
+				t = a.archiveSourceType(info.FolderID)
+				folderTypes[info.FolderID] = t
+			}
+			switch t {
+			case "", folder.TypeSent, folder.TypeDrafts:
+				continue
+			}
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// archiveSourceType returns the type of the folder a message is archived
+// from, or "" when the folder cannot be resolved.
+func (a *App) archiveSourceType(folderID string) folder.Type {
+	log := logging.WithComponent("app")
+	f, err := a.folderStore.Get(folderID)
+	switch {
+	case err != nil:
+		log.Warn().Err(err).Str("folderID", folderID).Msg("Archive: skipping messages in unresolved folder")
+		return ""
+	case f == nil:
+		log.Warn().Str("folderID", folderID).Msg("Archive: skipping messages in missing folder")
+		return ""
+	}
+	return f.Type
 }
 
 // Trash moves messages to the Trash folder.
