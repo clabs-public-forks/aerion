@@ -96,6 +96,10 @@
   }
 </script>
 
+{#snippet snoozed()}
+  {#if snoozeLabel}<Icon icon="mdi:alarm-snooze" class="inline w-3.5 h-3.5 -mt-0.5" /> {$_('chat.snoozedUntil', { values: { time: snoozeLabel } })} · {/if}
+{/snippet}
+
 {#snippet iconButton(icon: string, label: string, onclick: () => void, active?: boolean, disabled = false)}
   <!-- aria-pressed only for toggles (active passed); plain actions omit it. -->
   <button
@@ -215,12 +219,12 @@
       {#if senderEmail || !subject}
         <h2 class="text-sm font-semibold text-foreground truncate" title={people.map((p) => p.email).join(', ')}>{title}</h2>
         <p class="text-sm text-muted-foreground truncate" title={senderEmail || subject}>
-          {#if snoozeLabel}<Icon icon="mdi:alarm-snooze" class="inline w-3.5 h-3.5 -mt-0.5" /> {$_('chat.snoozedUntil', { values: { time: snoozeLabel } })} · {/if}{senderEmail || $_('viewer.noSubject')}
+          {@render snoozed()}{senderEmail || $_('viewer.noSubject')}
         </p>
       {:else}
         <h2 class="text-base font-semibold text-foreground truncate" title={subject}>{subject}</h2>
         <p class="text-sm text-muted-foreground truncate" title={people.map((p) => p.email).join(', ')}>
-          {#if snoozeLabel}<Icon icon="mdi:alarm-snooze" class="inline w-3.5 h-3.5 -mt-0.5" /> {$_('chat.snoozedUntil', { values: { time: snoozeLabel } })} · {/if}{title}
+          {@render snoozed()}{title}
         </p>
       {/if}
     </div>

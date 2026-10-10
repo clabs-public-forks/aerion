@@ -46,9 +46,14 @@ export function formatRelativeDate(date: Date): string {
   return format(date, 'MMM d, yyyy')
 }
 
+/** Clock time per locale ("14:05" or "02:05 PM"), shared by chat list rows and bubbles. */
+export function formatTime(date: Date): string {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 /**
  * Format a date for chat list rows
- * - Today: clock time ("14:05" or "2:05 PM" per locale)
+ * - Today: clock time (formatTime)
  * - Yesterday: "Yesterday"
  * - Within the last 7 days: weekday ("Monday")
  * - This year: "Dec 15"
@@ -56,7 +61,7 @@ export function formatRelativeDate(date: Date): string {
  */
 export function formatListDate(date: Date): string {
   if (isToday(date)) {
-    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return formatTime(date)
   }
 
   if (isYesterday(date)) {

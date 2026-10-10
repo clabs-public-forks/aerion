@@ -197,9 +197,7 @@ export function formatDay(d: Date): string {
   return format(d, isThisYear(d) ? 'EEE d MMM' : 'EEE d MMM yyyy')
 }
 
-export function formatTime(d: Date): string {
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
+export { formatTime } from '$lib/utils/date'
 
 export interface ThreadItem {
   msg: messageModels.Message

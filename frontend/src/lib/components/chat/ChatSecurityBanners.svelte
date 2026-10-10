@@ -8,15 +8,17 @@
   import { _ } from '$lib/i18n'
   import type { message as messageModels } from '../../../../wailsjs/go/models'
   import type { ChatThread } from './chatThread.svelte'
-  import { securityStatus, type Tone } from './chatSecurity'
+  import type { SecurityLine, Tone } from './chatSecurity'
 
   interface Props {
     msg: messageModels.Message
     thread: ChatThread
+    /** securityStatus(msg, thread, $_), computed once by the bubble. */
+    lines: SecurityLine[]
     variant?: 'banners' | 'badges'
   }
 
-  let { msg, thread, variant = 'banners' }: Props = $props()
+  let { msg, thread, lines, variant = 'banners' }: Props = $props()
 
   const TONES: Record<Tone, string> = {
     info: 'bg-info/12 border-info/35 text-info-foreground',
@@ -26,7 +28,6 @@
     muted: 'bg-muted/50 border-border text-muted-foreground',
   }
 
-  const lines = $derived(securityStatus(msg, thread, $_))
   const badges = $derived(lines.filter((l) => l.badge))
   const banners = $derived(lines.filter((l) => !l.badge))
 

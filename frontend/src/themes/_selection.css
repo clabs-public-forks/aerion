@@ -3,6 +3,11 @@
    cannot carry text at 4.5:1 (including the 80% secondary text) get a
    darkened or lightened primary and a pure white or black foreground here. */
 @layer base {
+  /* Must come first: [data-theme] on <html> ties :root on specificity. */
+  :root, [data-theme="light"] {
+    --selection: 262.1 83.3% 54.8%;
+    --selection-foreground: 0 0% 100%;
+  }
   [data-theme="adwaita-light"] {
     --selection: 213 76% 55%;
     --selection-foreground: 0 0% 0%;
@@ -18,10 +23,6 @@
   [data-theme="breeze-dark"] {
     --selection: 200 80% 58%;
     --selection-foreground: 0 0% 0%;
-  }
-  :root, [data-theme="light"] {
-    --selection: 262.1 83.3% 54.8%;
-    --selection-foreground: 0 0% 100%;
   }
   [data-theme="light-blue"] {
     --selection: 217 91% 60%;

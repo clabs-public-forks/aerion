@@ -78,7 +78,8 @@
   const senderName = $derived(msg.fromName || msg.fromEmail || $_('viewer.unknown'))
   const photo = $derived(contactPhotos.get(msg.fromEmail))
   const time = $derived(formatTime(item.date))
-  const hasBadges = $derived(securityStatus(msg, thread, $_).some((l) => l.badge))
+  const security = $derived(securityStatus(msg, thread, $_))
+  const hasBadges = $derived(security.some((l) => l.badge))
   const recipientsTitle = $derived(
     [
       `${$_('viewer.from')} ${msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail}`,
@@ -159,7 +160,7 @@
     tabindex="-1"
     role="article"
     aria-label={`${senderName}, ${time}`}
-    onfocus={() => onFocusChange(true)}
+    onfocus={(e) => onFocusChange(e.currentTarget.matches(':focus-visible'))}
     onblur={() => onFocusChange(false)}
   >
     <!-- Avatar column (others only); spacer keeps grouped bubbles aligned -->
@@ -185,12 +186,12 @@
             {#if msg.isDraft}<span class="text-destructive font-medium">{$_('chat.draft')}</span>{/if}
             <span>{time}</span>
           {/if}
-          <ChatSecurityBanners {msg} {thread} variant="badges" />
+          <ChatSecurityBanners {msg} {thread} lines={security} variant="badges" />
         </div>
       {/if}
 
       <div class="flex flex-col gap-1.5 w-full {item.mine ? 'items-end' : 'items-start'}">
-        <ChatSecurityBanners {msg} {thread} />
+        <ChatSecurityBanners {msg} {thread} lines={security} />
 
         <div
           class="relative w-full rounded-2xl group-focus-visible:ring-2 group-focus-visible:ring-primary/40 {mode === 'bubble' && !bare ? (item.mine ? 'w-auto bg-primary text-primary-foreground rounded-br-md' : 'w-auto bg-muted text-foreground rounded-bl-md') : ''}"
