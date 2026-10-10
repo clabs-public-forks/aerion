@@ -93,8 +93,8 @@
   const threadKey = $derived(chatItem?.threadKey ?? (threadId ?? '').replace(/[<>]/g, ''))
   const actions = new ChatActions({
     thread, scroll, onActionComplete: (next) => onActionComplete?.(next),
-    accountId: () => accountId, threadKey: () => threadKey, messageIds: () => messageIds,
-    chatItem: () => chatItem, people: () => people, allRead: () => allRead, isTrash: () => isTrash, isSpam: () => isSpam,
+    accountId: () => accountId, threadKey: () => threadKey,
+    chatItem: () => chatItem, people: () => people, isTrash: () => isTrash, isSpam: () => isSpam,
   })
 
   onMount(() => {
@@ -331,12 +331,12 @@
       {showBackButton}
       {onBack}
       {onCompose}
-      onArchive={() => void actions.archive()}
+      onArchive={archive}
       onReplyChat={focusComposer}
       onForward={forward}
       onExpand={() => void expand()}
       onDelete={deleteChat}
-      onSpam={() => void actions.spam()}
+      onSpam={spam}
       onPin={() => actions.togglePin()}
       onSnooze={(d) => void actions.snooze(d)}
       onUnsnooze={() => actions.unsnooze()}

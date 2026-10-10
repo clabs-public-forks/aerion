@@ -7,6 +7,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Keyboard focus ring for compact icon and text buttons. */
+@utility focus-ring {
+  @apply focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden;
+}
+
 @theme inline {
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));

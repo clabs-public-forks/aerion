@@ -103,7 +103,7 @@
 {#snippet iconButton(icon: string, label: string, onclick: () => void, active?: boolean, disabled = false)}
   <!-- aria-pressed only for toggles (active passed); plain actions omit it. -->
   <button
-    class="p-2 rounded-md hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden disabled:opacity-50 disabled:pointer-events-none"
+    class="p-2 rounded-md hover:bg-muted transition-colors focus-ring disabled:opacity-50 disabled:pointer-events-none"
     title={label}
     aria-label={label}
     aria-pressed={active}
@@ -218,7 +218,7 @@
     <div class="min-w-0">
       {#if senderEmail || !subject}
         <h2 class="text-sm font-semibold text-foreground truncate" title={people.map((p) => p.email).join(', ')}>{title}</h2>
-        <p class="text-sm text-muted-foreground truncate" title={senderEmail || subject}>
+        <p class="text-sm text-muted-foreground truncate" title={senderEmail}>
           {@render snoozed()}{senderEmail || $_('viewer.noSubject')}
         </p>
       {:else}

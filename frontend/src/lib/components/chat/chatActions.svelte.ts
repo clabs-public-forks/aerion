@@ -14,10 +14,8 @@ interface Deps {
   scroll: ChatScroll
   accountId: () => string | null
   threadKey: () => string
-  messageIds: () => string[]
   chatItem: () => ChatItem | null
   people: () => Person[]
-  allRead: () => boolean
   isTrash: () => boolean
   isSpam: () => boolean
   onActionComplete: (autoSelectNext?: boolean) => void
@@ -26,12 +24,16 @@ interface Deps {
 export class ChatActions {
   constructor(private d: Deps) {}
 
+  private get messageIds() {
+    return this.d.thread.messages.map((m) => m.id)
+  }
+
   private get ready() {
     return !!this.d.accountId() && !!this.d.threadKey()
   }
 
   private triageTarget() {
-    return { accountId: this.d.accountId() ?? '', threadKey: this.d.threadKey(), messageIds: this.d.messageIds() }
+    return { accountId: this.d.accountId() ?? '', threadKey: this.d.threadKey(), messageIds: this.messageIds }
   }
 
   afterUndo = () => {
@@ -40,7 +42,7 @@ export class ChatActions {
   }
 
   async archive() {
-    if (await archiveChat(this.d.messageIds(), this.afterUndo)) this.d.onActionComplete(true)
+    if (await archiveChat(this.messageIds, this.afterUndo)) this.d.onActionComplete(true)
   }
 
   // Moves to Trash (undoable), or deletes permanently in Trash. wholeThread
@@ -53,7 +55,7 @@ export class ChatActions {
 
   async toggleRead() {
     const { thread } = this.d
-    const allRead = this.d.allRead()
+    const allRead = thread.messages.every((m) => m.isRead)
     // Only messages that change, so every pending id gets a readChanged echo.
     const ids = thread.messages.filter((m) => !!m.isRead === allRead).map((m) => m.id)
     if (ids.length === 0) return
@@ -89,7 +91,7 @@ export class ChatActions {
   }
 
   async spam() {
-    const ids = this.d.messageIds()
+    const ids = this.messageIds
     const isSpam = this.d.isSpam()
     try {
       if (isSpam) {

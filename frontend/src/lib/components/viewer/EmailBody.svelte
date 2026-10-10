@@ -748,7 +748,7 @@ ${processedHtml}
       <div class="flex justify-end mb-2">
         <div class="inline-flex items-stretch rounded-md border border-border text-xs text-muted-foreground">
           <button
-            class="flex items-center gap-1.5 px-2 py-1 rounded-l-md hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring {fromEmail ? '' : 'rounded-r-md'}"
+            class="flex items-center gap-1.5 px-2 py-1 rounded-l-md hover:bg-muted hover:text-foreground transition-colors focus-ring {fromEmail ? '' : 'rounded-r-md'}"
             title={$_('viewer.remoteImagesBlocked')}
             onclick={loadImages}
           >
@@ -759,7 +759,7 @@ ${processedHtml}
           {#if fromEmail}
             <DropdownMenu.Root bind:open={alwaysLoadDropdownOpen}>
               <DropdownMenu.Trigger
-                class="flex items-center px-1 border-l border-border rounded-r-md hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                class="flex items-center px-1 border-l border-border rounded-r-md hover:bg-muted hover:text-foreground transition-colors focus-ring"
                 title={$_('viewer.alwaysLoad')}
                 aria-label={$_('viewer.alwaysLoad')}
               >

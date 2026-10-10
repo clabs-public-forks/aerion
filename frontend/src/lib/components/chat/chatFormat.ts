@@ -197,8 +197,6 @@ export function formatDay(d: Date): string {
   return format(d, isThisYear(d) ? 'EEE d MMM' : 'EEE d MMM yyyy')
 }
 
-export { formatTime } from '$lib/utils/date'
-
 export interface ThreadItem {
   msg: messageModels.Message
   date: Date

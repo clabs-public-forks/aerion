@@ -73,7 +73,6 @@
     searchInputRef?.blur()
   }
 
-  const ring = 'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden'
   const itemClass = 'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground'
 </script>
 
@@ -82,7 +81,7 @@
     <ResponsiveSidebarToggle />
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        class="flex items-center gap-1 min-w-0 px-2 py-1 rounded-md hover:bg-muted transition-colors {ring}"
+        class="flex items-center gap-1 min-w-0 px-2 py-1 rounded-md hover:bg-muted transition-colors focus-ring"
         aria-label={`${$_('chat.scope')}: ${scopeLabel}`}
       >
         <span class="font-semibold text-foreground truncate">{scopeLabel}</span>
@@ -128,7 +127,7 @@
       <div class="mr-1"><ComposeButton onclick={onCompose} /></div>
     {/if}
     <button
-      class="p-2 rounded-md hover:bg-muted transition-colors {ring}"
+      class="p-2 rounded-md hover:bg-muted transition-colors focus-ring"
       title={syncBusy ? `${$_('sidebar.syncing')} ${$_('sidebar.clickToCancel')}` : $_('sidebar.syncAllAccounts')}
       aria-label={$_('sidebar.syncAllAccounts')}
       onclick={onSync}
@@ -157,7 +156,7 @@
     />
     {#if query}
       <button
-        class="p-0.5 rounded hover:bg-background/60 {ring}"
+        class="p-0.5 rounded hover:bg-background/60 focus-ring"
         aria-label={$_('messageList.clearSearch')}
         onclick={() => { onQuery(''); searchInputRef?.focus() }}
       >
@@ -170,7 +169,7 @@
     {#each filters as f (f.value)}
       <button
         disabled={isSearch && !searchSupports(f.value)}
-        class="px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap transition-colors {filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'} {ring} disabled:opacity-50 disabled:pointer-events-none"
+        class="px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap transition-colors {filter === f.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'} focus-ring disabled:opacity-50 disabled:pointer-events-none"
         aria-pressed={filter === f.value}
         onclick={() => onFilter(f.value)}
       >

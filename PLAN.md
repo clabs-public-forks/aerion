@@ -195,7 +195,7 @@ Validation:
 - Visual pass 2026-10-10 (dev server, Nord Dark only, real mailbox; widths 668/900/1100px via an iframe because the Chrome window could not be resized): list, selection switching, header subject, day separators, remote-images banner and card expand look right. Fixed: toolbar and header buttons lacked focus-visible rings (Compose's ring was invisible on primary, now offset); no divider under the reading-pane subject, so scrolled messages clipped flush; `ChatRichCard`'s `block` overrode `line-clamp-3` (16-line preview) and the toggle plus `pr-20` squeezed it to a 162px column. Still unchecked: light themes, signed/encrypted/bad-signature messages (none in the mailbox), measured row heights.
 
 - M5 review: `viewer/ConversationViewer.svelte` (classic, unmounted) still has hard-coded blue/green/amber banners and its own status mapping; left out of scope (ISSUES.md U1). The solid-button pairing (`bg-*-foreground` with `text-background`) is covered by the contrast script rows tagged `btn` (≥ 5.17).
-- M3 review found that `_selection.css`'s `:root` rule gave the 7 unlisted themes the light purple instead of the `--primary` fallback; fixed with an explicit reset block there.
+- M3 review found that `_selection.css`'s `:root` rule gave the 7 unlisted themes the light purple instead of the `--primary` fallback; fixed by scoping that rule to `[data-theme="light"]` (`applyTheme` always sets `data-theme`).
 - `formatListDate` today branch uses `toLocaleTimeString` (OS locale) and goes stale after midnight; not fixed.
 - Subtitle `totalCount` is only refreshed on account reload (only `unreadCount` is patched in place), so the total can lag after deletes or syncs.
 - `contain-intrinsic-size` (80px/60px) is computed from the row layout, not measured.

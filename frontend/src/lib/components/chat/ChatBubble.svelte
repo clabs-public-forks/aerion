@@ -11,14 +11,15 @@
   import AttachmentList from '$lib/components/viewer/AttachmentList.svelte'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
+  import { formatTime } from '$lib/utils/date'
   import { contactPhotos } from '$lib/stores/contactPhotos.svelte'
   import { getDarkMailContent } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
   import { toasts } from '$lib/stores/toast'
   import ChatRichCard from './ChatRichCard.svelte'
   import ChatSecurityBanners from './ChatSecurityBanners.svelte'
-  import { securityStatus } from './chatSecurity'
-  import { formatTime, linkify, parseRecipients, displayName, type ReplyMode, type ThreadItem } from './chatFormat'
+  import { securityStatus, TONES } from './chatSecurity'
+  import { linkify, parseRecipients, displayName, type ReplyMode, type ThreadItem } from './chatFormat'
   import type { ChatThread } from './chatThread.svelte'
 
 
@@ -79,7 +80,8 @@
   const photo = $derived(contactPhotos.get(msg.fromEmail))
   const time = $derived(formatTime(item.date))
   const security = $derived(securityStatus(msg, thread, $_))
-  const hasBadges = $derived(security.some((l) => l.badge))
+  const badges = $derived(security.filter((l) => l.badge))
+  const banners = $derived(security.filter((l) => !l.badge))
   const recipientsTitle = $derived(
     [
       `${$_('viewer.from')} ${msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail}`,
@@ -155,7 +157,7 @@
   {onReply}
 >
   <div
-    class="group flex gap-2 px-4 {item.groupStart ? (mode === 'full' && !item.newDay ? 'mt-3 pt-3 border-t border-border' : 'mt-3') : 'mt-0.5'} {item.mine ? 'flex-row-reverse' : ''}"
+    class="group flex gap-2 px-4 {item.groupStart ? 'mt-3' : 'mt-0.5'} {item.groupStart && mode === 'full' && !item.newDay ? 'pt-3 border-t border-border' : ''} {item.mine ? 'flex-row-reverse' : ''}"
     data-message-id={msg.id}
     tabindex="-1"
     role="article"
@@ -179,19 +181,24 @@
           <span class="truncate">{item.subject}</span>
         </div>
       {/if}
-      {#if item.groupStart || hasBadges}
+      {#if item.groupStart || badges.length}
         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-1 mb-0.5 text-xs text-muted-foreground" title={item.groupStart ? recipientsTitle : undefined}>
           {#if item.groupStart}
             {#if !item.mine}<span class="font-medium text-foreground/80">{senderName}</span>{/if}
             {#if msg.isDraft}<span class="text-destructive font-medium">{$_('chat.draft')}</span>{/if}
             <span>{time}</span>
           {/if}
-          <ChatSecurityBanners {msg} {thread} lines={security} variant="badges" />
+          {#each badges as b (b.icon + b.text)}
+            <span class="inline-flex items-center gap-1 px-1.5 py-px rounded-full border text-[11px] leading-4 {TONES[b.tone]}" title={b.text}>
+              <Icon icon={b.icon} class="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span class="max-w-48 truncate">{b.text}</span>
+            </span>
+          {/each}
         </div>
       {/if}
 
       <div class="flex flex-col gap-1.5 w-full {item.mine ? 'items-end' : 'items-start'}">
-        <ChatSecurityBanners {msg} {thread} lines={security} />
+        <ChatSecurityBanners {msg} {thread} {banners} />
 
         <div
           class="relative w-full rounded-2xl group-focus-visible:ring-2 group-focus-visible:ring-primary/40 {mode === 'bubble' && !bare ? (item.mine ? 'w-auto bg-primary text-primary-foreground rounded-br-md' : 'w-auto bg-muted text-foreground rounded-bl-md') : ''}"

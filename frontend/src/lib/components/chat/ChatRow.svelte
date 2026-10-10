@@ -68,6 +68,9 @@
   })
 
   const hasUnread = $derived(chat.unreadCount > 0)
+  // Secondary text and avatar rings on the solid selection of a focused list.
+  const selText = $derived(selected ? 'group-data-[focused]/list:text-selection-foreground/80' : '')
+  const selRing = $derived(selected ? 'group-data-[focused]/list:ring-selection' : '')
   // Search results always show the matching text.
   const showPreview = $derived(getShowMessagePreview() || !!chat.highlightedSnippet)
   const time = $derived(formatListDate(chat.latestDate))
@@ -127,11 +130,11 @@
 {/snippet}
 
 {#snippet repliedIcon()}
-  <span class="text-muted-foreground {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}" title={$_('chat.youRepliedLast')}><Icon icon="mdi:reply" class="inline w-3.5 h-3.5 -mt-0.5" /></span>
+  <span class="text-muted-foreground {selText}" title={$_('chat.youRepliedLast')}><Icon icon="mdi:reply" class="inline w-3.5 h-3.5 -mt-0.5" /></span>
 {/snippet}
 
 {#snippet statusIcons()}
-  <span class="flex items-center gap-1 shrink-0 text-muted-foreground {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}" aria-hidden="true">
+  <span class="flex items-center gap-1 shrink-0 text-muted-foreground {selText}" aria-hidden="true">
     {#if chat.isEncrypted}<Icon icon="mdi:lock" class="w-3.5 h-3.5" />{/if}
     {#if chat.hasAttachments}<Icon icon="mdi:paperclip" class="w-3.5 h-3.5" />{/if}
     {#if chat.snoozedUntil}<span title={$_('chat.snoozedUntil', { values: { time: snoozeTime } })}><Icon icon="mdi:alarm-snooze" class="w-3.5 h-3.5" /></span>{/if}
@@ -167,7 +170,8 @@
     tabindex="-1"
     data-chat-row
     draggable={getLayoutMode() !== 'narrow'}
-    class="chat-row relative flex items-center gap-3 px-3 py-2.5 mx-1.5 my-0.5 rounded-lg cursor-pointer outline-hidden transition-colors {selected ? 'bg-muted group-data-[focused]/list:bg-selection group-data-[focused]/list:text-selection-foreground' : 'hover:bg-muted/50'} {showPreview ? 'chat-row-tall' : 'chat-row-short'}"
+    class="chat-row relative flex items-center gap-3 px-3 py-2.5 mx-1.5 my-0.5 rounded-lg cursor-pointer outline-hidden transition-colors {selected ? 'bg-muted group-data-[focused]/list:bg-selection group-data-[focused]/list:text-selection-foreground' : 'hover:bg-muted/50'}"
+    style:contain-intrinsic-size={showPreview ? 'auto 80px' : 'auto 60px'}
     onclick={onSelect}
     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
     ondragstart={handleDragStart}
@@ -178,13 +182,13 @@
     <div class="relative shrink-0 w-11 h-11" aria-hidden="true">
       {#if people.length > 1}
         <div class="absolute top-0 left-0">{@render avatar(people[0], 26)}</div>
-        <div class="absolute bottom-0 right-0 rounded-full ring-2 ring-background {selected ? 'group-data-[focused]/list:ring-selection' : ''}">{@render avatar(people[1], 26)}</div>
+        <div class="absolute bottom-0 right-0 rounded-full ring-2 ring-background {selRing}">{@render avatar(people[1], 26)}</div>
       {:else}
         {@render avatar(people[0], 44)}
       {/if}
       {#if showAccount && chat.accountColor}
         <span
-          class="absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full ring-2 ring-background {selected ? 'group-data-[focused]/list:ring-selection' : ''}"
+          class="absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full ring-2 ring-background {selRing}"
           style="background-color: {chat.accountColor}"
           title={chat.accountName}
         ></span>
@@ -195,11 +199,11 @@
       <!-- People + time -->
       <div class="flex items-baseline gap-2">
         <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'} {selected ? 'group-data-[focused]/list:text-selection-foreground' : ''}">{title}</span>
-        <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'} {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}">{time}</span>
+        <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'} {selText}">{time}</span>
       </div>
       <!-- Subject (one line), with the status icons when the latest line is hidden -->
       <div class="flex items-center gap-1.5">
-        <span class="flex-1 min-w-0 truncate text-sm leading-5 {hasUnread ? 'text-foreground' : 'text-foreground/80'} {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}">
+        <span class="flex-1 min-w-0 truncate text-sm leading-5 {hasUnread ? 'text-foreground' : 'text-foreground/80'} {selText}">
           {#if !showPreview && chat.lastFromMe}{@render repliedIcon()}{/if}
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{subject}{/if}
@@ -209,7 +213,7 @@
       {#if showPreview}
         <!-- Latest line + status icons -->
         <div class="flex items-center gap-1.5">
-          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground/90' : 'text-muted-foreground'} {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}">
+          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground/90' : 'text-muted-foreground'} {selText}">
             {#if chat.lastFromMe}{@render repliedIcon()}{/if}
             <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
             {#if chat.highlightedSnippet}{@html chat.highlightedSnippet}{:else}{chat.snippet}{/if}
@@ -252,11 +256,5 @@
   /* Skip layout and paint for off-screen rows in long lists. */
   .chat-row {
     content-visibility: auto;
-  }
-  .chat-row-tall {
-    contain-intrinsic-size: auto 80px;
-  }
-  .chat-row-short {
-    contain-intrinsic-size: auto 60px;
   }
 </style>

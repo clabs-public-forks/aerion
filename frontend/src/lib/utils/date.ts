@@ -31,11 +31,16 @@ export function formatRelativeDate(date: Date): string {
     return `${diffHours}h`
   }
 
+  return formatDayLabel(date, isThisWeek(date))
+}
+
+/** Shared tail of the list date formats: "Yesterday", weekday when recent, then month-day. */
+function formatDayLabel(date: Date, recent: boolean): string {
   if (isYesterday(date)) {
-    return t('date.yesterday')
+    return get(_)('date.yesterday')
   }
 
-  if (isThisWeek(date)) {
+  if (recent) {
     return format(date, 'EEEE')
   }
 
@@ -67,20 +72,8 @@ export function formatListDate(date: Date): string {
     return formatTime(date)
   }
 
-  if (isYesterday(date)) {
-    return get(_)('date.yesterday')
-  }
-
   const daysAgo = differenceInCalendarDays(new Date(), date)
-  if (daysAgo > 0 && daysAgo < 7) {
-    return format(date, 'EEEE')
-  }
-
-  if (isThisYear(date)) {
-    return format(date, 'MMM d')
-  }
-
-  return format(date, 'MMM d, yyyy')
+  return formatDayLabel(date, daysAgo > 0 && daysAgo < 7)
 }
 
 /**
