@@ -321,8 +321,12 @@ func TestSenderChatDueSnooze(t *testing.T) {
 	}
 }
 
-func TestSenderChatCleanup(t *testing.T) {
-	s, accountID, _, now := senderChatFixture(t)
+// TestSenderChatStaleKeys checks that state keys follow the inbox chat list:
+// a combined sender keeps its state with or without inbox mail, a split
+// sender or one the default no longer combines drops it, and a pinned or
+// snoozed thread that joins a sender chat moves into it.
+func TestSenderChatStaleKeys(t *testing.T) {
+	s, accountID, inboxID, now := senderChatFixture(t)
 	if err := s.SetSenderChat(accountID, lms, true); err != nil {
 		t.Fatal(err)
 	}
@@ -332,40 +336,97 @@ func TestSenderChatCleanup(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := s.SetSenderChat(accountID, "ghost@x", true); err != nil {
+	if err := s.ClearSenderChat(accountID, "ghost@x"); err != nil {
 		t.Fatal(err)
 	}
+	if n, err := s.CleanupChatState(); err != nil || n != 0 {
+		t.Errorf("CleanupChatState = %d, %v; want 0 (sender chat state is not cleaned there)", n, err)
+	}
 
+	type move = ChatKeyMove
 	steps := []struct {
-		name    string
-		before  func() error
-		removed int64
-		kept    bool // sender chat state for lms
+		name   string
+		before func() error
+		want   []move
 	}{
-		{"combined senders keep state, with or without messages", func() error { return nil }, 0, true},
+		{"combined senders keep state", func() error { return nil }, nil},
 		{"messages leaving the inbox keep state", func() error {
 			_, err := s.db.Exec(`UPDATE messages SET folder_id = 'sent-1' WHERE from_email LIKE ?`, lms)
 			return err
-		}, 0, true},
-		{"flag off drops state", func() error { return s.SetSenderChat(accountID, lms, false) }, 1, false},
+		}, nil},
+		{"default off drops senders without a choice", func() error {
+			_, err := s.db.Exec(`INSERT INTO settings (key, value) VALUES ('chat_combine_senders', 'false')`)
+			return err
+		}, []move{{accountID, SenderChatKey("ghost@x"), ""}}},
+		{"split drops state", func() error { return s.SetSenderChat(accountID, lms, false) },
+			[]move{{accountID, SenderChatKey("ghost@x"), ""}, {accountID, lmsKey, ""}}},
 	}
 	for _, st := range steps {
 		t.Run(st.name, func(t *testing.T) {
 			if err := st.before(); err != nil {
 				t.Fatal(err)
 			}
-			n, err := s.CleanupChatState()
-			if err != nil || n != st.removed {
-				t.Errorf("CleanupChatState = %d, %v; want %d", n, err, st.removed)
-			}
-			got, err := s.GetChatState(accountID, lmsKey)
+			got, err := s.StaleChatKeys()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if kept := got.PinnedAt != nil; kept != st.kept {
-				t.Errorf("sender chat state kept = %v, want %v", kept, st.kept)
+			if !reflect.DeepEqual(got, st.want) {
+				t.Errorf("StaleChatKeys = %+v, want %+v", got, st.want)
 			}
 		})
+	}
+	if err := s.MoveChatState(ChatKeyMove{accountID, lmsKey, ""}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.GetChatState(accountID, lmsKey); err != nil || !got.empty() {
+		t.Errorf("dropped state = %+v, %v; want empty", got, err)
+	}
+
+	// Back in the inbox, lms's thread t@x is pinned while split, then lms
+	// combines: the pin moves into the sender chat.
+	if _, err := s.db.Exec(`UPDATE messages SET folder_id = ? WHERE from_email LIKE ? AND account_id = ?`, inboxID, lms, accountID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetChatState(accountID, "t@x", pinned); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSenderChat(accountID, lms, true); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.StaleChatKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []move{{accountID, SenderChatKey("ghost@x"), ""}, {accountID, "t@x", lmsKey}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("StaleChatKeys = %+v, want %+v", got, want)
+	}
+	if err := s.MoveChatState(want[1]); err != nil {
+		t.Fatal(err)
+	}
+	if st, err := s.GetChatState(accountID, lmsKey); err != nil || st.PinnedAt == nil || !st.PinnedAt.Equal(now) {
+		t.Errorf("sender chat state = %+v, %v; want pinned at %v", st, err, now)
+	}
+	if st, err := s.GetChatState(accountID, "t@x"); err != nil || !st.empty() {
+		t.Errorf("thread state = %+v, %v; want empty", st, err)
+	}
+}
+
+func TestSenderChatChoice(t *testing.T) {
+	s, accountID, _, _ := senderChatFixture(t)
+	if err := s.ClearSenderChat(accountID, lms); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.SenderChatChoice(accountID, lms); err != nil || got != nil {
+		t.Errorf("SenderChatChoice after clear = %v, %v; want nil", got, err)
+	}
+	for _, combined := range []bool{true, false} {
+		if err := s.SetSenderChat(accountID, lms, combined); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.SenderChatChoice(accountID, " NoReply@lms.example "); err != nil || got == nil || *got != combined {
+			t.Errorf("SenderChatChoice = %v, %v; want %v", got, err, combined)
+		}
 	}
 }
 

@@ -1,8 +1,10 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hkdb/aerion/internal/account"
 	"github.com/hkdb/aerion/internal/certificate"
@@ -287,8 +289,11 @@ func (a *App) GetChatCombineSenders() (bool, error) {
 }
 
 // SetChatCombineSenders sets whether senders combine by default; per-sender
-// choices still win. Chat lists reload when the value changes.
+// choices still win. When the value changes, pins, snoozes and chat draft
+// links move to the chats their threads now belong to, and chat lists reload.
 func (a *App) SetChatCombineSenders(combine bool) error {
+	a.chatStateMu.Lock()
+	defer a.chatStateMu.Unlock()
 	previous, err := a.settingsStore.GetChatCombineSenders()
 	if err != nil {
 		return err
@@ -299,14 +304,18 @@ func (a *App) SetChatCombineSenders(combine bool) error {
 	if previous == combine {
 		return nil
 	}
+	changed, moveErr := a.moveStaleChatState()
+	a.armSnoozeTimer(time.Second)
 	accounts, err := a.accountStore.List()
 	if err != nil {
-		return err
+		return errors.Join(moveErr, err)
 	}
 	for _, acc := range accounts {
-		a.emitChatsChanged(acc.ID)
+		if !changed[acc.ID] {
+			a.emitChatsChanged(acc.ID)
+		}
 	}
-	return nil
+	return moveErr
 }
 
 // GetChatSendKey returns the chat composer's send key ("enter" or "ctrl-enter")

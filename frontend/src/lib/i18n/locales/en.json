@@ -180,6 +180,8 @@
     "splitSender": "Show as separate threads",
     "senderCombinedToast": "Messages from {sender} combined",
     "senderSplitToast": "Messages from {sender} shown as separate threads",
+    "senderAlreadyCombined": "Messages from {sender} are already combined. This thread stays separate because {sender} didn't start it",
+    "senderAlreadySplit": "Messages from {sender} already show as separate threads",
     "archiveAllLow": "Archive all low priority",
     "markAllLowRead": "Mark all low priority as read",
     "chatsArchivedToast": "{count, plural, one {# chat} other {# chats}} archived",
