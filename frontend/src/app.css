@@ -366,14 +366,16 @@ mark {
 
 /* Full-layout list + detail columns. When the window can't fit the stored
    list width, the list shrinks first (down to LIST_MIN in uiState) so the
-   detail pane keeps about 20rem; the detail pane only shrinks after that. */
+   detail pane keeps about 30rem; the detail pane only shrinks after that.
+   A smaller basis left the list at full width while the reading pane
+   narrowed to less than the list. */
 .pane-list-resizable {
   flex-shrink: 1000;
   min-width: 280px;
 }
 
 .pane-detail {
-  flex: 1 1 20rem;
+  flex: 1 1 30rem;
   min-width: 0;
 }
 
