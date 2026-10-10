@@ -7,8 +7,8 @@ import (
 
 	"github.com/hkdb/aerion/internal/carddav"
 	"github.com/hkdb/aerion/internal/contact"
-	"github.com/hkdb/aerion/internal/database"
 	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
+	"github.com/hkdb/aerion/internal/database"
 	"github.com/hkdb/aerion/internal/platform"
 )
 
@@ -389,13 +389,14 @@ type ResizedContactPhoto struct {
 // dialog `await`s this.
 //
 // Inputs:
-//   sourceID              — the contact source being granted write access
-//   authContextKind       — "mail" or "standalone-contacts"
-//   authContextIdentifier — account_id (for "mail") or source_id (for
-//                           "standalone-contacts"); identifies the
-//                           OAuth identity the new tokens attach to
-//   expectedEmail         — the picked identity's email; enforced on
-//                           OAuth callback (mismatch = reject)
+//
+//	sourceID              — the contact source being granted write access
+//	authContextKind       — "mail" or "standalone-contacts"
+//	authContextIdentifier — account_id (for "mail") or source_id (for
+//	                        "standalone-contacts"); identifies the
+//	                        OAuth identity the new tokens attach to
+//	expectedEmail         — the picked identity's email; enforced on
+//	                        OAuth callback (mismatch = reject)
 //
 // Aerion's design forbids creating new accounts from inside the contacts
 // extension; all auth contexts MUST be one the user already set up in core

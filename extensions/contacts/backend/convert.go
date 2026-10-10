@@ -46,18 +46,18 @@ func fromRecord(rec *contact.Record) coreapi.Contact {
 	// `"emails": []` rather than `"emails": null`. Frontend `{#each contact.emails}`
 	// blocks iterate empty arrays fine; iterating null throws.
 	out := coreapi.Contact{
-		ID:        rec.ID,
-		Name:      rec.Fn,
-		Emails:    []string{},
-		Org:       rec.Org,
-		Title:     rec.Title,
-		Note:      rec.Note,
-		Bday:      rec.Bday,
-		Nickname:  rec.Nickname,
+		ID:             rec.ID,
+		Name:           rec.Fn,
+		Emails:         []string{},
+		Org:            rec.Org,
+		Title:          rec.Title,
+		Note:           rec.Note,
+		Bday:           rec.Bday,
+		Nickname:       rec.Nickname,
 		PhotoData:      rec.PhotoData,
 		PhotoMediaType: rec.PhotoMediaType,
 		PhotoURL:       rec.PhotoURL,
-		UpdatedAt: rec.UpdatedAt,
+		UpdatedAt:      rec.UpdatedAt,
 	}
 
 	// Source mapping: 'local' → 'aerion' (legacy compat for the detail-pane

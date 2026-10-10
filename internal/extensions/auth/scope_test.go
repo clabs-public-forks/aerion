@@ -68,10 +68,10 @@ func TestMissingScopes(t *testing.T) {
 
 func TestResolveClientConfigID(t *testing.T) {
 	tests := []struct {
-		name        string
-		provider    string
-		extPresent  bool
-		want        coreapi.ClientConfigID
+		name       string
+		provider   string
+		extPresent bool
+		want       coreapi.ClientConfigID
 	}{
 		{"google with ext config", "google", true, "google-extensions"},
 		{"google without ext config falls back to mail", "google", false, "google-mail"},

@@ -21,14 +21,14 @@ import (
 // received and responds with the configured status + headers. Used by the
 // Put/Delete tests to assert request shape and exercise error paths.
 type fakeCardDAVServer struct {
-	srv          *httptest.Server
-	lastMethod   string
-	lastPath     string
-	lastIfMatch  string
-	lastBody     []byte
-	respStatus   int
-	respETag     string
-	respBody     string
+	srv         *httptest.Server
+	lastMethod  string
+	lastPath    string
+	lastIfMatch string
+	lastBody    []byte
+	respStatus  int
+	respETag    string
+	respBody    string
 }
 
 func newFakeServer(status int, etag, body string) *fakeCardDAVServer {

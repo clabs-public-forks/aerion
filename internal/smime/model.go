@@ -10,12 +10,12 @@ import (
 type SignatureStatus string
 
 const (
-	StatusNone          SignatureStatus = ""              // Not S/MIME
-	StatusSigned        SignatureStatus = "signed"        // Valid signature, trusted chain
-	StatusInvalid       SignatureStatus = "invalid"       // Signature does not verify
+	StatusNone          SignatureStatus = ""               // Not S/MIME
+	StatusSigned        SignatureStatus = "signed"         // Valid signature, trusted chain
+	StatusInvalid       SignatureStatus = "invalid"        // Signature does not verify
 	StatusUnknownSigner SignatureStatus = "unknown_signer" // Valid sig, untrusted CA
-	StatusSelfSigned    SignatureStatus = "self_signed"   // Valid sig, self-signed cert
-	StatusExpiredCert   SignatureStatus = "expired_cert"  // Valid sig, expired cert
+	StatusSelfSigned    SignatureStatus = "self_signed"    // Valid sig, self-signed cert
+	StatusExpiredCert   SignatureStatus = "expired_cert"   // Valid sig, expired cert
 	// StatusSignerMismatch: valid sig, trusted chain, but the certificate
 	// does not name the message's From address
 	StatusSignerMismatch SignatureStatus = "signer_mismatch"

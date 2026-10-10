@@ -98,7 +98,7 @@ type msContact struct {
 
 	Categories []string `json:"categories,omitempty"`
 
-	Birthday string `json:"birthday,omitempty"`     // ISO 8601 datetime; we send YYYY-MM-DDTHH:00:00Z
+	Birthday string `json:"birthday,omitempty"` // ISO 8601 datetime; we send YYYY-MM-DDTHH:00:00Z
 	Personal string `json:"personalNotes,omitempty"`
 }
 

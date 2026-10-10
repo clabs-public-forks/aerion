@@ -19,7 +19,6 @@ type OAuthTokens struct {
 	Scopes       []string  `json:"scopes"`       // Stored in DB
 }
 
-
 // IsExpired returns true if the access token has expired
 func (t *OAuthTokens) IsExpired() bool {
 	return time.Now().After(t.ExpiresAt)

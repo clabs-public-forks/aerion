@@ -13,9 +13,10 @@ import (
 
 // pushMicrosoftRSVP calls Graph's dedicated RSVP endpoints for the user's
 // own attendance on an event others organized:
-//   POST /me/events/{id}/accept             { comment, sendResponse }
-//   POST /me/events/{id}/decline
-//   POST /me/events/{id}/tentativelyAccept
+//
+//	POST /me/events/{id}/accept             { comment, sendResponse }
+//	POST /me/events/{id}/decline
+//	POST /me/events/{id}/tentativelyAccept
 //
 // These are preferred over a generic PATCH because:
 //   - they're idempotent on Graph's side (PATCHing attendees[] from the

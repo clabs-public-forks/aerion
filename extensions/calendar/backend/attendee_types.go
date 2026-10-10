@@ -42,11 +42,11 @@ const (
 type Attendee struct {
 	Email      string `json:"email"`
 	CommonName string `json:"cn,omitempty"`
-	PartStat   string `json:"partStat,omitempty"`   // PartStat* const
-	Role       string `json:"role,omitempty"`       // Role* const
-	RSVP       bool   `json:"rsvp,omitempty"`       // RSVP param TRUE/FALSE
-	CUType     string `json:"cuType,omitempty"`     // CUType* const
-	Delegate   string `json:"delegate,omitempty"`   // DELEGATED-TO email, lowercase
+	PartStat   string `json:"partStat,omitempty"` // PartStat* const
+	Role       string `json:"role,omitempty"`     // Role* const
+	RSVP       bool   `json:"rsvp,omitempty"`     // RSVP param TRUE/FALSE
+	CUType     string `json:"cuType,omitempty"`   // CUType* const
+	Delegate   string `json:"delegate,omitempty"` // DELEGATED-TO email, lowercase
 
 	// ScheduleStatus is RFC 6638's SCHEDULE-STATUS param, returned by
 	// CalDAV servers after a PUT to indicate iTIP delivery state.

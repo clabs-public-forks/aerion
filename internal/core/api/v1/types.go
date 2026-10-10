@@ -11,12 +11,12 @@ type Address struct {
 // Attachment represents file content attached to a message or compose request.
 // Either Data or Path must be set; Data takes precedence when both are present.
 type Attachment struct {
-	Filename string `json:"filename"`
-	MIMEType string `json:"mimeType"`
-	Size     int64  `json:"size"`
-	Data     []byte `json:"data,omitempty"`
-	Path     string `json:"path,omitempty"`
-	IsInline bool   `json:"isInline,omitempty"`
+	Filename  string `json:"filename"`
+	MIMEType  string `json:"mimeType"`
+	Size      int64  `json:"size"`
+	Data      []byte `json:"data,omitempty"`
+	Path      string `json:"path,omitempty"`
+	IsInline  bool   `json:"isInline,omitempty"`
 	ContentID string `json:"contentId,omitempty"`
 }
 
@@ -55,27 +55,27 @@ const (
 // internal/message.Message but is decoupled from core's storage shape so core
 // can evolve without breaking the extension API.
 type Message struct {
-	ID         string    `json:"id"`
-	AccountID  string    `json:"accountId"`
-	FolderID   string    `json:"folderId"`
-	UID        uint32    `json:"uid"`
-	MessageID  string    `json:"messageId"`  // RFC 5322 Message-ID
-	InReplyTo  string    `json:"inReplyTo"`
-	References []string  `json:"references"`
-	ThreadID   string    `json:"threadId"`
-	Subject    string    `json:"subject"`
-	From       Address   `json:"from"`
-	To         []Address `json:"to"`
-	Cc         []Address `json:"cc"`
-	Bcc        []Address `json:"bcc"`
-	ReplyTo    string    `json:"replyTo"`
-	Date       time.Time `json:"date"`
-	BodyHTML   string    `json:"bodyHtml,omitempty"`
-	BodyText   string    `json:"bodyText,omitempty"`
-	Snippet    string    `json:"snippet"`
-	Flags      Flags     `json:"flags"`
-	Size       int       `json:"size"`
-	HasAttachments bool  `json:"hasAttachments"`
+	ID             string    `json:"id"`
+	AccountID      string    `json:"accountId"`
+	FolderID       string    `json:"folderId"`
+	UID            uint32    `json:"uid"`
+	MessageID      string    `json:"messageId"` // RFC 5322 Message-ID
+	InReplyTo      string    `json:"inReplyTo"`
+	References     []string  `json:"references"`
+	ThreadID       string    `json:"threadId"`
+	Subject        string    `json:"subject"`
+	From           Address   `json:"from"`
+	To             []Address `json:"to"`
+	Cc             []Address `json:"cc"`
+	Bcc            []Address `json:"bcc"`
+	ReplyTo        string    `json:"replyTo"`
+	Date           time.Time `json:"date"`
+	BodyHTML       string    `json:"bodyHtml,omitempty"`
+	BodyText       string    `json:"bodyText,omitempty"`
+	Snippet        string    `json:"snippet"`
+	Flags          Flags     `json:"flags"`
+	Size           int       `json:"size"`
+	HasAttachments bool      `json:"hasAttachments"`
 }
 
 // Folder is the API-surface representation of a mail folder.
@@ -131,11 +131,11 @@ type Contact struct {
 	//   - PhotoData (base64) + PhotoMediaType (e.g. "image/jpeg") = inline embed
 	//   - PhotoURL = vCard URL-ref (PHOTO;VALUE=URI). Avatar falls back to initials
 	//     in this phase; fetching is its own track.
-	PhotoData      string `json:"photoData,omitempty"`
-	PhotoMediaType string `json:"photoMediaType,omitempty"`
-	PhotoURL       string `json:"photoUrl,omitempty"`
-	SourceID   string           `json:"sourceId,omitempty"`
-	UpdatedAt  time.Time        `json:"updatedAt"`
+	PhotoData      string    `json:"photoData,omitempty"`
+	PhotoMediaType string    `json:"photoMediaType,omitempty"`
+	PhotoURL       string    `json:"photoUrl,omitempty"`
+	SourceID       string    `json:"sourceId,omitempty"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 // ContactEmail is one email on a Contact, with its TYPE and primary flag.

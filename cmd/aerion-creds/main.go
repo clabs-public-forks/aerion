@@ -3,7 +3,8 @@
 // app (built from source on Flathub) can read credentials at runtime.
 //
 // Build:
-//   go build -ldflags "-X 'main.GoogleClientID=...' -X 'main.GoogleClientSecret=...' -X 'main.MicrosoftClientID=...' -X 'main.GoogleTestingClientID=...' -X 'main.GoogleTestingClientSecret=...'" -o aerion-creds
+//
+//	go build -ldflags "-X 'main.GoogleClientID=...' -X 'main.GoogleClientSecret=...' -X 'main.MicrosoftClientID=...' -X 'main.GoogleTestingClientID=...' -X 'main.GoogleTestingClientSecret=...'" -o aerion-creds
 package main
 
 import (

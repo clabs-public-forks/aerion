@@ -87,7 +87,7 @@ func TestGetSenderConversation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.UnreadCount != 3 || c.Subject != "Re: Forum post" || !c.LatestDate.Equal(now.Add(-14*time.Hour - 30*time.Minute)) {
+	if c.UnreadCount != 3 || c.Subject != "Re: Forum post" || !c.LatestDate.Equal(now.Add(-14*time.Hour-30*time.Minute)) {
 		t.Errorf("UnreadCount, Subject, LatestDate = %d, %q, %v", c.UnreadCount, c.Subject, c.LatestDate)
 	}
 	var senders []string

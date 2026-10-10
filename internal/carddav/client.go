@@ -339,9 +339,9 @@ type ParsedRecord struct {
 	ETag     string
 	VCardRaw string
 
-	FN       string
-	NGiven   string
-	NFamily  string
+	FN      string
+	NGiven  string
+	NFamily string
 
 	Emails    []ParsedEmail
 	Phones    []ParsedPhone

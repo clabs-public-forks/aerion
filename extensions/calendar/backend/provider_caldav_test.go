@@ -26,10 +26,10 @@ import (
 // exercised by caldavProvider — the rest stub safely.
 type fakeSecrets struct{ password string }
 
-func (f fakeSecrets) Set(_, _ string) error       { return nil }
+func (f fakeSecrets) Set(_, _ string) error        { return nil }
 func (f fakeSecrets) Get(_ string) (string, error) { return f.password, nil }
-func (f fakeSecrets) Delete(_ string) error       { return nil }
-func (f fakeSecrets) DeleteAll() error            { return nil }
+func (f fakeSecrets) Delete(_ string) error        { return nil }
+func (f fakeSecrets) DeleteAll() error             { return nil }
 
 var _ coreapi.Secrets = fakeSecrets{}
 

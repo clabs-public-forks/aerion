@@ -425,4 +425,3 @@ func resolveCalDAVURL(baseURL, href string) string {
 	}
 	return base.ResolveReference(ref).String()
 }
-

@@ -27,10 +27,10 @@ type NotificationData struct {
 
 // Notification represents a desktop notification to be shown
 type Notification struct {
-	Title   string
-	Body    string
-	Icon    string
-	Data    NotificationData
+	Title string
+	Body  string
+	Icon  string
+	Data  NotificationData
 }
 
 // Notifier provides cross-platform notification support with click handling

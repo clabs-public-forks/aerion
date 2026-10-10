@@ -9,10 +9,10 @@ package v1
 // import paths, no compiled-type references, no host-coupled fields. The
 // host reads the manifest before deciding whether to load an extension.
 type Manifest struct {
-	ID               string         `json:"id"`               // canonical extension id (matches settings.AllExtensionKeys)
-	Name             string         `json:"name"`             // user-facing display name
-	Version          string         `json:"version"`          // semver
-	Description      string         `json:"description"`      // 1-2 sentence summary shown in Settings
+	ID               string         `json:"id"`          // canonical extension id (matches settings.AllExtensionKeys)
+	Name             string         `json:"name"`        // user-facing display name
+	Version          string         `json:"version"`     // semver
+	Description      string         `json:"description"` // 1-2 sentence summary shown in Settings
 	Author           string         `json:"author"`
 	MinAerionVersion string         `json:"minAerionVersion"` // semver — host refuses to load if lower
 	Capabilities     []string       `json:"capabilities"`     // coarse capabilities; see below

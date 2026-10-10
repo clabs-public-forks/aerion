@@ -23,11 +23,11 @@ DESCRIPTION:Standup soon
 END:VALARM
 END:VEVENT`)
 	ev := Event{
-		ID:           "ev1",
-		Summary:      "Standup",
-		DTStartUnix:  time.Date(2026, 6, 5, 14, 0, 0, 0, time.UTC).Unix(),
-		DTEndUnix:    time.Date(2026, 6, 5, 15, 0, 0, 0, time.UTC).Unix(),
-		ICSBlob:      ics,
+		ID:          "ev1",
+		Summary:     "Standup",
+		DTStartUnix: time.Date(2026, 6, 5, 14, 0, 0, 0, time.UTC).Unix(),
+		DTEndUnix:   time.Date(2026, 6, 5, 15, 0, 0, 0, time.UTC).Unix(),
+		ICSBlob:     ics,
 	}
 	insts := []EventInstance{{Event: ev, InstanceStartUnix: ev.DTStartUnix, InstanceEndUnix: ev.DTEndUnix}}
 

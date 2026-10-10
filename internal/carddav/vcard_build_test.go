@@ -22,8 +22,8 @@ func TestBuildVCard_RoundTripPreservesUnknownProperties(t *testing.T) {
 	}, "\r\n")
 
 	rec := &contact.Record{
-		ID:  "abc-123",
-		Fn:  "New Name",
+		ID: "abc-123",
+		Fn: "New Name",
 		Emails: []contact.RecordEmail{
 			{Email: "new@example.com", EmailType: "work", IsPrimary: true},
 		},

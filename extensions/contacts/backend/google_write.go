@@ -216,7 +216,7 @@ type googleModifyMembersRequest struct {
 }
 
 type googleUpdatePhotoRequest struct {
-	PhotoBytes string `json:"photoBytes"` // standard base64 (NOT urlsafe)
+	PhotoBytes   string `json:"photoBytes"` // standard base64 (NOT urlsafe)
 	PersonFields string `json:"personFields,omitempty"`
 }
 

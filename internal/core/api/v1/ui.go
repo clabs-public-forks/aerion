@@ -55,10 +55,10 @@ type InboxViewRequest struct {
 //  4. User clicks → extension's onboarding handler runs (incremental OAuth + provider discovery).
 type AccountSetupHookRequest struct {
 	ExtensionID string   `json:"extensionId"`
-	Providers   []string `json:"providers"`            // e.g., ["google", "microsoft", "imap"]
-	ButtonLabel string   `json:"buttonLabel"`          // e.g., "Also set up your calendar"
+	Providers   []string `json:"providers"`   // e.g., ["google", "microsoft", "imap"]
+	ButtonLabel string   `json:"buttonLabel"` // e.g., "Also set up your calendar"
 	Description string   `json:"description,omitempty"`
-	Component   string   `json:"component"`            // Svelte component handling the onboarding flow
+	Component   string   `json:"component"` // Svelte component handling the onboarding flow
 }
 
 // UI is the surface for extension-driven UI registrations and UI actions.

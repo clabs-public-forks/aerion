@@ -12,8 +12,8 @@ import (
 	_ "time/tzdata" // IANA zones for Windows, which has no system tz database
 
 	"github.com/hkdb/aerion/app"
-	"github.com/hkdb/aerion/internal/platform"
 	"github.com/hkdb/aerion/internal/appstate"
+	"github.com/hkdb/aerion/internal/platform"
 	"github.com/hkdb/aerion/internal/settings"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"

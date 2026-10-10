@@ -17,7 +17,7 @@ func TestMSSidecar_RoundTrip(t *testing.T) {
 
 	side := MSSidecar{
 		EmailTypes: map[string]string{
-			"alice@example.com":     "work",
+			"alice@example.com":      "work",
 			"alice@home.example.com": "home",
 		},
 		URLs: []MSSidecarURL{

@@ -98,11 +98,6 @@ cleanup here, so it can be done once the fork is independent.
   lookup, the sync toggle, trash-with-undo) that go with them; the chat
   side uses `accountStore.getFolder`/`getInbox` and
   `components/chat/chatTriage.ts`.
-- **U2** Go sources: `gofmt -l` lists 55 files (for example
-  `internal/message/store.go`, `app/compose.go`, `app/account.go`, and many
-  under `extensions/` and `internal/`), mostly struct-tag alignment and
-  import order. They are left unformatted to keep upstream merges clean;
-  run `gofmt -w` across the tree once the fork is independent.
 - **U3** non-English locale files: this fork updates English only, so the
   other locales drift. Remove them, or decide to maintain them.
 

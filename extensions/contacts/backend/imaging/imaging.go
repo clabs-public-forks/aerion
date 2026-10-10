@@ -117,4 +117,3 @@ func ResizeToJPEG(raw []byte, opts ResizeOptions) ([]byte, string, error) {
 	}
 	return out.Bytes(), "image/jpeg", nil
 }
-

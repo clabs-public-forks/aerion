@@ -24,7 +24,7 @@ type ProcessedBody struct {
 	HasAttachments bool
 	Attachments    []*message.Attachment  // Extracted during parsing (no re-parse needed)
 	RawBytes       []byte                 // For on-demand attachment content fetch
-	SMIMEResult    *smime.SignatureResult  // S/MIME verification result
+	SMIMEResult    *smime.SignatureResult // S/MIME verification result
 	SMIMERawBody   []byte                 // Raw S/MIME body for on-view processing
 	SMIMEEncrypted bool                   // Whether the message is encrypted
 	PGPRawBody     []byte                 // Raw PGP body for on-view processing
@@ -339,10 +339,11 @@ const bodyTruncationThreshold = 0.8
 // skip the message.
 //
 // Decision table (all comparisons in bytes):
-//   reportedSize == 0          → charge   (no signal to defer on; treat as definitive)
-//   received    >= maxMsgSize  → charge   (Aerion's own cap, not server truncation; next fetch hits same wall)
-//   received    <  reported*T  → DON'T    (clear shortfall; likely server-side truncation)
-//   otherwise                  → charge   (received is close enough to expected; the empty body is real)
+//
+//	reportedSize == 0          → charge   (no signal to defer on; treat as definitive)
+//	received    >= maxMsgSize  → charge   (Aerion's own cap, not server truncation; next fetch hits same wall)
+//	received    <  reported*T  → DON'T    (clear shortfall; likely server-side truncation)
+//	otherwise                  → charge   (received is close enough to expected; the empty body is real)
 //
 // Kept as a pure function (no Engine receiver) so it can be unit-tested
 // against synthetic inputs without standing up a full sync engine.

@@ -134,4 +134,3 @@ func sameSite(a, b string) bool {
 	siteB, errB := publicsuffix.EffectiveTLDPlusOne(b)
 	return errA == nil && errB == nil && siteA == siteB
 }
-
