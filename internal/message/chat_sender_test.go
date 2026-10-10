@@ -438,7 +438,8 @@ func TestSenderChatSearchUnifiedInbox(t *testing.T) {
 }
 
 // TestSenderChatDefault checks that senders combine without a sender_chat
-// row, except the account's own addresses and mail without a sender.
+// row, except the account's own addresses and mail without a sender, and
+// that with the chat_combine_senders setting off only combined rows do.
 func TestSenderChatDefault(t *testing.T) {
 	s, accountID, inboxID := newBodyFailedTestStore(t)
 	now := time.Now().UTC().Truncate(time.Second)
@@ -491,5 +492,25 @@ func TestSenderChatDefault(t *testing.T) {
 	}
 	if got := len(chats); got != 5 {
 		t.Errorf("after split: %d chats, want 5: %v", got, chatKeys(chats))
+	}
+
+	// With the default off, only senders combined explicitly combine.
+	if _, err := s.db.Exec(`INSERT INTO settings (key, value) VALUES ('chat_combine_senders', 'false')`); err != nil {
+		t.Fatalf("turn default off: %v", err)
+	}
+	if _, err := s.db.Exec(`DELETE FROM sender_chat`); err != nil {
+		t.Fatal(err)
+	}
+	if on, err := s.IsSenderChat(accountID, "bob@example.com"); err != nil || on {
+		t.Errorf("default off: IsSenderChat = %v, %v; want false", on, err)
+	}
+	if n, err := s.CountChats("", ChatSectionAll, now); err != nil || n != 5 {
+		t.Errorf("default off: CountChats = %d, %v; want 5", n, err)
+	}
+	if err := s.SetSenderChat(accountID, "bob@example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.CountChats("", ChatSectionAll, now); err != nil || n != 4 {
+		t.Errorf("default off, bob combined: CountChats = %d, %v; want 4", n, err)
 	}
 }

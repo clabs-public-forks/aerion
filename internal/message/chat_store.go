@@ -29,8 +29,8 @@ const (
 // SenderChatPrefix starts the chat key of a sender chat: every thread started
 // by a combined sender maps to SenderChatPrefix + lowercased email. A thread
 // key is a Message-ID or UUID, so it never has this prefix. Senders are
-// combined by default; sender_chat records a per-sender choice, and the
-// account's own addresses never combine.
+// combined per the chat_combine_senders setting (default on); sender_chat
+// records a per-sender choice, and the account's own addresses never combine.
 const SenderChatPrefix = "sender:"
 
 // Chat is a conversation row in the chat list, with local triage state.
@@ -126,11 +126,16 @@ func keysJSON(keys []string) string {
 const myAddresses = `SELECT id AS account_id, LOWER(email) AS email FROM accounts
 	UNION SELECT account_id, LOWER(email) FROM identities`
 
+// combineSendersDefault is the chat_combine_senders setting
+// (settings.KeyChatCombineSenders) as 0 or 1; unset means on.
+const combineSendersDefault = `COALESCE((SELECT value <> 'false' FROM settings WHERE key = 'chat_combine_senders'), 1)`
+
 // senderCombinedExpr is true when the sender email in col is combined for the
 // account: not empty, not one of the account's own addresses (joined as me),
-// and not split in sender_chat (joined as sch).
+// and combined in sender_chat (joined as sch) or, without a row there, by
+// default.
 func senderCombinedExpr(col string) string {
-	return fmt.Sprintf("(%[1]s <> '' AND me.email IS NULL AND COALESCE(sch.combined, 1) = 1)", col)
+	return fmt.Sprintf("(%[1]s <> '' AND me.email IS NULL AND COALESCE(sch.combined, %[2]s) = 1)", col, combineSendersDefault)
 }
 
 // chatKeyRows maps messages to chat keys. It selects (mid, thread_key,
@@ -827,7 +832,7 @@ func NormalizeSenderEmail(email string) string {
 }
 
 // SetSenderChat records whether the threads a sender starts combine into one
-// sender chat for an account (the default) or show separately.
+// sender chat for an account or show separately, overriding the default.
 func (s *Store) SetSenderChat(accountID, email string, combined bool) error {
 	email = NormalizeSenderEmail(email)
 	if email == "" {

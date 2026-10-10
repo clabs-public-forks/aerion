@@ -243,6 +243,8 @@ export function GetAutostart():Promise<boolean>;
 
 export function GetChatAutoAdvance():Promise<string>;
 
+export function GetChatCombineSenders():Promise<boolean>;
+
 export function GetChatCount(arg1:string,arg2:string):Promise<number>;
 
 export function GetChatDraft(arg1:string,arg2:string):Promise<app.ChatDraft>;
@@ -610,6 +612,8 @@ export function SetAlwaysShowMessageCheckbox(arg1:boolean):Promise<void>;
 export function SetAutostart(arg1:boolean):Promise<void>;
 
 export function SetChatAutoAdvance(arg1:string):Promise<void>;
+
+export function SetChatCombineSenders(arg1:boolean):Promise<void>;
 
 export function SetChatIncludeQuote(arg1:boolean):Promise<void>;
 

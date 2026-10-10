@@ -571,6 +571,8 @@
     "autoAdvanceNext": "Open the next (older) chat",
     "autoAdvancePrevious": "Open the previous (newer) chat",
     "autoAdvanceDescription": "Which chat opens when the current one leaves the list.",
+    "combineSenders": "Combine messages from each sender",
+    "combineSendersDescription": "Show all the threads a sender starts as one chat. A chat's menu can still combine or split one sender.",
     "showLowGroup": "Show Low priority group",
     "showLowGroupDescription": "List newsletters and bulk mail in a collapsed group under All. When off, they appear only under the Low priority filter.",
     "notifyPriorityOnly": "Notify only for priority mail",

@@ -281,6 +281,34 @@ func (a *App) SetChatNotifyPriorityOnly(only bool) error {
 	return a.settingsStore.SetChatNotifyPriorityOnly(only)
 }
 
+// GetChatCombineSenders returns whether each sender's threads combine into one chat by default
+func (a *App) GetChatCombineSenders() (bool, error) {
+	return a.settingsStore.GetChatCombineSenders()
+}
+
+// SetChatCombineSenders sets whether senders combine by default; per-sender
+// choices still win. Chat lists reload when the value changes.
+func (a *App) SetChatCombineSenders(combine bool) error {
+	previous, err := a.settingsStore.GetChatCombineSenders()
+	if err != nil {
+		return err
+	}
+	if err := a.settingsStore.SetChatCombineSenders(combine); err != nil {
+		return err
+	}
+	if previous == combine {
+		return nil
+	}
+	accounts, err := a.accountStore.List()
+	if err != nil {
+		return err
+	}
+	for _, acc := range accounts {
+		a.emitChatsChanged(acc.ID)
+	}
+	return nil
+}
+
 // GetChatSendKey returns the chat composer's send key ("enter" or "ctrl-enter")
 func (a *App) GetChatSendKey() (string, error) {
 	return a.settingsStore.GetChatSendKey()
