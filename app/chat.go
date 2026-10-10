@@ -264,10 +264,14 @@ func (a *App) initChatState() {
 	} else if n > 0 {
 		log.Info().Int64("rows", n).Msg("Removed chat state for deleted threads")
 	}
-	if _, err := a.moveStaleChatState(); err != nil {
+	changed, err := a.moveStaleChatState()
+	if err != nil {
 		log.Warn().Err(err).Msg("Failed to move chat state to sender chats")
 	}
 	a.chatStateMu.Unlock()
+	for accountID := range changed {
+		a.emitChatsChanged(accountID)
+	}
 	a.armSnoozeTimer(time.Second)
 }
 
@@ -275,8 +279,7 @@ func (a *App) initChatState() {
 // belongs to a sender chat into that chat, and drops them from sender chats
 // whose sender no longer combines (as splitting does), so state follows the
 // chat list after an upgrade or a change to the combine default. It returns
-// the accounts it changed and emits chats:changed for each. Callers hold
-// chatStateMu.
+// the accounts it changed. Callers hold chatStateMu.
 func (a *App) moveStaleChatState() (map[string]bool, error) {
 	moves, err := a.messageStore.StaleChatKeys()
 	if err != nil {
@@ -293,9 +296,6 @@ func (a *App) moveStaleChatState() (map[string]bool, error) {
 			errs = append(errs, err)
 		}
 		changed[m.AccountID] = true
-	}
-	for accountID := range changed {
-		a.emitChatsChanged(accountID)
 	}
 	if len(moves) > 0 {
 		log := logging.WithComponent("app.chat")

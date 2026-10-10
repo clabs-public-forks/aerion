@@ -12,6 +12,15 @@ export interface SecurityLine {
   /** Positive state (signed, encrypted): shown as a compact badge, not a banner. */
   badge?: boolean
 }
+/** Background, border and text classes for each tone. */
+export const TONES: Record<Tone, string> = {
+  info: 'bg-info/12 border-info/35 text-info-foreground',
+  ok: 'bg-success/12 border-success/35 text-success-foreground',
+  warn: 'bg-warning/12 border-warning/35 text-warning-foreground',
+  bad: 'bg-destructive/12 border-destructive/35 text-foreground [&_svg]:text-destructive',
+  muted: 'bg-muted/50 border-border text-muted-foreground',
+}
+
 type Translate = (key: string, options?: { values?: Record<string, string> }) => string
 
 // status → [tone, icon, i18n key]; keys taking {email} or {keyId} get them filled in.

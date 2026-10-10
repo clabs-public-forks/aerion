@@ -46,9 +46,11 @@ export function formatRelativeDate(date: Date): string {
   return format(date, 'MMM d, yyyy')
 }
 
+const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' })
+
 /** Clock time per locale ("14:05" or "02:05 PM"), shared by chat list rows and bubbles. */
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return timeFormat.format(date)
 }
 
 /**

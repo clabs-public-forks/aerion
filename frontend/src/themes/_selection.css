@@ -3,24 +3,15 @@
    cannot carry text at 4.5:1 (including the 80% secondary text) get a
    darkened or lightened primary and a pure white or black foreground here. */
 @layer base {
-  /* Must come first: [data-theme] on <html> ties :root on specificity. */
-  :root, [data-theme="light"] {
+  :root:not([data-theme]), [data-theme="light"] {
     --selection: 262.1 83.3% 54.8%;
     --selection-foreground: 0 0% 100%;
   }
-  [data-theme="adwaita-light"] {
+  [data-theme="adwaita-light"], [data-theme="adwaita-dark"] {
     --selection: 213 76% 55%;
     --selection-foreground: 0 0% 0%;
   }
-  [data-theme="adwaita-dark"] {
-    --selection: 213 76% 55%;
-    --selection-foreground: 0 0% 0%;
-  }
-  [data-theme="breeze-light"] {
-    --selection: 200 80% 58%;
-    --selection-foreground: 0 0% 0%;
-  }
-  [data-theme="breeze-dark"] {
+  [data-theme="breeze-light"], [data-theme="breeze-dark"] {
     --selection: 200 80% 58%;
     --selection-foreground: 0 0% 0%;
   }
@@ -36,11 +27,7 @@
     --selection: 215 10% 39%;
     --selection-foreground: 0 0% 100%;
   }
-  [data-theme="dark-gray"] {
-    --selection: 215 10% 53%;
-    --selection-foreground: 0 0% 0%;
-  }
-  [data-theme="dark-balanced"] {
+  [data-theme="dark-gray"], [data-theme="dark-balanced"] {
     --selection: 215 10% 53%;
     --selection-foreground: 0 0% 0%;
   }
@@ -56,17 +43,13 @@
     --selection: 265 89% 78%;
     --selection-foreground: 0 0% 0%;
   }
-  [data-theme="github-light"] {
+  [data-theme="github-light"], [data-theme="github-dark"] {
     --selection: 130 54% 39%;
     --selection-foreground: 0 0% 0%;
   }
   [data-theme="github-soft-dark"] {
     --selection: 124 41% 30%;
     --selection-foreground: 0 0% 100%;
-  }
-  [data-theme="github-dark"] {
-    --selection: 130 54% 39%;
-    --selection-foreground: 0 0% 0%;
   }
   [data-theme="nord-light"] {
     --selection: 213 32% 54%;
@@ -80,18 +63,8 @@
     --selection: 208 100% 35%;
     --selection-foreground: 0 0% 100%;
   }
-  [data-theme="yaru-light"] {
+  [data-theme="yaru-light"], [data-theme="yaru-dark"] {
     --selection: 14 82% 52%;
     --selection-foreground: 0 0% 0%;
-  }
-  [data-theme="yaru-dark"] {
-    --selection: 14 82% 52%;
-    --selection-foreground: 0 0% 0%;
-  }
-  /* Primary already carries text at 4.5:1; reset what the :root rule above sets. */
-  [data-theme="catppuccin-macchiato"], [data-theme="catppuccin-mocha"], [data-theme="dark"],
-  [data-theme="pop-dark"], [data-theme="pop-light"], [data-theme="tokyo-night"], [data-theme="vs-code-light"] {
-    --selection: var(--primary);
-    --selection-foreground: var(--primary-foreground);
   }
 }

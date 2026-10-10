@@ -17,8 +17,9 @@
   import { toasts } from '$lib/stores/toast'
   import ChatRichCard from './ChatRichCard.svelte'
   import ChatSecurityBanners from './ChatSecurityBanners.svelte'
-  import { securityStatus } from './chatSecurity'
-  import { formatTime, linkify, parseRecipients, displayName, type ReplyMode, type ThreadItem } from './chatFormat'
+  import { securityStatus, TONES } from './chatSecurity'
+  import { linkify, parseRecipients, displayName, type ReplyMode, type ThreadItem } from './chatFormat'
+  import { formatTime } from '$lib/utils/date'
   import type { ChatThread } from './chatThread.svelte'
 
 
@@ -79,7 +80,7 @@
   const photo = $derived(contactPhotos.get(msg.fromEmail))
   const time = $derived(formatTime(item.date))
   const security = $derived(securityStatus(msg, thread, $_))
-  const hasBadges = $derived(security.some((l) => l.badge))
+  const badges = $derived(security.filter((l) => l.badge))
   const recipientsTitle = $derived(
     [
       `${$_('viewer.from')} ${msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail}`,
@@ -179,14 +180,19 @@
           <span class="truncate">{item.subject}</span>
         </div>
       {/if}
-      {#if item.groupStart || hasBadges}
+      {#if item.groupStart || badges.length > 0}
         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-1 mb-0.5 text-xs text-muted-foreground" title={item.groupStart ? recipientsTitle : undefined}>
           {#if item.groupStart}
             {#if !item.mine}<span class="font-medium text-foreground/80">{senderName}</span>{/if}
             {#if msg.isDraft}<span class="text-destructive font-medium">{$_('chat.draft')}</span>{/if}
             <span>{time}</span>
           {/if}
-          <ChatSecurityBanners {msg} {thread} lines={security} variant="badges" />
+          {#each badges as b (b.icon + b.text)}
+            <span class="inline-flex items-center gap-1 px-1.5 py-px rounded-full border text-[11px] leading-4 {TONES[b.tone]}" title={b.text}>
+              <Icon icon={b.icon} class="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span class="max-w-48 truncate">{b.text}</span>
+            </span>
+          {/each}
         </div>
       {/if}
 

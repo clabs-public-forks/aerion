@@ -133,9 +133,17 @@ const combineSendersDefault = `COALESCE((SELECT value <> 'false' FROM settings W
 // senderCombinedExpr is true when the sender email in col is combined for the
 // account: not empty, not one of the account's own addresses (joined as me),
 // and combined in sender_chat (joined as sch) or, without a row there, by
-// default.
+// default. The query must include senderCombinedJoins for the same columns.
 func senderCombinedExpr(col string) string {
 	return fmt.Sprintf("(%[1]s <> '' AND me.email IS NULL AND COALESCE(sch.combined, %[2]s) = 1)", col, combineSendersDefault)
+}
+
+// senderCombinedJoins joins sender_chat as sch and myAddresses as me for the
+// account and sender email columns, as senderCombinedExpr expects.
+func senderCombinedJoins(accountCol, emailCol string) string {
+	return fmt.Sprintf(`
+		LEFT JOIN sender_chat sch ON sch.account_id = %[1]s AND sch.email = %[2]s
+		LEFT JOIN (%[3]s) me ON me.account_id = %[1]s AND me.email = %[2]s`, accountCol, emailCol, myAddresses)
 }
 
 // chatKeyRows maps messages to chat keys. It selects (mid, thread_key,
@@ -155,9 +163,7 @@ func chatKeyRows(cond string) string {
 			FROM messages m
 			INNER JOIN folders f ON m.folder_id = f.id
 			WHERE ` + cond + `
-		) k
-		LEFT JOIN sender_chat sch ON sch.account_id = k.account_id AND sch.email = k.starter
-		LEFT JOIN (` + myAddresses + `) me ON me.account_id = k.account_id AND me.email = k.starter`
+		) k` + senderCombinedJoins("k.account_id", "k.starter")
 }
 
 // isSenderKey matches a sender chat key in col, case-sensitively (LIKE is
@@ -546,23 +552,51 @@ func (s *Store) threadChatKeys(cond string, keys []string, args ...any) (map[cha
 	if err != nil || !senderChats {
 		return chatKeys, err
 	}
+	return chatKeys, s.queryChatKeys(chatKeys, cond, keys, args...)
+}
+
+// inboxChatKeys is threadChatKeys over the inbox for threads by account,
+// checking for sender chats once.
+func (s *Store) inboxChatKeys(byAccount map[string][]string) (map[chatRef]string, error) {
+	chatKeys := map[chatRef]string{}
+	if len(byAccount) == 0 {
+		return chatKeys, nil
+	}
+	senderChats, err := s.hasSenderChats()
+	if err != nil || !senderChats {
+		return chatKeys, err
+	}
+	for accountID, keys := range byAccount {
+		if err := s.queryChatKeys(chatKeys, "f.folder_type = 'inbox' AND f.account_id = ?", keys, accountID); err != nil {
+			return nil, err
+		}
+	}
+	return chatKeys, nil
+}
+
+// queryChatKeys adds to chatKeys the sender chat key of each given thread
+// that maps to one within the folder scope cond (taking args).
+func (s *Store) queryChatKeys(chatKeys map[chatRef]string, cond string, keys []string, args ...any) error {
+	if len(keys) == 0 {
+		return nil
+	}
 	rows, err := s.db.Query(`
 		SELECT DISTINCT ck.account_id, ck.thread_key, ck.chat_key
 		FROM (`+chatKeyRows(cond+" AND "+threadKeysMatch("m."))+`) ck
 		WHERE ck.chat_key <> ck.thread_key`, append(slices.Clone(args), threadKeysArgs(keys)...)...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query chat keys: %w", err)
+		return fmt.Errorf("failed to query chat keys: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var ref chatRef
 		var chatKey string
 		if err := rows.Scan(&ref.account, &ref.key, &chatKey); err != nil {
-			return nil, fmt.Errorf("failed to scan chat key: %w", err)
+			return fmt.Errorf("failed to scan chat key: %w", err)
 		}
 		chatKeys[ref] = chatKey
 	}
-	return chatKeys, rows.Err()
+	return rows.Err()
 }
 
 // threadRecipients returns the Sent recipients of threads in the folder scope
@@ -622,9 +656,7 @@ func (s *Store) fillLastFromMe(chats []*Chat) error {
 	}
 
 	mine := map[string]map[string]bool{} // account -> lowercased identity emails
-	rows, err := s.db.Query(`
-		SELECT id, LOWER(email) FROM accounts
-		UNION SELECT account_id, LOWER(email) FROM identities`)
+	rows, err := s.db.Query(myAddresses)
 	if err != nil {
 		return fmt.Errorf("failed to load identities: %w", err)
 	}
@@ -784,19 +816,15 @@ func (s *Store) ListDueSnoozes(now time.Time) ([]DueSnooze, error) {
 	rows.Close()
 
 	// Find thread snoozes now inside a sender chat, one query per account.
-	inSenderChat := map[chatRef]string{}
 	threadKeys := map[string][]string{}
 	for _, d := range dues {
 		if senderOfChatKey(d.threadKey) == "" {
 			threadKeys[d.accountID] = append(threadKeys[d.accountID], d.threadKey)
 		}
 	}
-	for accountID, keys := range threadKeys {
-		chatKeys, err := s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", keys, accountID)
-		if err != nil {
-			return nil, err
-		}
-		maps.Copy(inSenderChat, chatKeys)
+	inSenderChat, err := s.inboxChatKeys(threadKeys)
+	if err != nil {
+		return nil, err
 	}
 	result := make([]DueSnooze, 0, len(dues))
 	for _, d := range dues {
@@ -876,9 +904,7 @@ func (s *Store) StaleChatKeys() ([]ChatKeyMove, error) {
 	rows, err := s.db.Query(`
 		SELECT k.account_id, k.thread_key, ` + isSenderKey("k.thread_key") + `,
 			` + isSenderKey("k.thread_key") + ` AND NOT ` + senderCombinedExpr(starter) + `
-		FROM (` + chatStateKeys + `) k
-		LEFT JOIN sender_chat sch ON sch.account_id = k.account_id AND sch.email = ` + starter + `
-		LEFT JOIN (` + myAddresses + `) me ON me.account_id = k.account_id AND me.email = ` + starter + `
+		FROM (` + chatStateKeys + `) k` + senderCombinedJoins("k.account_id", starter) + `
 		ORDER BY k.account_id, k.thread_key`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query chat state keys: %w", err)
@@ -904,14 +930,12 @@ func (s *Store) StaleChatKeys() ([]ChatKeyMove, error) {
 		return nil, fmt.Errorf("failed to iterate chat state keys: %w", err)
 	}
 
-	accounts := slices.Sorted(maps.Keys(threads))
-	for _, accountID := range accounts {
-		keys := threads[accountID]
-		chatKeys, err := s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", keys, accountID)
-		if err != nil {
-			return nil, err
-		}
-		for _, key := range keys {
+	chatKeys, err := s.inboxChatKeys(threads)
+	if err != nil {
+		return nil, err
+	}
+	for _, accountID := range slices.Sorted(maps.Keys(threads)) {
+		for _, key := range threads[accountID] {
 			if to := chatKeys[chatRef{accountID, key}]; to != "" {
 				moves = append(moves, ChatKeyMove{AccountID: accountID, From: key, To: to})
 			}
@@ -998,9 +1022,7 @@ func (s *Store) IsSenderChat(accountID, email string) (bool, error) {
 	var combined bool
 	err := s.db.QueryRow(`
 		SELECT `+senderCombinedExpr("k.starter")+`
-		FROM (SELECT ? AS account_id, ? AS starter) k
-		LEFT JOIN sender_chat sch ON sch.account_id = k.account_id AND sch.email = k.starter
-		LEFT JOIN (`+myAddresses+`) me ON me.account_id = k.account_id AND me.email = k.starter`,
+		FROM (SELECT ? AS account_id, ? AS starter) k`+senderCombinedJoins("k.account_id", "k.starter"),
 		accountID, NormalizeSenderEmail(email)).Scan(&combined)
 	if err != nil {
 		return false, fmt.Errorf("failed to get sender chat: %w", err)
@@ -1174,15 +1196,13 @@ func (s *Store) fillNewMailChatKeys(mail []NewMail) error {
 	for _, nm := range mail {
 		byAccount[nm.accountID] = append(byAccount[nm.accountID], nm.ChatKey)
 	}
-	for accountID, keys := range byAccount {
-		chatKeys, err := s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", keys, accountID)
-		if err != nil {
-			return err
-		}
-		for i := range mail {
-			if chatKey, ok := chatKeys[chatRef{mail[i].accountID, mail[i].ChatKey}]; ok {
-				mail[i].ChatKey = chatKey
-			}
+	chatKeys, err := s.inboxChatKeys(byAccount)
+	if err != nil {
+		return err
+	}
+	for i := range mail {
+		if chatKey, ok := chatKeys[chatRef{mail[i].accountID, mail[i].ChatKey}]; ok {
+			mail[i].ChatKey = chatKey
 		}
 	}
 	return nil

@@ -304,16 +304,14 @@ func (a *App) SetChatCombineSenders(combine bool) error {
 	if previous == combine {
 		return nil
 	}
-	changed, moveErr := a.moveStaleChatState()
+	_, moveErr := a.moveStaleChatState()
 	a.armSnoozeTimer(time.Second)
 	accounts, err := a.accountStore.List()
 	if err != nil {
 		return errors.Join(moveErr, err)
 	}
 	for _, acc := range accounts {
-		if !changed[acc.ID] {
-			a.emitChatsChanged(acc.ID)
-		}
+		a.emitChatsChanged(acc.ID)
 	}
 	return moveErr
 }

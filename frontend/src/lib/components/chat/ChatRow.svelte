@@ -41,6 +41,9 @@
   let snoozeActive = $state(false)
   // Stay rendered while the snooze menu or date dialog is open.
   const showActions = $derived(hovered || selected || snoozeActive)
+  // Secondary text and avatar rings on the solid selection of a focused list.
+  const selMuted = $derived(selected ? 'group-data-[focused]/list:text-selection-foreground/80' : '')
+  const selRing = $derived(selected ? 'group-data-[focused]/list:ring-selection' : '')
 
   // The actions (and so the snooze menu) render on hover or selection;
   // count as hovered so a context-menu or keyboard request can open it.
@@ -127,11 +130,11 @@
 {/snippet}
 
 {#snippet repliedIcon()}
-  <span class="text-muted-foreground {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}" title={$_('chat.youRepliedLast')}><Icon icon="mdi:reply" class="inline w-3.5 h-3.5 -mt-0.5" /></span>
+  <span class="text-muted-foreground {selMuted}" title={$_('chat.youRepliedLast')}><Icon icon="mdi:reply" class="inline w-3.5 h-3.5 -mt-0.5" /></span>
 {/snippet}
 
 {#snippet statusIcons()}
-  <span class="flex items-center gap-1 shrink-0 text-muted-foreground {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}" aria-hidden="true">
+  <span class="flex items-center gap-1 shrink-0 text-muted-foreground {selMuted}" aria-hidden="true">
     {#if chat.isEncrypted}<Icon icon="mdi:lock" class="w-3.5 h-3.5" />{/if}
     {#if chat.hasAttachments}<Icon icon="mdi:paperclip" class="w-3.5 h-3.5" />{/if}
     {#if chat.snoozedUntil}<span title={$_('chat.snoozedUntil', { values: { time: snoozeTime } })}><Icon icon="mdi:alarm-snooze" class="w-3.5 h-3.5" /></span>{/if}
@@ -178,13 +181,13 @@
     <div class="relative shrink-0 w-11 h-11" aria-hidden="true">
       {#if people.length > 1}
         <div class="absolute top-0 left-0">{@render avatar(people[0], 26)}</div>
-        <div class="absolute bottom-0 right-0 rounded-full ring-2 ring-background {selected ? 'group-data-[focused]/list:ring-selection' : ''}">{@render avatar(people[1], 26)}</div>
+        <div class="absolute bottom-0 right-0 rounded-full ring-2 ring-background {selRing}">{@render avatar(people[1], 26)}</div>
       {:else}
         {@render avatar(people[0], 44)}
       {/if}
       {#if showAccount && chat.accountColor}
         <span
-          class="absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full ring-2 ring-background {selected ? 'group-data-[focused]/list:ring-selection' : ''}"
+          class="absolute -bottom-0.5 -left-0.5 w-3 h-3 rounded-full ring-2 ring-background {selRing}"
           style="background-color: {chat.accountColor}"
           title={chat.accountName}
         ></span>
@@ -195,11 +198,11 @@
       <!-- People + time -->
       <div class="flex items-baseline gap-2">
         <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'} {selected ? 'group-data-[focused]/list:text-selection-foreground' : ''}">{title}</span>
-        <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'} {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}">{time}</span>
+        <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'} {selMuted}">{time}</span>
       </div>
       <!-- Subject (one line), with the status icons when the latest line is hidden -->
       <div class="flex items-center gap-1.5">
-        <span class="flex-1 min-w-0 truncate text-sm leading-5 {hasUnread ? 'text-foreground' : 'text-foreground/80'} {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}">
+        <span class="flex-1 min-w-0 truncate text-sm leading-5 {hasUnread ? 'text-foreground' : 'text-foreground/80'} {selMuted}">
           {#if !showPreview && chat.lastFromMe}{@render repliedIcon()}{/if}
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{subject}{/if}
@@ -209,7 +212,7 @@
       {#if showPreview}
         <!-- Latest line + status icons -->
         <div class="flex items-center gap-1.5">
-          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground/90' : 'text-muted-foreground'} {selected ? 'group-data-[focused]/list:text-selection-foreground/80' : ''}">
+          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground/90' : 'text-muted-foreground'} {selMuted}">
             {#if chat.lastFromMe}{@render repliedIcon()}{/if}
             <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
             {#if chat.highlightedSnippet}{@html chat.highlightedSnippet}{:else}{chat.snippet}{/if}
