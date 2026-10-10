@@ -186,12 +186,14 @@ Validation:
 
 - [x] M1 — Chat list row and header (visual checks outstanding: dev mode forces Nord Dark on the real mailbox, so row heights, light-theme hover and screenshots need the owner)
 - [x] M2 — Selection follows pane focus (contrast verified by script, lowest ratio 4.61 across all 28 theme variants after `_selection.css`; screenshots and the click-to-switch check not done, no display in this session, so the owner needs to check them)
-- [ ] M3 — ChatView extraction
+- [x] M3 — ChatView extraction (moved scroll/anchor/message focus to `chatScroll.svelte.ts` and triage actions to `chatActions.svelte.ts`; ChatView 499 → 397 lines; lint and check pass; walkthrough not done, no display in this session)
 - [ ] M4 — Reading pane polish
 - [ ] M5 — Themed status tokens
 
 ## Surprises & Discoveries
 
+- M3 review found that `_selection.css`'s `:root` rule gave the 7 unlisted themes the light purple instead of the `--primary` fallback; fixed with an explicit reset block there.
+- `formatListDate` today branch uses `toLocaleTimeString` (OS locale) and goes stale after midnight; not fixed.
 - Subtitle `totalCount` is only refreshed on account reload (only `unreadCount` is patched in place), so the total can lag after deletes or syncs.
 - `contain-intrinsic-size` (80px/60px) is computed from the row layout, not measured.
 - `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.

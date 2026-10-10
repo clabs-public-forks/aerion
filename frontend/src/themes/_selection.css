@@ -87,4 +87,10 @@
     --selection: 14 82% 52%;
     --selection-foreground: 0 0% 0%;
   }
+  /* Primary already carries text at 4.5:1; reset what the :root rule above sets. */
+  [data-theme="catppuccin-macchiato"], [data-theme="catppuccin-mocha"], [data-theme="dark"],
+  [data-theme="pop-dark"], [data-theme="pop-light"], [data-theme="tokyo-night"], [data-theme="vs-code-light"] {
+    --selection: var(--primary);
+    --selection-foreground: var(--primary-foreground);
+  }
 }

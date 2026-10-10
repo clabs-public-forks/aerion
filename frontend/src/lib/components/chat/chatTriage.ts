@@ -29,7 +29,7 @@ export interface ChatRowActions {
 
 type After = () => void
 
-function t(key: string, values?: Record<string, string | number>): string {
+export function t(key: string, values?: Record<string, string | number>): string {
   return get(_)(key, values ? { values } : undefined)
 }
 
