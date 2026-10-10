@@ -62,6 +62,9 @@ When finished, put back anything you changed (see Gotchas), close the tab, then:
 
 ## Gotchas
 
+- **Dev mode always renders Nord (Dark)** (`applyTheme` in
+  `theme.svelte.ts` forces it under `import.meta.env.DEV`), so the theme picker
+  has no visible effect in dev.
 - **Dev mode uses the user's real accounts and saved UI state.** It syncs real
   mail. Collapsed sidebars, the active view and widths are saved for real. Note
   the starting `GetUIState()` and restore it before stopping. The calendar
