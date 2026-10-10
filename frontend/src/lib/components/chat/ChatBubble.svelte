@@ -162,7 +162,7 @@
     tabindex="-1"
     role="article"
     aria-label={`${senderName}, ${time}`}
-    onfocus={(e) => onFocusChange(e.currentTarget.matches(':focus-visible'))}
+    onfocus={() => onFocusChange(true)}
     onblur={() => onFocusChange(false)}
   >
     <!-- Avatar column (others only); spacer keeps grouped bubbles aligned -->

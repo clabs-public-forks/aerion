@@ -196,7 +196,8 @@ Validation:
 
 - M5 review: `viewer/ConversationViewer.svelte` (classic, unmounted) still has hard-coded blue/green/amber banners and its own status mapping; left out of scope (ISSUES.md U1). The solid-button pairing (`bg-*-foreground` with `text-background`) is covered by the contrast script rows tagged `btn` (≥ 5.17).
 - M3 review found that `_selection.css`'s `:root` rule gave the 7 unlisted themes the light purple instead of the `--primary` fallback; fixed by scoping that rule to `[data-theme="light"]` (`applyTheme` always sets `data-theme`).
-- `formatListDate` today branch uses `toLocaleTimeString` (OS locale) and goes stale after midnight; not fixed.
+- Simplify review found the M4 bubble `onfocus` checked `:focus-visible`, so a mouse click no longer set `focusedId` and Delete, Reply and message navigation acted on the thread or last message instead of the clicked one; reverted to `onFocusChange(true)`, since the CSS `group-focus-visible` variants already hide the ring on mouse focus.
+- `formatListDate` today branch uses `formatTime` (OS locale) and goes stale after midnight; not fixed.
 - Subtitle `totalCount` is only refreshed on account reload (only `unreadCount` is patched in place), so the total can lag after deletes or syncs.
 - `contain-intrinsic-size` (80px/60px) is computed from the row layout, not measured.
 - `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.
