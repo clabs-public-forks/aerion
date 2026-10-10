@@ -718,6 +718,10 @@ export function GetSearchCountUnifiedInbox(arg1, arg2) {
   return window['go']['app']['App']['GetSearchCountUnifiedInbox'](arg1, arg2);
 }
 
+export function GetSenderChat(arg1, arg2, arg3) {
+  return window['go']['app']['App']['GetSenderChat'](arg1, arg2, arg3);
+}
+
 export function GetShowMessageListCircles() {
   return window['go']['app']['App']['GetShowMessageListCircles']();
 }

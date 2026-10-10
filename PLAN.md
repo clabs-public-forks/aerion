@@ -93,7 +93,11 @@ Validation: `cd frontend && npm run lint && npm run check`. Use the `run-aerion`
   - [x] State paths: ListDueSnoozes, orphan cleanup, ListNewMail (2026-10-09)
   - [x] Binding SetSenderChat with undo command (2026-10-09)
   - [x] Tests (message, undo, migration) and make test (2026-10-09)
-- [ ] M2: Sender chat conversation and replies
+- [x] M2: Sender chat conversation and replies (2026-10-09)
+  - [x] Shared conversation loading helpers from GetConversation (2026-10-09)
+  - [x] GetSenderConversation store method (2026-10-09)
+  - [x] GetSenderChat binding and make generate (2026-10-09)
+  - [x] Tests (scope, Sent merge, accounts, reply headers, draft link, 500+ timing) and make test (2026-10-09)
 - [ ] M3: Combine action and sender chat UI
 
 ## Surprises & Discoveries
@@ -105,6 +109,10 @@ Validation: `cd frontend && npm run lint && npm run check`. Use the `run-aerion`
 - 2026-10-09 (M1): The starter window runs over the whole inbox scope. `ListChats`/`CountChats` use a plain thread-key fragment when no account has a combined sender, so databases without sender chats run the old query shape.
 - 2026-10-09 (M1): `NewMail.ChatKey` is filled but `app/background.go` still opens notifications by thread ID. M3 must switch notification clicks to the chat key.
 - 2026-10-09 (M1): `gofmt -l` already flags `internal/message/store.go` and several `app/*.go` files before this feature; they are left untouched.
+- 2026-10-09 (M2): There is no explicit conversation load budget, so the timing test compares against `GetConversation`. A 605-message sender chat (300 one-message threads plus 300 unthreaded notices) loads in about 7 ms, against about 3.5 ms for a 600-message single thread on the same machine (`go test ./internal/message -run Timing -v`). The test fails above 2 s.
+- 2026-10-09 (M2): `GetSenderChat` returns more messages than the chat row's `messageCount`: the row counts in-scope messages only, and the conversation also includes Sent/Drafts mail in those threads.
+- 2026-10-09 (M2): Chat drafts needed no change. `chatThreadKey` only trims `<`/`>` and whitespace, so a `sender:` key is stored as is, and `buildChatReply` takes its threading headers from the targeted message.
+- 2026-10-09 (M2): Code review found that replies stored without a thread ID (matched only by Message-ID or In-Reply-To) were missing, so `GetSenderConversation` now matches those like `GetConversation`. For M3: in the inbox scope the conversation's `FolderID` is "", so the UI must use each message's own `FolderID` for actions.
 
 ## Decision Log
 
@@ -116,6 +124,8 @@ Validation: `cd frontend && npm run lint && npm run check`. Use the `run-aerion`
 - 2026-10-09 (M1): The chat key comes from one shared SQL fragment, `chatKeyRows`, which yields `(mid, thread_key, account_id, chat_key)` for messages in scope. The thread starter is found with `FIRST_VALUE(LOWER(from_email)) OVER (PARTITION BY thread_key, account ORDER BY date, id)` and left-joined to `sender_chat`. One window pass replaces the planned two-level GROUP BY and lets list, count, search, due snoozes, cleanup and `ListNewMail` share the mapping. Each chat row also carries the JSON list of its thread keys, so `fillLastFromMe` matches Sent mail through `json_each` without hitting SQLite's variable limit.
 - 2026-10-09 (M1): Sender chat keys are matched with a case-sensitive `substr` prefix test (`isSenderKey`), not `LIKE`, which ignores case. Emails are normalized once by `NormalizeSenderEmail`, which the binding also uses before its lookups.
 - 2026-10-09 (M1): `SetSenderChat` undo restores the flag and, after a split, the sender chat's previous pin/snooze state. The chat-draft link is released (draft kept), not restored on undo.
+- 2026-10-09 (M2): `GetConversation`'s loading was split into shared helpers (`conversationColumns`, `scanConversationMessages`, `dedupeCopies`, `conversationParticipants`) so `GetSenderConversation` reuses them. Duplicate copies of one message are deduped as before, with "in scope" meaning any folder in the scope (the account's inbox, or the given folder).
+- 2026-10-09 (M2): `GetSenderConversation` finds the thread keys through `chatKeyRows`, so the conversation and the chat row share one mapping. The summary is computed in Go: `ThreadID` is the chat key, and subject, snippet and date come from the latest message. It returns nil when the sender chat has nothing in scope.
 
 ## Outcomes & Retrospective
 
@@ -130,5 +140,15 @@ Validation: `cd frontend && npm run lint && npm run check`. Use the `run-aerion`
   - SQL-side search merge (logged in Surprises for M3)
   - migrating per-thread state on combine (Decision Log)
   - restoring the draft link on undo (Decision Log)
+
+- M2 (2026-10-09): `GetSenderConversation` and the `GetSenderChat` binding load a sender chat as one date-ordered conversation with Sent/Drafts copies, reusing helpers split out of `GetConversation`. Chat replies and draft links work with `sender:` keys unchanged. Covered by a table-driven store test, a timing test, a reply-header test and a draft-link persistence test. Review fixes:
+  - Message-ID/In-Reply-To matching for unthreaded replies
+  - accepting a `sender:` chat key as the email
+  - simplify pass: one JSON string for the keys, a `rows.Err` check on the scope-folder query
+
+  Declined:
+  - Sent-only threads and Sent unread counts (same as the chat row and `GetConversation`)
+  - pushing the chat-key filter into the window query (it needs whole threads to find the starter; load is about 9 ms at 600 messages)
+  - generalizing `GetConversation` into one loader over thread keys (larger refactor outside M2)
 
   The full feature retrospective is written when M3 lands.

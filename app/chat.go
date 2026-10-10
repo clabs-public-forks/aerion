@@ -39,6 +39,21 @@ func (a *App) SearchChats(folderID, query string, offset, limit int, filter stri
 	return a.messageStore.SearchChats(folderID, query, offset, limit, filter)
 }
 
+// GetSenderChat returns a combined sender chat as one conversation: the
+// sender's threads in folderID ("" for the account's inbox) with their Sent
+// and Drafts messages. It returns nil when the chat has no messages there.
+func (a *App) GetSenderChat(accountID, email, folderID string) (*message.Conversation, error) {
+	conv, err := a.messageStore.GetSenderConversation(accountID, email, folderID)
+	if err != nil || conv == nil {
+		return conv, err
+	}
+	owner := a.loadChatOwner()
+	for _, m := range conv.Messages {
+		attachChatFields(m, owner)
+	}
+	return conv, nil
+}
+
 // PinChat pins or unpins a thread. Undoable.
 func (a *App) PinChat(accountID, threadKey string, pinned bool) error {
 	desc := "Unpin chat"

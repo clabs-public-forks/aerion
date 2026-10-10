@@ -377,6 +377,8 @@ export function GetSearchCount(arg1:string,arg2:string,arg3:string,arg4:string):
 
 export function GetSearchCountUnifiedInbox(arg1:string,arg2:string):Promise<number>;
 
+export function GetSenderChat(arg1:string,arg2:string,arg3:string):Promise<message.Conversation>;
+
 export function GetShowMessageListCircles():Promise<boolean>;
 
 export function GetShowMessageListProfilePics():Promise<boolean>;
