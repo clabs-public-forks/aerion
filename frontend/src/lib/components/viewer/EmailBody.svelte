@@ -744,14 +744,14 @@ ${processedHtml}
 <div class="email-body relative">
   {#if bodyHtml}
     {#if hasRemoteImages && imagesBlocked}
-      <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-sm">
-        <Icon icon="mdi:image-off" class="w-4 h-4 text-yellow-600 shrink-0" />
-        <span class="text-yellow-700 dark:text-yellow-400">{$_('viewer.remoteImagesBlocked')}</span>
+      <div class="flex items-center gap-2 px-3 py-2 mb-3 rounded-md bg-warning/10 border border-warning/35 text-sm">
+        <Icon icon="mdi:image-off" class="w-4 h-4 text-warning-foreground shrink-0" />
+        <span class="text-warning-foreground">{$_('viewer.remoteImagesBlocked')}</span>
 
         <div class="ml-auto flex items-center gap-1">
           <!-- Load Images button -->
           <button
-            class="px-2 py-1 text-xs font-medium rounded bg-yellow-600 text-white hover:bg-yellow-700 transition-colors"
+            class="px-2 py-1 text-xs font-medium rounded bg-warning-foreground text-background hover:opacity-90 transition-opacity"
             onclick={loadImages}
           >
             {$_('viewer.loadImages')}
@@ -761,7 +761,7 @@ ${processedHtml}
           {#if fromEmail}
             <DropdownMenu.Root bind:open={alwaysLoadDropdownOpen}>
               <DropdownMenu.Trigger
-                class="px-2 py-1 text-xs font-medium rounded bg-yellow-600 text-white hover:bg-yellow-700 transition-colors flex items-center gap-1"
+                class="px-2 py-1 text-xs font-medium rounded bg-warning-foreground text-background hover:opacity-90 transition-opacity flex items-center gap-1"
               >
                 {$_('viewer.alwaysLoad')}
                 <Icon icon="mdi:chevron-down" class="w-3 h-3" />

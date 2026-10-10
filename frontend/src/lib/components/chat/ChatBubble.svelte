@@ -17,6 +17,7 @@
   import { toasts } from '$lib/stores/toast'
   import ChatRichCard from './ChatRichCard.svelte'
   import ChatSecurityBanners from './ChatSecurityBanners.svelte'
+  import { securityStatus } from './chatSecurity'
   import { formatTime, linkify, parseRecipients, displayName, type ReplyMode, type ThreadItem } from './chatFormat'
   import type { ChatThread } from './chatThread.svelte'
 
@@ -77,6 +78,7 @@
   const senderName = $derived(msg.fromName || msg.fromEmail || $_('viewer.unknown'))
   const photo = $derived(contactPhotos.get(msg.fromEmail))
   const time = $derived(formatTime(item.date))
+  const hasBadges = $derived(securityStatus(msg, thread, $_).some((l) => l.badge))
   const recipientsTitle = $derived(
     [
       `${$_('viewer.from')} ${msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail}`,
@@ -176,11 +178,14 @@
           <span class="truncate">{item.subject}</span>
         </div>
       {/if}
-      {#if item.groupStart}
-        <div class="flex items-baseline gap-2 px-1 mb-0.5 text-xs text-muted-foreground" title={recipientsTitle}>
-          {#if !item.mine}<span class="font-medium text-foreground/80">{senderName}</span>{/if}
-          {#if msg.isDraft}<span class="text-destructive font-medium">{$_('chat.draft')}</span>{/if}
-          <span>{time}</span>
+      {#if item.groupStart || hasBadges}
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-1 mb-0.5 text-xs text-muted-foreground" title={item.groupStart ? recipientsTitle : undefined}>
+          {#if item.groupStart}
+            {#if !item.mine}<span class="font-medium text-foreground/80">{senderName}</span>{/if}
+            {#if msg.isDraft}<span class="text-destructive font-medium">{$_('chat.draft')}</span>{/if}
+            <span>{time}</span>
+          {/if}
+          <ChatSecurityBanners {msg} {thread} variant="badges" />
         </div>
       {/if}
 
