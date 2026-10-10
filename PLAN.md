@@ -197,12 +197,12 @@ Validation:
 - M5 review: `viewer/ConversationViewer.svelte` (classic, unmounted) still has hard-coded blue/green/amber banners and its own status mapping; left out of scope (ISSUES.md U1). The solid-button pairing (`bg-*-foreground` with `text-background`) is covered by the contrast script rows tagged `btn` (≥ 5.17).
 - M3 review found that `_selection.css`'s `:root` rule gave the 7 unlisted themes the light purple instead of the `--primary` fallback; fixed with an explicit reset block there.
 - `formatListDate` today branch uses `toLocaleTimeString` (OS locale) and goes stale after midnight; not fixed.
-- Subtitle `totalCount` is only refreshed on account reload (only `unreadCount` is patched in place), so the total can lag after deletes or syncs.
 - `contain-intrinsic-size` (80px/60px) is computed from the row layout, not measured.
 - `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.
 
 ## Decision Log
 
+- Owner request 2026-10-10: the list header no longer shows the message/unread counts subtitle (M1 item 5 reverted; `chat.listCounts` removed).
 - M5: tokens live in one `_status.css` keyed on `:root` / `.dark` rather than in each of the 28 theme blocks (themes may still override them); `-foreground` is the tinted-banner text color, also used as a solid button background with `text-background`. Bad banners use `--destructive` for tint and border with `text-foreground` text, since several themes' destructive reds fail 4.5:1 as text. EXT_RULES.md has no theming rules and no extension code was touched.
 
 - M4 baseline (from code, not measured): group gap `mt-3` (12px), same-sender `mt-0.5`; header block `pt-3 pb-1` with a 32px avatar row and `text-sm` title. Target: same gaps plus `pt-3` and a 1px hairline above full-body groups; header title `text-base`.

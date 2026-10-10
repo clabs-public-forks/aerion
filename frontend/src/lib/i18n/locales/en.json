@@ -94,7 +94,6 @@
   "chat": {
     "searchChats": "Search chats...",
     "scope": "Chat scope",
-    "listCounts": "{total, plural, one {# message} other {# messages}}, {unread, number} unread",
     "allInboxes": "All inboxes",
     "allFolders": "All folders...",
     "filters": "Chat filters",

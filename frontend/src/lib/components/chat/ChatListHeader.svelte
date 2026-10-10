@@ -14,7 +14,6 @@
 
   interface Props {
     scopeLabel: string
-    counts: { total: number; unread: number } | null
     isUnified: boolean
     folderId: string | null
     filter: ChatFilter
@@ -31,7 +30,7 @@
   }
 
   let {
-    scopeLabel, counts, isUnified, folderId, filter, isSearch, query, syncBusy,
+    scopeLabel, isUnified, folderId, filter, isSearch, query, syncBusy,
     onUnifiedSelect, onInboxSelect, onBrowseFolders, onFilter, onQuery, onSync, onCompose,
   }: Props = $props()
 
@@ -136,12 +135,6 @@
       <Icon icon="mdi:refresh" class="w-5 h-5 text-muted-foreground {syncBusy ? 'animate-spin' : ''}" />
     </button>
   </div>
-
-  {#if counts}
-    <p class="px-2 -mt-1 text-xs text-muted-foreground">
-      {$_('chat.listCounts', { values: { total: counts.total, unread: counts.unread } })}
-    </p>
-  {/if}
 
   <div class="flex items-center gap-1 bg-muted rounded-md px-2 focus-within:ring-2 focus-within:ring-ring">
     <Icon icon="mdi:magnify" class="w-4 h-4 text-muted-foreground shrink-0" />
