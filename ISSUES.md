@@ -19,16 +19,6 @@ has not yet been confirmed against the code.
   imports: EXT_RULES R1, R2 and R5. The bridge gets a token closure and the
   core DB, and the extension imports `internal/*`. This is architectural
   (see C12).
-- **A5 low** `app/compose.go` OAuth token path: every refresh failure emits
-  `oauth:reauth-required` and reports "re-authorization required", although
-  only `oauth2.ErrInvalidGrant` needs a new consent; a network error or a
-  provider outage prompts a pointless re-auth. Also, `oauth2.GetProvider`
-  returns a provider with an empty `ClientID` when no credentials are
-  configured, so `RefreshTokenWithProvider` posts no `client_id` and Google
-  answers `invalid_request - Could not determine client ID from request`
-  (seen on every launch of a dev build without OAuth credentials in `.env`;
-  re-auth cannot fix it). Fail early with a "not configured" error, as
-  `StartAuthFlowWithProvider` does, and prompt only on `ErrInvalidGrant`.
 
 ### Contacts
 
@@ -49,32 +39,6 @@ has not yet been confirmed against the code.
 
 ### Mail sync
 
-- **M1 low** `internal/sync/parse.go` `parseMessageBodyInternal`: inline
-  parts the HTML body embeds no longer set `has_attachments`, but only for
-  bodies parsed from now on. Messages fetched earlier keep a paperclip for
-  signature logos the attachment list hides, because bodies are not
-  re-fetched. A one-off migration recomputing the flag from stored
-  attachments and `body_html` would fix them.
-  Deeper fix: persist an `embedded` flag on attachment rows at parse time so
-  `has_attachments` and `GetAttachments` share one stored answer, dropping
-  the read-time `body_html` load and the `AttachmentList` visibility gate.
-- **M3 low** `app/idle_sent.go` `syncSentAfterIdle` emits `folder:synced`
-  and `sent:synced` even when the Sent sync stored nothing, so chat lists and
-  open threads reload up to every 30 s per account during inbox flag
-  activity. Snapshot Sent's highest UID before the sync, as `newmail.go`
-  does for the inbox, and emit `sent:synced` only on change. Aerion's own
-  read and star actions echo back as IDLE flag events, so ordinary use
-  also triggers these Sent syncs.
-- **M4 low** `app/sync.go`, `app/background.go`, `app/idle_sent.go`: three
-  hand-written copies of the folder-sync slot bookkeeping (busy check,
-  cancel registration). The IDLE inbox body fetch in `background.go` deletes
-  its key without the ownership check `releaseSyncContext` does. One
-  `beginFolderSync` helper with a per-call token would replace them.
-- **M5 low** `internal/message/embedded.go` `embeddedCIDs` and
-  `app/compose.go` `quotedHTMLReferencesCID` answer the same cid question
-  with different matching (whole reference vs. substring), so a reply can
-  re-attach a part the viewer hides. Unify them; compose's loose match is
-  deliberate, so this changes reply behavior.
 - **M6 low** `app/idle_sent.go`: Sent activity from other clients is
   inferred from inbox IDLE events, so a new (non-reply) message sent
   elsewhere reaches Sent and its chat thread only on the next scheduled
@@ -82,19 +46,36 @@ has not yet been confirmed against the code.
   folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
   which would also retire the 30 s throttle state; cheaper: a shorter Sent
   poll interval.
-- **M2 low, unverified** `internal/sync/fetch.go:188`
-  `fetchMessageBodiesBatch`: `go test -race ./internal/sync/` fails in
-  `TestFetchMessageBodiesBatch_IncompleteBodies`. `msg.Next()` discards an
-  unread literal on the caller's goroutine while go-imap's read goroutine
-  reads the same buffer, when the connection drops mid-literal. Decide
-  whether it is a go-imap v2 beta bug, our misuse of the streaming API, or
-  a test-only artifact; production sees dropped connections too.
-
-### Chats
-
-- **C1 low** `internal/message` `SearchUnifiedInbox`: unified-inbox
-  search returns thread rows and does not merge sender chats, so a combined
-  sender's threads show separately there.
+- **M2 low, confirmed upstream** go-imap v2 `imapclient.fetchLiteralReader`
+  (beta.8 and HEAD c328f5e): when a FETCH literal read fails early (dropped
+  connection, read timeout), it releases the read goroutine while its inner
+  `LimitReader` still has bytes left. The next `Next`/`Close` then discards
+  them from the shared `bufio.Reader`, so the two goroutines race on it.
+  `fetchMessageBodiesBatch` now stops consuming after a failed literal. The
+  other literal readers in `internal/sync` (`bulk.go`, `header_recovery.go`,
+  `messages.go`, `search.go`, and `fetch.go`'s single-body fetch) still race.
+  Fix: apply the same stop there, or report the bug upstream and upgrade
+  once it is fixed.
+- **M7 low** `internal/database/backfill.go` `backfillEmbeddedAttachments`
+  (migration 49): the query joins `body_html` onto every inline attachment
+  row, so a message with several inline parts has its whole body read once
+  per part, all inside the migration transaction. A large mailbox can stall
+  the first startup after upgrading. Fix: select the distinct messages with
+  inline parts first, read each body once, then match its parts.
+- **M8 low** `app/sync.go` `SyncFolder`: after cancelling an existing slot it
+  drops `syncMu` for a 100 ms sleep. In that window the cancelled slot still
+  looks busy, so `beginFolderSync` (IDLE body fetch) skips its work, and a
+  caller that claims the slot is then cancelled by `registerFolderSyncLocked`.
+  Present before the issues pass. Fix: wait for the cancelled slot's release
+  instead of sleeping, or re-check the slot after relocking.
+- **M9 low** `app/idle_sent.go` `syncSentAfterIdle`: whether to emit
+  `sent:synced` is guessed by comparing the folder's highest UID, message
+  count and UIDVALIDITY before and after the sync. A sync that only fetches
+  bodies for messages already stored changes none of these, and another
+  writer (a manual `SyncFolder`) can change Sent between the snapshots;
+  either can leave chat views stale until the next scheduled sync. Fix:
+  have `SyncMessages` and `FetchBodiesInBackground` report whether they
+  stored or removed anything, and drop `folderSnapshot`.
 
 ### Upstream independence
 

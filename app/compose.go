@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	goImap "github.com/emersion/go-imap/v2"
 	"github.com/hkdb/aerion/internal/account"
 	"github.com/hkdb/aerion/internal/certificate"
+	"github.com/hkdb/aerion/internal/cid"
 	"github.com/hkdb/aerion/internal/contact"
 	"github.com/hkdb/aerion/internal/credentials"
 	"github.com/hkdb/aerion/internal/draft"
@@ -90,18 +92,7 @@ func (ops *composeOps) getValidOAuthToken(ctx context.Context, accountID string)
 	// Refresh the token
 	newTokenResp, err := ops.refreshOAuthToken(accountID, tokens)
 	if err != nil {
-		log.Error().Err(err).
-			Str("account_id", accountID).
-			Msg("OAuth token refresh failed")
-
-		// Emit event for frontend to prompt re-authorization
-		wailsRuntime.EventsEmit(ctx, "oauth:reauth-required", map[string]interface{}{
-			"accountId": accountID,
-			"provider":  tokens.Provider,
-			"error":     err.Error(),
-		})
-
-		return nil, fmt.Errorf("OAuth token refresh failed, re-authorization required: %w", err)
+		return nil, ops.oauthRefreshFailed(ctx, accountID, tokens.Provider, err)
 	}
 
 	// Calculate new expiry time
@@ -125,6 +116,31 @@ func (ops *composeOps) getValidOAuthToken(ctx context.Context, accountID string)
 		Msg("OAuth token refreshed successfully")
 
 	return tokens, nil
+}
+
+// eventsEmit is wailsRuntime.EventsEmit, replaceable in tests.
+var eventsEmit = wailsRuntime.EventsEmit
+
+// oauthRefreshFailed logs a token refresh failure and wraps it for the
+// caller. Only invalid_grant prompts the frontend to re-authorize; a network
+// error, provider outage, or missing client ID cannot be fixed by consent.
+func (ops *composeOps) oauthRefreshFailed(ctx context.Context, accountID, provider string, err error) error {
+	log := logging.WithComponent("composeOps")
+	switch {
+	case errors.Is(err, oauth2.ErrInvalidGrant):
+		log.Error().Err(err).Str("account_id", accountID).Msg("OAuth refresh token rejected")
+		eventsEmit(ctx, "oauth:reauth-required", map[string]interface{}{
+			"accountId": accountID,
+			"provider":  provider,
+			"error":     err.Error(),
+		})
+		return fmt.Errorf("OAuth token refresh failed, re-authorization required: %w", err)
+	case errors.Is(err, oauth2.ErrNotConfigured):
+		log.Warn().Err(err).Str("account_id", accountID).Msg("OAuth token refresh skipped")
+	default:
+		log.Error().Err(err).Str("account_id", accountID).Msg("OAuth token refresh failed")
+	}
+	return fmt.Errorf("OAuth token refresh failed: %w", err)
 }
 
 // refreshOAuthToken obtains a new access token using the stored refresh token,
@@ -822,27 +838,29 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 			}
 		}
 	}
-	for cid, dataURL := range inlineMap {
+	embedded := cid.Embedded(quotedHTML)
+	for id, dataURL := range inlineMap {
 		// Replies include an "inline" attachment only when the quoted HTML
-		// actually embeds it — mailers stamp Content-IDs on ordinary document
-		// attachments, and re-attaching those sends phantom copies with the
-		// cid as filename (#381). Forwards keep every part (the forwarder
-		// wants the documents).
-		if mode != "forward" && !quotedHTMLReferencesCID(quotedHTML, cid) {
+		// embeds it as an image source, the match the viewer uses to hide it
+		// from the attachment list. Mailers stamp Content-IDs on ordinary
+		// document attachments, and re-attaching those sends phantom copies
+		// with the cid as filename (#381). Forwards keep every part (the
+		// forwarder wants the documents).
+		if _, ok := embedded[id]; mode != "forward" && !ok {
 			continue
 		}
 		ct, b64 := parseDataURL(dataURL)
 		if b64 == "" {
 			continue
 		}
-		filename := inlineNames[cid]
+		filename := inlineNames[id]
 		if filename == "" {
 			filename = email.FallbackFilename(ct)
 		}
 		attachments = append(attachments, smtp.Attachment{
 			ContentBase64: b64,
 			ContentType:   ct,
-			ContentID:     cid,
+			ContentID:     id,
 			Inline:        true,
 			Filename:      sanitizeAttachmentFilename(filename),
 		})
@@ -864,15 +882,6 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 		References:  refs,
 		Attachments: attachments,
 	}, nil
-}
-
-// quotedHTMLReferencesCID reports whether the quoted HTML actually references
-// the given (bracket-stripped) Content-ID. Guards against re-attaching
-// misclassified "inline" documents that the reply body never embeds (#381).
-// Plain substring match errs toward keeping an attachment when the cid
-// appears anywhere in the body, regardless of quote style.
-func quotedHTMLReferencesCID(html, cid string) bool {
-	return strings.Contains(html, "cid:"+cid)
 }
 
 // fetchForwardAttachments fetches regular (non-inline) attachment content from IMAP

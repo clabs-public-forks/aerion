@@ -2,7 +2,7 @@
 // current scope and filter, refreshed on sync and chat-state events.
 // Scope (folder selection) stays in App; ChatList passes it in via setScope.
 
-import { GetChats, GetChatCount, SearchChats, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox } from '../../../wailsjs/go/app/App'
+import { GetChats, GetChatCount, SearchChats, SearchChatsUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox } from '../../../wailsjs/go/app/App'
 import { message } from '../../../wailsjs/go/models'
 // @ts-ignore - wailsjs runtime
 import { EventsOn } from '../../../wailsjs/runtime/runtime'
@@ -252,7 +252,7 @@ class ChatListStore {
       const q = this.query.trim()
       const mode = this.effectiveFilter === 'unread' ? 'unread' : ''
       const [results, total] = await Promise.all(this.isUnified
-        ? [SearchUnifiedInbox(q, offset, limit, mode), GetSearchCountUnifiedInbox(q, mode)] as const
+        ? [SearchChatsUnifiedInbox(q, offset, limit, mode), GetSearchCountUnifiedInbox(q, mode)] as const
         : [SearchChats(folderId, q, offset, limit, mode), GetSearchCount(accountId, folderId, q, mode)] as const)
       return { items: (results || []).map((r) => toItem(r, accountId, folderId)), total }
     }

@@ -3,6 +3,8 @@ package app
 import (
 	"strings"
 	"testing"
+
+	"github.com/hkdb/aerion/internal/cid"
 )
 
 func TestSanitizeAttachmentFilename(t *testing.T) {
@@ -29,7 +31,9 @@ func TestSanitizeAttachmentFilename(t *testing.T) {
 	}
 }
 
-func TestQuotedHTMLReferencesCID(t *testing.T) {
+// TestReplyReferencesCID covers the #381 guard: replies re-attach only the
+// inline parts the quoted HTML embeds.
+func TestReplyReferencesCID(t *testing.T) {
 	tests := []struct {
 		name string
 		html string
@@ -61,20 +65,47 @@ func TestQuotedHTMLReferencesCID(t *testing.T) {
 			want: false,
 		},
 		{
-			// Substring matching deliberately errs toward keeping: a cid that
-			// is a prefix of another referenced cid still counts as present.
-			name: "prefix of another cid counts as referenced (err-safe)",
-			html: `<img src="cid:abc2@x">`,
-			cid:  "abc",
+			name: "prefix of another cid is not referenced",
+			html: `<img src="cid:part10">`,
+			cid:  "part1",
+			want: false,
+		},
+		{
+			name: "whole cid next to a longer one",
+			html: `<img src="cid:part10"><img src="cid:part1">`,
+			cid:  "part1",
 			want: true,
+		},
+		{
+			name: "unquoted src reference",
+			html: `<img src=cid:logo@x width=10>`,
+			cid:  "logo@x",
+			want: true,
+		},
+		{
+			name: "unquoted self-closing src drops the slash",
+			html: `<img src=cid:logo@x/>`,
+			cid:  "logo@x",
+			want: true,
+		},
+		{
+			name: "quoted cid containing a slash",
+			html: `<img src="cid:a/b@x">`,
+			cid:  "a/b@x",
+			want: true,
+		},
+		{
+			name: "cid outside src= is not referenced",
+			html: `<p>see cid:abc@x</p>`,
+			cid:  "abc@x",
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := quotedHTMLReferencesCID(tt.html, tt.cid)
-			if got != tt.want {
-				t.Fatalf("quotedHTMLReferencesCID(%q, %q) = %v, want %v", tt.html, tt.cid, got, tt.want)
+			if _, got := cid.Embedded(tt.html)[tt.cid]; got != tt.want {
+				t.Fatalf("cid.Embedded(%q) has %q = %v, want %v", tt.html, tt.cid, got, tt.want)
 			}
 		})
 	}

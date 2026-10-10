@@ -244,10 +244,19 @@ func (m *Manager) RefreshToken(providerName, refreshToken string) (*TokenRespons
 // retry can recover; only a fresh consent flow can.
 var ErrInvalidGrant = errors.New("token refresh failed: invalid_grant")
 
+// ErrNotConfigured is returned (wrapped) by RefreshTokenWithProvider when the
+// provider has no client ID, e.g. a dev build without OAuth credentials. No
+// request is made, and re-authorization cannot fix it.
+var ErrNotConfigured = errors.New("OAuth provider is not configured (missing client ID)")
+
 // RefreshTokenWithProvider runs the OAuth2 refresh flow against the given
 // ProviderConfig. Used by the extension Auth Broker to refresh tokens issued
 // under non-mail client configurations (e.g., google-extensions).
 func (m *Manager) RefreshTokenWithProvider(provider ProviderConfig, refreshToken string) (*TokenResponse, error) {
+	if provider.ClientID == "" {
+		return nil, fmt.Errorf("%w: %s", ErrNotConfigured, provider.Name)
+	}
+
 	data := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refreshToken},

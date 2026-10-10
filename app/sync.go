@@ -39,23 +39,27 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 	a.syncLastRequest[syncKey] = time.Now()
 
 	// Cancel existing sync for this specific folder if any
-	if cancel, exists := a.syncContexts[syncKey]; exists {
+	if slot, exists := a.syncContexts[syncKey]; exists {
 		log.Debug().Str("account", accountID).Str("folder", folderID).Msg("Cancelling existing sync for restart")
-		cancel()
+		slot.cancel()
 		// Small delay to let goroutines clean up
 		a.syncMu.Unlock()
 		time.Sleep(100 * time.Millisecond)
 		a.syncMu.Lock()
 	}
 
-	// Create new cancellable context for this sync
-	ctx, cancel := context.WithCancel(a.ctx)
-	a.syncContexts[syncKey] = cancel
+	ctx, release := a.registerFolderSyncLocked(syncKey)
 
 	a.syncMu.Unlock()
 
-	// NOTE: Don't cleanup syncContexts here - body sync runs in goroutine
-	// and needs the context to remain cancellable. Cleanup happens in the goroutine.
+	// The body fetch goroutine releases the slot when it finishes; earlier
+	// returns release it here.
+	bodyFetchStarted := false
+	defer func() {
+		if !bodyFetchStarted {
+			release()
+		}
+	}()
 
 	// Get account to determine sync period
 	acc, err := a.accountStore.Get(accountID)
@@ -132,9 +136,9 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 
 	// Start background body fetching (emits progress events for "bodies" phase)
 	// Pass ctx so body fetch can also be cancelled
-	go func(syncCtx context.Context, syncDays int, cancelFn context.CancelFunc, key string) {
-		// Cleanup sync context when goroutine completes
-		defer a.releaseSyncContext(key, cancelFn)
+	bodyFetchStarted = true
+	go func(syncCtx context.Context, syncDays int) {
+		defer release()
 
 		// Panic recovery - ensure we always emit an event so UI doesn't get stuck
 		defer func() {
@@ -174,7 +178,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 				"folderId":  folderID,
 			})
 		}
-	}(ctx, syncPeriodDays, cancel, syncKey)
+	}(ctx, syncPeriodDays)
 
 	return nil
 }
@@ -400,15 +404,43 @@ func (a *App) SyncAllComplete() error {
 	return nil
 }
 
-// releaseSyncContext removes key from syncContexts if it still holds
-// cancel. A newer sync may have cancelled this one and registered its own
-// cancel under the same key; that entry is left alone.
-func (a *App) releaseSyncContext(key string, cancel context.CancelFunc) {
+// syncSlot is one registered folder sync. Its pointer is the ownership token
+// release checks, so a replaced sync never removes its successor's entry.
+type syncSlot struct {
+	cancel context.CancelFunc
+}
+
+// beginFolderSync claims the sync slot for key unless a sync already holds
+// it. release cancels ctx and frees the slot if this call still owns it.
+func (a *App) beginFolderSync(key string) (ctx context.Context, release func(), ok bool) {
 	a.syncMu.Lock()
 	defer a.syncMu.Unlock()
-	if current, ok := a.syncContexts[key]; ok && fmt.Sprintf("%p", current) == fmt.Sprintf("%p", cancel) {
-		delete(a.syncContexts, key)
+	if _, busy := a.syncContexts[key]; busy {
+		return nil, nil, false
 	}
+	ctx, release = a.registerFolderSyncLocked(key)
+	return ctx, release, true
+}
+
+// registerFolderSyncLocked registers a sync under key, cancelling and
+// replacing any existing entry, and returns its context and release func. The
+// caller holds syncMu.
+func (a *App) registerFolderSyncLocked(key string) (context.Context, func()) {
+	if old, exists := a.syncContexts[key]; exists {
+		old.cancel()
+	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	slot := &syncSlot{cancel: cancel}
+	a.syncContexts[key] = slot
+	release := func() {
+		cancel()
+		a.syncMu.Lock()
+		defer a.syncMu.Unlock()
+		if a.syncContexts[key] == slot {
+			delete(a.syncContexts, key)
+		}
+	}
+	return ctx, release
 }
 
 // syncPeriodDays returns the account's sync period, or the 30-day default
@@ -428,9 +460,9 @@ func (a *App) CancelFolderSync(accountID, folderID string) {
 	defer a.syncMu.Unlock()
 
 	syncKey := accountID + ":" + folderID
-	if cancel, exists := a.syncContexts[syncKey]; exists {
+	if slot, exists := a.syncContexts[syncKey]; exists {
 		log.Info().Str("syncKey", syncKey).Msg("Cancelling folder sync")
-		cancel()
+		slot.cancel()
 		delete(a.syncContexts, syncKey)
 	}
 }
@@ -443,10 +475,10 @@ func (a *App) CancelAccountSync(accountID string) {
 
 	// Find and cancel all syncs for this account (keys are "accountID:folderID")
 	prefix := accountID + ":"
-	for key, cancel := range a.syncContexts {
+	for key, slot := range a.syncContexts {
 		if strings.HasPrefix(key, prefix) {
 			log.Info().Str("syncKey", key).Msg("Cancelling folder sync")
-			cancel()
+			slot.cancel()
 			delete(a.syncContexts, key)
 		}
 	}
@@ -464,11 +496,11 @@ func (a *App) CancelAllSyncs() {
 	// Set cancellation flag so SyncAllComplete/SyncAccountComplete loops stop
 	a.syncCancelled = true
 
-	for syncKey, cancel := range a.syncContexts {
+	for syncKey, slot := range a.syncContexts {
 		log.Info().Str("syncKey", syncKey).Msg("Cancelling sync")
-		cancel()
+		slot.cancel()
 	}
-	a.syncContexts = make(map[string]context.CancelFunc)
+	a.syncContexts = make(map[string]*syncSlot)
 
 	a.syncMu.Unlock()
 

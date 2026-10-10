@@ -359,35 +359,67 @@ type ChatSearchResult struct {
 	Recipients []Address `json:"recipients,omitempty"`
 }
 
-// SearchChats runs SearchConversations for a folder, merges threads of the
-// same sender chat into one result (at the first, newest one's position), and
-// in a Sent folder adds each thread's recipients so rows name them instead of
-// me. A merged page can hold fewer results than limit.
+// SearchChats runs SearchConversations for a folder and merges the results
+// as mergeChatResults does.
 func (s *Store) SearchChats(folderID, query string, offset, limit int, filter string) ([]*ChatSearchResult, error) {
 	found, _, err := s.SearchConversations(folderID, query, offset, limit, filter)
 	if err != nil || len(found) == 0 {
 		return nil, err
 	}
+	// Folder search leaves the account unset; merging keys on it.
+	var accountID string
+	if err := s.db.QueryRow(`SELECT account_id FROM folders WHERE id = ?`, folderID).Scan(&accountID); err != nil {
+		return nil, fmt.Errorf("failed to get folder account: %w", err)
+	}
+	for _, c := range found {
+		c.AccountID = accountID
+	}
+	return s.mergeChatResults(found, query, "f.id = ?", folderID)
+}
+
+// SearchChatsUnifiedInbox runs SearchConversationsUnifiedInbox and merges the
+// results as mergeChatResults does, never across accounts.
+func (s *Store) SearchChatsUnifiedInbox(query string, offset, limit int, filter string) ([]*ChatSearchResult, error) {
+	found, _, err := s.SearchConversationsUnifiedInbox(query, offset, limit, filter)
+	if err != nil || len(found) == 0 {
+		return nil, err
+	}
+	return s.mergeChatResults(found, query, "f.folder_type = 'inbox'")
+}
+
+// chatRef names a thread or chat key within an account: sender chats are per
+// account.
+type chatRef struct{ account, key string }
+
+// mergeChatResults merges search results (with AccountID set) in the folder
+// scope cond (taking args) that belong to the same sender chat into one
+// result, at the first, newest one's position, and in a Sent folder adds each
+// thread's recipients so rows name them instead of me. A merged page can hold
+// fewer results than were found.
+func (s *Store) mergeChatResults(found []*ConversationSearchResult, query, cond string, args ...any) ([]*ChatSearchResult, error) {
+	refs := make([]chatRef, len(found))
 	keys := make([]string, len(found))
 	unbracket := strings.NewReplacer("<", "", ">", "")
 	for i, c := range found {
 		keys[i] = unbracket.Replace(c.ThreadID)
+		refs[i] = chatRef{c.AccountID, keys[i]}
 	}
-	chatKeys, err := s.threadChatKeys("f.id = ?", folderID, keys)
+	chatKeys, err := s.threadChatKeys(cond, keys, args...)
 	if err != nil {
 		return nil, err
 	}
 
 	var results []*ChatSearchResult
-	byChat := map[string]*ChatSearchResult{}
-	senderFirst := map[string]*ChatSearchResult{} // first thread key -> sender chat
+	byChat := map[chatRef]*ChatSearchResult{}
+	senderFirst := map[chatRef]*ChatSearchResult{} // first thread -> sender chat
 	byThread := make([]*ChatSearchResult, len(found))
 	for i, c := range found {
-		chatKey, ok := chatKeys[keys[i]]
+		chatKey, ok := chatKeys[refs[i]]
 		if !ok {
 			chatKey = keys[i]
 		}
-		if r := byChat[chatKey]; r != nil {
+		chat := chatRef{c.AccountID, chatKey}
+		if r := byChat[chat]; r != nil {
 			r.MessageCount += c.MessageCount
 			r.UnreadCount += c.UnreadCount
 			r.HasAttachments = r.HasAttachments || c.HasAttachments
@@ -399,20 +431,20 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 			continue
 		}
 		r := &ChatSearchResult{ConversationSearchResult: *c, ThreadKey: chatKey, SenderEmail: senderOfChatKey(chatKey)}
-		byChat[chatKey] = r
+		byChat[chat] = r
 		byThread[i] = r
 		results = append(results, r)
 		if r.SenderEmail != "" {
-			senderFirst[keys[i]] = r
+			senderFirst[refs[i]] = r
 		}
 	}
-	if err := s.fillLatestSubjects(folderID, query, senderFirst); err != nil {
+	if err := s.fillLatestSubjects(cond, args, query, senderFirst); err != nil {
 		return nil, err
 	}
 	if found[0].FolderType != "sent" {
 		return results, nil
 	}
-	recipients, err := s.threadRecipients(folderID, keys)
+	recipients, err := s.threadRecipients(cond, keys, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +453,7 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 		if seen[r] == nil {
 			seen[r] = map[string]bool{}
 		}
-		for _, a := range recipients[keys[i]] {
+		for _, a := range recipients[refs[i]] {
 			email := strings.ToLower(a.Email)
 			if seen[r][email] {
 				continue
@@ -434,27 +466,34 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 }
 
 // fillLatestSubjects gives each sender chat result the subject of its newest
-// message, as ListChats does. Results are newest first, so that message is in
-// the result's first thread; first maps that thread's key to its result.
-func (s *Store) fillLatestSubjects(folderID, query string, first map[string]*ChatSearchResult) error {
+// message in the folder scope cond (taking args), as ListChats does. Results
+// are newest first, so that message is in the result's first thread; first
+// maps that thread to its result.
+func (s *Store) fillLatestSubjects(cond string, args []any, query string, first map[chatRef]*ChatSearchResult) error {
 	if len(first) == 0 {
 		return nil
 	}
+	keys := make([]string, 0, len(first))
+	for ref := range first {
+		keys = append(keys, ref.key)
+	}
 	rows, err := s.db.Query(`
-		SELECT `+threadKeyExpr("m.")+` AS thread_key, MAX(m.date || char(31) || COALESCE(m.subject, ''))
+		SELECT f.account_id, `+threadKeyExpr("m.")+` AS thread_key, MAX(m.date || char(31) || COALESCE(m.subject, ''))
 		FROM messages m
-		WHERE m.folder_id = ? AND `+threadKeysMatch("m.")+`
-		GROUP BY thread_key`, append([]any{folderID}, threadKeysArgs(slices.Collect(maps.Keys(first)))...)...)
+		INNER JOIN folders f ON m.folder_id = f.id
+		WHERE `+cond+` AND `+threadKeysMatch("m.")+`
+		GROUP BY f.account_id, thread_key`, append(slices.Clone(args), threadKeysArgs(keys)...)...)
 	if err != nil {
 		return fmt.Errorf("failed to query latest subjects: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var key, latest string
-		if err := rows.Scan(&key, &latest); err != nil {
+		var ref chatRef
+		var latest string
+		if err := rows.Scan(&ref.account, &ref.key, &latest); err != nil {
 			return fmt.Errorf("failed to scan latest subject: %w", err)
 		}
-		if r := first[key]; r != nil {
+		if r := first[ref]; r != nil {
 			_, r.Subject, _ = strings.Cut(latest, "\x1f")
 			r.HighlightedSubject = highlightMatches(r.Subject, query)
 		}
@@ -473,54 +512,54 @@ func mergeParticipants(list, more []Address) []Address {
 	return list
 }
 
-// threadChatKeys returns the sender chat key of each given thread that maps
-// to one within the scope cond (with one arg, scopeArg); other threads are
-// absent.
-func (s *Store) threadChatKeys(cond string, scopeArg any, keys []string) (map[string]string, error) {
-	args := append([]any{scopeArg}, threadKeysArgs(keys)...)
+// threadChatKeys returns the sender chat key of each given thread, by account
+// and thread key, that maps to one within the folder scope cond (taking
+// args); other threads are absent.
+func (s *Store) threadChatKeys(cond string, keys []string, args ...any) (map[chatRef]string, error) {
 	rows, err := s.db.Query(`
-		SELECT DISTINCT ck.thread_key, ck.chat_key
+		SELECT DISTINCT ck.account_id, ck.thread_key, ck.chat_key
 		FROM (`+chatKeyRows(cond+" AND "+threadKeysMatch("m."))+`) ck
-		WHERE ck.chat_key <> ck.thread_key`, args...)
+		WHERE ck.chat_key <> ck.thread_key`, append(slices.Clone(args), threadKeysArgs(keys)...)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query chat keys: %w", err)
 	}
 	defer rows.Close()
-	chatKeys := map[string]string{}
+	chatKeys := map[chatRef]string{}
 	for rows.Next() {
-		var threadKey, chatKey string
-		if err := rows.Scan(&threadKey, &chatKey); err != nil {
+		var ref chatRef
+		var chatKey string
+		if err := rows.Scan(&ref.account, &ref.key, &chatKey); err != nil {
 			return nil, fmt.Errorf("failed to scan chat key: %w", err)
 		}
-		chatKeys[threadKey] = chatKey
+		chatKeys[ref] = chatKey
 	}
 	return chatKeys, rows.Err()
 }
 
-// threadRecipients returns the Sent recipients of threads in a folder, by
-// thread key, aggregated as in the chat list.
-func (s *Store) threadRecipients(folderID string, keys []string) (map[string][]Address, error) {
-	args := append([]any{folderID}, threadKeysArgs(keys)...)
+// threadRecipients returns the Sent recipients of threads in the folder scope
+// cond (taking args), by account and thread key, aggregated as in the chat
+// list.
+func (s *Store) threadRecipients(cond string, keys []string, args ...any) (map[chatRef][]Address, error) {
 	query := `
-		SELECT ` + threadKeyExpr("m.") + ` AS thread_key, ` + recipientsJSONExpr + `
+		SELECT f.account_id, ` + threadKeyExpr("m.") + ` AS thread_key, ` + recipientsJSONExpr + `
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id
-		WHERE m.folder_id = ? AND ` + threadKeysMatch("m.") + `
-		GROUP BY thread_key`
-	rows, err := s.db.Query(query, args...)
+		WHERE ` + cond + ` AND ` + threadKeysMatch("m.") + `
+		GROUP BY f.account_id, thread_key`
+	rows, err := s.db.Query(query, append(slices.Clone(args), threadKeysArgs(keys)...)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query thread recipients: %w", err)
 	}
 	defer rows.Close()
 
-	recipients := make(map[string][]Address, len(keys))
+	recipients := make(map[chatRef][]Address, len(keys))
 	for rows.Next() {
-		var key string
+		var ref chatRef
 		var recipientsJSON sql.NullString
-		if err := rows.Scan(&key, &recipientsJSON); err != nil {
+		if err := rows.Scan(&ref.account, &ref.key, &recipientsJSON); err != nil {
 			return nil, fmt.Errorf("failed to scan thread recipients: %w", err)
 		}
-		recipients[key] = parseAggregatedToListJSON(recipientsJSON.String)
+		recipients[ref] = parseAggregatedToListJSON(recipientsJSON.String)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate thread recipients: %w", err)
@@ -720,7 +759,7 @@ func (s *Store) ListDueSnoozes(now time.Time) ([]DueSnooze, error) {
 	if err != nil {
 		return nil, err
 	}
-	inSenderChat := map[string]map[string]string{}
+	inSenderChat := map[chatRef]string{}
 	if senderChats {
 		threadKeys := map[string][]string{}
 		for _, d := range dues {
@@ -729,15 +768,17 @@ func (s *Store) ListDueSnoozes(now time.Time) ([]DueSnooze, error) {
 			}
 		}
 		for accountID, keys := range threadKeys {
-			if inSenderChat[accountID], err = s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", accountID, keys); err != nil {
+			chatKeys, err := s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", keys, accountID)
+			if err != nil {
 				return nil, err
 			}
+			maps.Copy(inSenderChat, chatKeys)
 		}
 	}
 	result := make([]DueSnooze, 0, len(dues))
 	for _, d := range dues {
 		ds := DueSnooze{AccountID: d.accountID, ThreadKey: d.threadKey}
-		if inSenderChat[d.accountID][d.threadKey] != "" {
+		if inSenderChat[chatRef{d.accountID, d.threadKey}] != "" {
 			ds.InSenderChat = true
 			result = append(result, ds)
 			continue
@@ -1010,12 +1051,12 @@ func (s *Store) fillNewMailChatKeys(mail []NewMail) error {
 		byAccount[nm.accountID] = append(byAccount[nm.accountID], nm.ChatKey)
 	}
 	for accountID, keys := range byAccount {
-		chatKeys, err := s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", accountID, keys)
+		chatKeys, err := s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", keys, accountID)
 		if err != nil {
 			return err
 		}
 		for i := range mail {
-			if chatKey, ok := chatKeys[mail[i].ChatKey]; ok && mail[i].accountID == accountID {
+			if chatKey, ok := chatKeys[chatRef{mail[i].accountID, mail[i].ChatKey}]; ok {
 				mail[i].ChatKey = chatKey
 			}
 		}

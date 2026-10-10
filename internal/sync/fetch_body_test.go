@@ -3,6 +3,7 @@ package sync
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -45,8 +46,8 @@ func TestFetchMessageBodiesBatch_IncompleteBodies(t *testing.T) {
 	e := &Engine{sanitizer: email.NewSanitizer(), attachExtractor: email.NewAttachmentExtractor(), log: logging.WithComponent("sync-test")}
 
 	results, err := e.fetchMessageBodiesBatch(context.Background(), client, map[uint32]string{1: "none", 2: "empty", 3: "full", 4: "cut"})
-	if err != nil {
-		t.Fatalf("fetchMessageBodiesBatch: %v", err)
+	if !errors.Is(err, errStreamBroken) {
+		t.Fatalf("fetchMessageBodiesBatch error = %v, want errStreamBroken", err)
 	}
 
 	tests := []struct {

@@ -1,7 +1,7 @@
 package app
 
 import (
-	"context"
+	"fmt"
 	"time"
 
 	"github.com/hkdb/aerion/internal/folder"
@@ -51,22 +51,16 @@ func (a *App) syncSentAfterIdle(accountID string) {
 		return
 	}
 	syncKey := accountID + ":" + sent.ID
-	a.syncMu.Lock()
-	if _, busy := a.syncContexts[syncKey]; busy {
-		a.syncMu.Unlock()
+	ctx, release, ok := a.beginFolderSync(syncKey)
+	if !ok {
 		if a.ctx.Err() == nil {
 			a.scheduleSentSyncAfterIdle(accountID)
 		}
 		return
 	}
-	ctx, cancel := context.WithCancel(a.ctx)
-	a.syncContexts[syncKey] = cancel
-	a.syncMu.Unlock()
-	defer func() {
-		cancel()
-		a.releaseSyncContext(syncKey, cancel)
-	}()
+	defer release()
 
+	before, snapErr := a.snapshotFolder(sent.ID)
 	syncPeriodDays := a.syncPeriodDays(accountID)
 	// Incremental, like the IDLE inbox sync; the scheduled sync stays the
 	// full reconciliation.
@@ -89,7 +83,42 @@ func (a *App) syncSentAfterIdle(accountID string) {
 		"accountId": accountID,
 		"folderId":  sent.ID,
 	})
+	// sent:synced reloads chat lists and open threads, so skip it when the
+	// sync stored nothing new; IDLE flag activity triggers many no-op syncs.
+	after, err := a.snapshotFolder(sent.ID)
+	if snapErr == nil && err == nil && after == before {
+		log.Debug().Str("accountID", accountID).Msg("Sent unchanged after IDLE sync; skipping sent:synced")
+		return
+	}
 	wailsRuntime.EventsEmit(a.ctx, "sent:synced", map[string]interface{}{
 		"accountId": accountID,
 	})
+}
+
+// folderSnapshot records what a sync can change in a folder's stored
+// messages: a new message raises the highest UID, a deletion lowers the
+// count, and a UIDVALIDITY change re-stores the mailbox.
+type folderSnapshot struct {
+	highestUID  uint32
+	count       int
+	uidValidity uint32
+}
+
+func (a *App) snapshotFolder(folderID string) (folderSnapshot, error) {
+	f, err := a.folderStore.Get(folderID)
+	if err != nil {
+		return folderSnapshot{}, err
+	}
+	if f == nil {
+		return folderSnapshot{}, fmt.Errorf("folder %s not found", folderID)
+	}
+	uid, err := a.messageStore.GetHighestUID(folderID)
+	if err != nil {
+		return folderSnapshot{}, err
+	}
+	count, err := a.messageStore.CountByFolder(folderID)
+	if err != nil {
+		return folderSnapshot{}, err
+	}
+	return folderSnapshot{highestUID: uid, count: count, uidValidity: f.UIDValidity}, nil
 }

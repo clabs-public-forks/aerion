@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/hkdb/aerion/internal/email"
@@ -26,16 +27,10 @@ import (
 // they already render in the body and would otherwise show as cards.
 func (a *App) GetAttachments(messageID string) ([]*message.Attachment, error) {
 	atts, err := a.attachmentStore.GetByMessage(messageID)
-	if err != nil || !message.HasInlineCID(atts) {
-		return atts, err
+	if err != nil {
+		return nil, err
 	}
-	msg, err := a.messageStore.Get(messageID)
-	if err != nil || msg == nil {
-		log := logging.WithComponent("app")
-		log.Warn().Err(err).Str("messageID", messageID).Msg("Could not load message body; listing all attachments")
-		return atts, nil
-	}
-	return message.FilterEmbeddedInline(atts, msg.BodyHTML), nil
+	return slices.DeleteFunc(atts, func(att *message.Attachment) bool { return att.Embedded }), nil
 }
 
 // GetAttachment returns a single attachment by ID

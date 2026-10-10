@@ -1126,6 +1126,10 @@ export function SearchChats(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['SearchChats'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function SearchChatsUnifiedInbox(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SearchChatsUnifiedInbox'](arg1, arg2, arg3, arg4);
+}
+
 export function SearchContacts(arg1, arg2) {
   return window['go']['app']['App']['SearchContacts'](arg1, arg2);
 }

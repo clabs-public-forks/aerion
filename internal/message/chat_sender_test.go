@@ -3,6 +3,7 @@ package message
 import (
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -392,6 +393,44 @@ func TestSenderChatNewMail(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("chat keys = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSenderChatSearchUnifiedInbox(t *testing.T) {
+	tests := []struct {
+		name     string
+		accounts []string // accounts with lms as a sender chat
+		want     []string // account|thread key|message IDs
+	}{
+		{"no sender chats", nil, []string{"acct-2|n9|n9", "acct-1|n1|n1", "acct-1|n2|n2"}},
+		{"one account", []string{"acct-1"}, []string{"acct-2|n9|n9", "acct-1|" + lmsKey + "|n1,n2"}},
+		{"both accounts stay apart", []string{"acct-1", "acct-2"}, []string{"acct-2|" + lmsKey + "|n9", "acct-1|" + lmsKey + "|n1,n2"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s, _, _, _ := senderChatFixture(t)
+			for _, a := range tt.accounts {
+				if err := s.SetSenderChat(a, lms, true); err != nil {
+					t.Fatal(err)
+				}
+			}
+			results, err := s.SearchChatsUnifiedInbox("grade", 0, 50, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, r := range results {
+				ids := append([]string(nil), r.MessageIDs...)
+				sort.Strings(ids)
+				got = append(got, r.AccountID+"|"+r.ThreadKey+"|"+strings.Join(ids, ","))
+			}
+			sort.Strings(got)
+			want := append([]string(nil), tt.want...)
+			sort.Strings(want)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("results = %v, want %v", got, want)
 			}
 		})
 	}

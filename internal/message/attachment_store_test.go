@@ -68,3 +68,44 @@ func TestAttachmentStore_ReplaceForMessages(t *testing.T) {
 		})
 	}
 }
+
+// TestAttachmentStore_Embedded checks that the embedded flag survives both
+// insert paths and both reads.
+func TestAttachmentStore_Embedded(t *testing.T) {
+	s, accountID, folderID := newBodyFailedTestStore(t)
+	if err := s.Create(&Message{ID: "m1", AccountID: accountID, FolderID: folderID, UID: 1, Date: time.Now()}); err != nil {
+		t.Fatalf("create message: %v", err)
+	}
+	as := NewAttachmentStore(s.db)
+	batch := []*Attachment{
+		{ID: "logo", MessageID: "m1", Filename: "logo.png", IsInline: true, ContentID: "logo@x", Embedded: true},
+		{ID: "pdf", MessageID: "m1", Filename: "report.pdf"},
+	}
+	if err := as.ReplaceForMessages([]string{"m1"}, batch); err != nil {
+		t.Fatalf("ReplaceForMessages: %v", err)
+	}
+	if err := as.Create(&Attachment{ID: "banner", MessageID: "m1", Filename: "banner.png", IsInline: true, ContentID: "banner@x", Embedded: true}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	want := map[string]bool{"logo": true, "pdf": false, "banner": true}
+	got, err := as.GetByMessage("m1")
+	if err != nil {
+		t.Fatalf("GetByMessage: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d attachments, want %d", len(got), len(want))
+	}
+	for _, a := range got {
+		if a.Embedded != want[a.ID] {
+			t.Errorf("GetByMessage %s embedded = %v, want %v", a.ID, a.Embedded, want[a.ID])
+		}
+		one, err := as.Get(a.ID)
+		if err != nil || one == nil {
+			t.Fatalf("Get %s: %v", a.ID, err)
+		}
+		if one.Embedded != want[a.ID] {
+			t.Errorf("Get %s embedded = %v, want %v", a.ID, one.Embedded, want[a.ID])
+		}
+	}
+}

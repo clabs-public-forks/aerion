@@ -3,9 +3,11 @@ package message
 import (
 	"slices"
 	"testing"
+
+	"github.com/hkdb/aerion/internal/cid"
 )
 
-func TestFilterEmbeddedInline(t *testing.T) {
+func TestMarkEmbedded(t *testing.T) {
 	logo := &Attachment{ID: "logo", IsInline: true, ContentID: "image001.png@01DA0000.12345678"}
 	banner := &Attachment{ID: "banner", IsInline: true, ContentID: "banner@x"}
 	unreferenced := &Attachment{ID: "unref", IsInline: true, ContentID: "orphan@x"}
@@ -48,18 +50,25 @@ func TestFilterEmbeddedInline(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := FilterEmbeddedInline(all, c.html)
-			ids := make([]string, 0, len(got))
-			for _, a := range got {
-				ids = append(ids, a.ID)
+			listed := MarkEmbedded(all, c.html)
+			var ids []string
+			for _, a := range all {
+				if !a.Embedded {
+					ids = append(ids, a.ID)
+				}
 			}
 			if !slices.Equal(ids, c.want) {
 				t.Errorf("got %v, want %v", ids, c.want)
+			}
+			if listed != (len(c.want) > 0) {
+				t.Errorf("MarkEmbedded() = %v, want %v", listed, len(c.want) > 0)
 			}
 		})
 	}
 }
 
+// TestEmbeddedCIDs also checks that cid.Embedded, which replies use, agrees
+// with MarkEmbedded: a reply re-attaches exactly the parts the viewer hides.
 func TestEmbeddedCIDs(t *testing.T) {
 	cases := []struct {
 		name string
@@ -81,8 +90,12 @@ func TestEmbeddedCIDs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if _, got := embeddedCIDs(c.html)[c.cid]; got != c.want {
-				t.Errorf("embeddedCIDs(%q) has %q = %v, want %v", c.html, c.cid, got, c.want)
+			if _, got := cid.Embedded(c.html)[c.cid]; got != c.want {
+				t.Errorf("cid.Embedded(%q) has %q = %v, want %v", c.html, c.cid, got, c.want)
+			}
+			att := &Attachment{IsInline: true, ContentID: c.cid}
+			if listed := MarkEmbedded([]*Attachment{att}, c.html); listed == c.want {
+				t.Errorf("MarkEmbedded(%q) lists %q = %v, want %v", c.html, c.cid, listed, !c.want)
 			}
 		})
 	}

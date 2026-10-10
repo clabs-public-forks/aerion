@@ -419,6 +419,11 @@ func (e *Engine) FetchServerMessage(ctx context.Context, accountID, folderID str
 		if err != nil {
 			e.log.Debug().Err(err).Str("messageId", m.ID).Msg("Failed to extract attachments")
 		} else {
+			parts := make([]*message.Attachment, len(attachments))
+			for i, att := range attachments {
+				parts[i] = att.Attachment
+			}
+			message.MarkEmbedded(parts, m.BodyHTML)
 			for _, att := range attachments {
 				if att.Attachment.IsInline && len(att.Content) > 0 {
 					att.Attachment.Content = att.Content

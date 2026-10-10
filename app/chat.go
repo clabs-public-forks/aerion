@@ -40,6 +40,12 @@ func (a *App) SearchChats(folderID, query string, offset, limit int, filter stri
 	return a.messageStore.SearchChats(folderID, query, offset, limit, filter)
 }
 
+// SearchChatsUnifiedInbox searches all inboxes like SearchUnifiedInbox,
+// merging each account's sender chat threads into one result.
+func (a *App) SearchChatsUnifiedInbox(query string, offset, limit int, filter string) ([]*message.ChatSearchResult, error) {
+	return a.messageStore.SearchChatsUnifiedInbox(query, offset, limit, filter)
+}
+
 // GetSenderChat returns a combined sender chat as one conversation: the
 // sender's threads in folderID ("" for the account's inbox) with their Sent
 // and Drafts messages. It returns nil when the chat has no messages there.

@@ -269,26 +269,20 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 	if folderID != "" {
 		syncPeriodDays := a.syncPeriodDays(event.AccountID)
 
-		// Register IDLE sync context so manual sync can cancel it
-		a.syncMu.Lock()
-		// Double-check no sync started while we were processing
-		if _, exists := a.syncContexts[syncKey]; exists {
-			a.syncMu.Unlock()
+		// Register so manual sync can cancel it; skip if a sync started
+		// while we were processing.
+		ctx, release, ok := a.beginFolderSync(syncKey)
+		if !ok {
 			log.Debug().Str("syncKey", syncKey).Msg("Skipping IDLE body fetch - sync started during processing")
 			return
 		}
-		ctx, cancel := context.WithCancel(a.ctx)
-		a.syncContexts[syncKey] = cancel
-		a.syncMu.Unlock()
 
-		go func(syncCtx context.Context, syncDays int, fID string, key string) {
+		go func(syncCtx context.Context, syncDays int, fID string) {
 			var folderSynced bool // Track whether folder:synced was emitted (to avoid duplicate messages:updated)
 
 			// Cleanup context on completion
 			defer func() {
-				a.syncMu.Lock()
-				delete(a.syncContexts, key)
-				a.syncMu.Unlock()
+				release()
 
 				// Only emit messages:updated if folder:synced wasn't already emitted
 				// (both trigger identical reloads in MessageList and ConversationViewer)
@@ -345,7 +339,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 					"folderId":  fID,
 				})
 			}
-		}(ctx, syncPeriodDays, folderID, syncKey)
+		}(ctx, syncPeriodDays, folderID)
 	}
 
 	// Notify about new mail if any

@@ -160,6 +160,7 @@ type Attachment struct {
 	Size        int    `json:"size"`
 	ContentID   string `json:"contentId,omitempty"` // For inline attachments
 	IsInline    bool   `json:"isInline"`
+	Embedded    bool   `json:"-"`                   // Inline part the HTML body shows; not listed
 	LocalPath   string `json:"localPath,omitempty"` // Path to downloaded file
 	Content     []byte `json:"-"`                   // Raw content for inline attachments (not serialized to JSON)
 }

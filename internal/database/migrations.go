@@ -1,9 +1,14 @@
 package database
 
+import "database/sql"
+
 // Migration represents a database migration
 type Migration struct {
 	Version int
 	SQL     string
+	// Run, if set, runs after SQL in the same transaction, for backfills
+	// that need Go code.
+	Run func(*sql.Tx) error
 }
 
 // migrations is the list of all database migrations
@@ -1443,5 +1448,14 @@ var migrations = []Migration{
 				PRIMARY KEY (account_id, email)
 			);
 		`,
+	},
+	{
+		Version: 49,
+		SQL: `
+			-- Inline parts the HTML body shows (signature logos) are not
+			-- listed as attachments and don't earn the paperclip.
+			ALTER TABLE attachments ADD COLUMN embedded INTEGER NOT NULL DEFAULT 0;
+		`,
+		Run: backfillEmbeddedAttachments,
 	},
 }

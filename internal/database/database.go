@@ -224,6 +224,11 @@ func (db *DB) applyMigration(m Migration) error {
 	if _, err := tx.Exec(m.SQL); err != nil {
 		return fmt.Errorf("migration SQL failed: %w", err)
 	}
+	if m.Run != nil {
+		if err := m.Run(tx); err != nil {
+			return fmt.Errorf("migration backfill failed: %w", err)
+		}
+	}
 
 	// Record migration
 	if _, err := tx.Exec("INSERT INTO migrations (version) VALUES (?)", m.Version); err != nil {

@@ -157,13 +157,7 @@ func (e *Engine) ParseRawBody(raw []byte) (bodyHTML, bodyText string) {
 // and returns the full ParsedBody including attachments.
 // This is used by the app layer for on-view processing of encrypted messages.
 func (e *Engine) ParseDecryptedBody(raw []byte, messageID string) *ParsedBody {
-	parsed := e.parseMessageBodyInternal(raw, messageID)
-
-	if parsed.BodyHTML != "" && e.sanitizer != nil {
-		parsed.BodyHTML = e.sanitizer.Sanitize(parsed.BodyHTML)
-	}
-
-	return parsed
+	return e.parseMessageBodyInternal(raw, messageID)
 }
 
 // emitProgress sends progress updates if a callback is set

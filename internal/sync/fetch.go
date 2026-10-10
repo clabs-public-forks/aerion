@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -73,7 +74,14 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connection: %w", err)
 	}
-	defer e.pool.Release(conn)
+	var streamErr error
+	defer func() {
+		if errors.Is(streamErr, errStreamBroken) {
+			e.pool.Discard(conn)
+			return
+		}
+		e.pool.Release(conn)
+	}()
 
 	// Select the mailbox
 	_, err = conn.Client().SelectMailbox(ctx, f.Path)
@@ -84,6 +92,7 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	// Use fetchMessageBodiesBatch for streaming fetch (avoids .Collect() blocking)
 	uidToMessageID := map[uint32]string{uid: messageID}
 	results, err := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
+	streamErr = err
 	if err != nil {
 		return nil, fmt.Errorf("fetch body failed: %w", err)
 	}
@@ -116,6 +125,25 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	// Return updated message
 	return e.messageStore.Get(messageID)
 }
+
+// replaceConn discards a dead connection and returns a fresh one with the
+// mailbox at path selected.
+func (e *Engine) replaceConn(ctx context.Context, old *imapPkg.PooledConnection, accountID, path string) (*imapPkg.PooledConnection, error) {
+	e.pool.Discard(old)
+	conn, err := e.pool.GetConnection(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new connection: %w", err)
+	}
+	if _, err := conn.Client().SelectMailbox(ctx, path); err != nil {
+		e.pool.Release(conn)
+		return nil, fmt.Errorf("failed to select mailbox on new connection: %w", err)
+	}
+	return conn, nil
+}
+
+// errStreamBroken reports that a body literal ended early and the client was
+// closed. The results returned alongside it are still valid.
+var errStreamBroken = errors.New("body literal ended early, connection closed")
 
 // fetchMessageBodiesBatch fetches bodies for multiple messages in a single IMAP command
 // The mailbox must already be selected by the caller.
@@ -161,7 +189,8 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 
 	// Stream messages one at a time instead of blocking on Collect()
 	// This allows cancellation between messages and returns partial results on error
-	for {
+	streamBroken := false
+	for !streamBroken {
 		// Check for cancellation between messages
 		if ctx.Err() != nil {
 			fetchCmd.Close()
@@ -184,7 +213,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		var readErr error
 		var reportedSize int64 // RFC822.SIZE; 0 if server didn't return it
 
-		for {
+		for readErr == nil {
 			item := msg.Next()
 			if item == nil {
 				break
@@ -229,6 +258,14 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				}
 			}
 		}
+
+		// A failed literal read has already handed go-imap's buffered
+		// reader back to its read goroutine, but the literal still has
+		// unread bytes. msg.Next, fetchCmd.Next and fetchCmd.Close would
+		// discard them from that same buffer and race with the goroutine
+		// (go-imap v2 fetchLiteralReader), so stop consuming the command
+		// and close the connection; the pool's health check then drops it.
+		streamBroken = readErr != nil
 
 		// Log if we didn't receive a body section at all
 		if !gotBodySection && fetchedUID != 0 {
@@ -276,23 +313,17 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		// Parse body content with timeout, extracting attachments in the same pass
 		parsed := e.parseMessageBodyFull(rawBytes, messageID, 30*time.Second)
 
-		// Sanitize HTML
-		bodyHTML := parsed.BodyHTML
-		if bodyHTML != "" {
-			bodyHTML = e.sanitizer.Sanitize(bodyHTML)
-		}
-
 		// Generate snippet
 		var snippet string
 		if parsed.BodyText != "" {
 			snippet = generateSnippet(parsed.BodyText, 200)
-		} else if bodyHTML != "" {
-			snippet = generateSnippet(stripHTMLTags(bodyHTML), 200)
+		} else if parsed.BodyHTML != "" {
+			snippet = generateSnippet(stripHTMLTags(parsed.BodyHTML), 200)
 		}
 
 		results[uid] = &ProcessedBody{
 			MessageID:      messageID,
-			BodyHTML:       bodyHTML,
+			BodyHTML:       parsed.BodyHTML, // sanitized by the parser
 			BodyText:       parsed.BodyText,
 			Snippet:        snippet,
 			HasAttachments: parsed.HasAttachments,
@@ -306,6 +337,18 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			ReportedSize:   reportedSize,
 			ReceivedBytes:  int64(len(rawBytes)),
 		}
+	}
+
+	if streamBroken {
+		e.log.Warn().
+			Int("fetched", len(results)).
+			Int("requested", len(uidToMessageID)).
+			Msg("Body literal ended early, closing connection and returning partial results")
+		client.Close()
+		if err := ctx.Err(); err != nil {
+			return results, err
+		}
+		return results, errStreamBroken
 	}
 
 	if err := fetchCmd.Close(); err != nil {
@@ -723,6 +766,14 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 
 		// Step 4: Fetch bodies via IMAP - single round-trip for all messages in batch
 		bodies, fetchErr := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
+		if errors.Is(fetchErr, errStreamBroken) {
+			// Keep the partial results (retrying would refetch the cut
+			// message) and continue on a fresh connection.
+			if conn, err = e.replaceConn(ctx, conn, accountID, f.Path); err != nil {
+				return fmt.Errorf("after broken stream: %w", err)
+			}
+			fetchErr = nil
+		}
 		if fetchErr != nil {
 			// Check if this is a connection error
 			if imapPkg.IsConnectionError(fetchErr) {
@@ -742,19 +793,8 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 					Int("attempt", connectionFailures).
 					Msg("Connection error during batch fetch, attempting recovery")
 
-				// Discard dead connection and get a new one
-				e.pool.Discard(conn)
-
-				conn, err = e.pool.GetConnection(ctx, accountID)
-				if err != nil {
-					return fmt.Errorf("failed to get new connection after error: %w", err)
-				}
-
-				// Re-select mailbox on new connection
-				_, err = conn.Client().SelectMailbox(ctx, f.Path)
-				if err != nil {
-					e.pool.Release(conn)
-					return fmt.Errorf("failed to select mailbox on new connection: %w", err)
+				if conn, err = e.replaceConn(ctx, conn, accountID, f.Path); err != nil {
+					return fmt.Errorf("after connection error: %w", err)
 				}
 
 				e.log.Debug().Msg("Connection recovered successfully, retrying batch")

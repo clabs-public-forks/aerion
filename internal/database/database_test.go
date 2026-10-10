@@ -208,6 +208,10 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN is_bulk`); err != nil {
 		t.Fatalf("drop messages.is_bulk for re-migrate: %v", err)
 	}
+	// And v49's embedded on attachments.
+	if _, err := db.Exec(`ALTER TABLE attachments DROP COLUMN embedded`); err != nil {
+		t.Fatalf("drop attachments.embedded for re-migrate: %v", err)
+	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
 	if err := db.Migrate(); err != nil {
@@ -371,6 +375,10 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	// And v46's is_bulk on messages (its tables use IF NOT EXISTS).
 	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN is_bulk`); err != nil {
 		t.Fatalf("drop messages.is_bulk for re-migrate: %v", err)
+	}
+	// And v49's embedded on attachments.
+	if _, err := db.Exec(`ALTER TABLE attachments DROP COLUMN embedded`); err != nil {
+		t.Fatalf("drop attachments.embedded for re-migrate: %v", err)
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,
@@ -567,6 +575,7 @@ func TestMigrationV46_ChatTriage(t *testing.T) {
 		`DROP TABLE conversation_state`,
 		`DROP TABLE sender_category`,
 		`ALTER TABLE messages DROP COLUMN is_bulk`,
+		`ALTER TABLE attachments DROP COLUMN embedded`,
 		`DELETE FROM migrations WHERE version >= 46`,
 		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
 			VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com')`,
@@ -631,6 +640,7 @@ func TestMigrationV48_SenderChat(t *testing.T) {
 
 	for _, stmt := range []string{
 		`DROP TABLE sender_chat`,
+		`ALTER TABLE attachments DROP COLUMN embedded`,
 		`DELETE FROM migrations WHERE version >= 48`,
 		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
 			VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com')`,
@@ -670,5 +680,84 @@ func TestMigrationV48_SenderChat(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("sender_chat has %d rows after account delete, want 0", n)
+	}
+}
+
+// TestMigrationV49_EmbeddedAttachments upgrades a v48 database: inline parts
+// the stored body embeds are marked embedded, and has_attachments is
+// recomputed only for messages with inline-cid parts.
+func TestMigrationV49_EmbeddedAttachments(t *testing.T) {
+	db := openTestDB(t)
+
+	for _, stmt := range []string{
+		`ALTER TABLE attachments DROP COLUMN embedded`,
+		`DELETE FROM migrations WHERE version >= 49`,
+		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+			VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com')`,
+		`INSERT INTO folders (id, account_id, name, path, folder_type) VALUES ('f-1', 'acct-1', 'INBOX', 'INBOX', 'inbox')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("prepare v48 state (%s): %v", stmt, err)
+		}
+	}
+
+	messages := []struct {
+		id, html string
+		hasAtts  int
+	}{
+		{"logo-only", `<p>Hi</p><img src="cid:logo@x">`, 1},
+		{"logo-and-pdf", `<img src="cid:logo2@x">`, 1},
+		{"unreferenced-inline", `<p>no images</p>`, 1},
+		{"prefix-only", `<img src="cid:part10">`, 1},
+		{"no-inline", `<img src="cid:other">`, 1},
+		{"no-rows", `<img src="cid:logo@x">`, 1},
+	}
+	for i, m := range messages {
+		if _, err := db.Exec(`INSERT INTO messages (id, account_id, folder_id, uid, subject, from_name, from_email, date, body_html, has_attachments)
+			VALUES (?, 'acct-1', 'f-1', ?, 'S', 'A', 'a@x', CURRENT_TIMESTAMP, ?, ?)`, m.id, i+1, m.html, m.hasAtts); err != nil {
+			t.Fatalf("seed message %s: %v", m.id, err)
+		}
+	}
+	atts := []struct {
+		id, messageID, contentID string
+		inline                   int
+	}{
+		{"a-logo", "logo-only", "logo@x", 1},
+		{"a-logo2", "logo-and-pdf", "logo2@x", 1},
+		{"a-pdf", "logo-and-pdf", "", 0},
+		{"a-unref", "unreferenced-inline", "orphan@x", 1},
+		{"a-part1", "prefix-only", "part1", 1},
+		{"a-noinline", "no-inline", "other", 0},
+	}
+	for _, a := range atts {
+		if _, err := db.Exec(`INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline)
+			VALUES (?, ?, 'f', 'image/png', 1, NULLIF(?, ''), ?)`, a.id, a.messageID, a.contentID, a.inline); err != nil {
+			t.Fatalf("seed attachment %s: %v", a.id, err)
+		}
+	}
+
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("migrate to v49: %v", err)
+	}
+
+	wantEmbedded := map[string]int{"a-logo": 1, "a-logo2": 1, "a-pdf": 0, "a-unref": 0, "a-part1": 0, "a-noinline": 0}
+	for id, want := range wantEmbedded {
+		var got int
+		if err := db.QueryRow(`SELECT embedded FROM attachments WHERE id = ?`, id).Scan(&got); err != nil {
+			t.Fatalf("read embedded %s: %v", id, err)
+		}
+		if got != want {
+			t.Errorf("attachment %s embedded = %d, want %d", id, got, want)
+		}
+	}
+	wantHasAtts := map[string]int{"logo-only": 0, "logo-and-pdf": 1, "unreferenced-inline": 1, "prefix-only": 1, "no-inline": 1, "no-rows": 1}
+	for id, want := range wantHasAtts {
+		var got int
+		if err := db.QueryRow(`SELECT has_attachments FROM messages WHERE id = ?`, id).Scan(&got); err != nil {
+			t.Fatalf("read has_attachments %s: %v", id, err)
+		}
+		if got != want {
+			t.Errorf("message %s has_attachments = %d, want %d", id, got, want)
+		}
 	}
 }

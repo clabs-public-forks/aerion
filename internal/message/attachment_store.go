@@ -51,15 +51,15 @@ func (s *AttachmentStore) ensureContentColumn() {
 // For inline attachments, also stores the content for offline access
 func (s *AttachmentStore) Create(a *Attachment) error {
 	query := `
-		INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline, local_path, content)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline, embedded, local_path, content)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	// Only store content for inline attachments to save space
 	var content []byte
 	if a.IsInline && len(a.Content) > 0 {
 		content = a.Content
 	}
-	_, err := s.db.Exec(query, a.ID, a.MessageID, a.Filename, a.ContentType, a.Size, nullString(a.ContentID), boolToInt(a.IsInline), nullString(a.LocalPath), content)
+	_, err := s.db.Exec(query, a.ID, a.MessageID, a.Filename, a.ContentType, a.Size, nullString(a.ContentID), boolToInt(a.IsInline), boolToInt(a.Embedded), nullString(a.LocalPath), content)
 	if err != nil {
 		return fmt.Errorf("failed to create attachment: %w", err)
 	}
@@ -69,7 +69,7 @@ func (s *AttachmentStore) Create(a *Attachment) error {
 // GetByMessage returns all attachments for a message
 func (s *AttachmentStore) GetByMessage(messageID string) ([]*Attachment, error) {
 	query := `
-		SELECT id, message_id, filename, content_type, size, content_id, is_inline, local_path
+		SELECT id, message_id, filename, content_type, size, content_id, is_inline, embedded, local_path
 		FROM attachments
 		WHERE message_id = ?
 		ORDER BY filename
@@ -84,9 +84,9 @@ func (s *AttachmentStore) GetByMessage(messageID string) ([]*Attachment, error) 
 	for rows.Next() {
 		a := &Attachment{}
 		var contentID, localPath sql.NullString
-		var isInline int
+		var isInline, embedded int
 
-		err := rows.Scan(&a.ID, &a.MessageID, &a.Filename, &a.ContentType, &a.Size, &contentID, &isInline, &localPath)
+		err := rows.Scan(&a.ID, &a.MessageID, &a.Filename, &a.ContentType, &a.Size, &contentID, &isInline, &embedded, &localPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan attachment: %w", err)
 		}
@@ -98,6 +98,7 @@ func (s *AttachmentStore) GetByMessage(messageID string) ([]*Attachment, error) 
 			a.LocalPath = localPath.String
 		}
 		a.IsInline = isInline == 1
+		a.Embedded = embedded == 1
 
 		attachments = append(attachments, a)
 	}
@@ -108,7 +109,7 @@ func (s *AttachmentStore) GetByMessage(messageID string) ([]*Attachment, error) 
 // Get returns a single attachment by ID
 func (s *AttachmentStore) Get(id string) (*Attachment, error) {
 	query := `
-		SELECT id, message_id, filename, content_type, size, content_id, is_inline, local_path
+		SELECT id, message_id, filename, content_type, size, content_id, is_inline, embedded, local_path
 		FROM attachments
 		WHERE id = ?
 	`
@@ -116,9 +117,9 @@ func (s *AttachmentStore) Get(id string) (*Attachment, error) {
 
 	a := &Attachment{}
 	var contentID, localPath sql.NullString
-	var isInline int
+	var isInline, embedded int
 
-	err := row.Scan(&a.ID, &a.MessageID, &a.Filename, &a.ContentType, &a.Size, &contentID, &isInline, &localPath)
+	err := row.Scan(&a.ID, &a.MessageID, &a.Filename, &a.ContentType, &a.Size, &contentID, &isInline, &embedded, &localPath)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -133,6 +134,7 @@ func (s *AttachmentStore) Get(id string) (*Attachment, error) {
 		a.LocalPath = localPath.String
 	}
 	a.IsInline = isInline == 1
+	a.Embedded = embedded == 1
 
 	return a, nil
 }
@@ -212,8 +214,8 @@ func (s *AttachmentStore) ReplaceForMessages(messageIDs []string, attachments []
 	}
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline, local_path, content)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline, embedded, local_path, content)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -227,7 +229,7 @@ func (s *AttachmentStore) ReplaceForMessages(messageIDs []string, attachments []
 		if a.IsInline && len(a.Content) > 0 {
 			content = a.Content
 		}
-		_, err := stmt.Exec(a.ID, a.MessageID, a.Filename, a.ContentType, a.Size, nullString(a.ContentID), boolToInt(a.IsInline), nullString(a.LocalPath), content)
+		_, err := stmt.Exec(a.ID, a.MessageID, a.Filename, a.ContentType, a.Size, nullString(a.ContentID), boolToInt(a.IsInline), boolToInt(a.Embedded), nullString(a.LocalPath), content)
 		if err != nil {
 			log.Debug().Err(err).Str("filename", a.Filename).Msg("Failed to create attachment in batch")
 			// Continue with other attachments

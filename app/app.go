@@ -311,11 +311,11 @@ type App struct {
 	ftsIndexer *message.FTSIndexer
 
 	// Sync management - tracks active syncs per account for cancel-and-restart
-	syncContexts    map[string]context.CancelFunc // keyed by "accountID:folderID"
-	syncLastRequest map[string]time.Time          // last sync request time for debounce
-	syncCancelled   bool                          // set by CancelAllSyncs to stop SyncAllComplete loop
-	wakeSyncing     bool                          // guards syncAfterWake against concurrent calls
-	syncMu          goSync.Mutex                  // protects sync maps
+	syncContexts    map[string]*syncSlot // keyed by "accountID:folderID"
+	syncLastRequest map[string]time.Time // last sync request time for debounce
+	syncCancelled   bool                 // set by CancelAllSyncs to stop SyncAllComplete loop
+	wakeSyncing     bool                 // guards syncAfterWake against concurrent calls
+	syncMu          goSync.Mutex         // protects sync maps
 
 	// Suppresses the IDLE echo of our own flag writes: when Aerion STOREs a flag
 	// change it stamps the account here, so the incoming IDLE FETCH echo of that
@@ -771,7 +771,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.ftsIndexer = message.NewFTSIndexer(db.DB)
 
 	// Initialize sync context tracking for cancel-and-restart
-	a.syncContexts = make(map[string]context.CancelFunc)
+	a.syncContexts = make(map[string]*syncSlot)
 	a.syncLastRequest = make(map[string]time.Time)
 	a.ownFlagChangeAt = make(map[string]time.Time)
 	a.ownExpungeAt = make(map[string]time.Time)
