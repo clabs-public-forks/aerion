@@ -69,7 +69,7 @@ removing its fixed entry from ISSUES.md. Land the branch after the last one.
 
 - [x] 1. M2: stop consuming a FETCH after a failed literal read
 - [x] 2. M7: read each body once in the embedded-attachment backfill
-- [ ] 3. M8: SyncFolder waits for the cancelled slot instead of sleeping
+- [x] 3. M8: SyncFolder waits for the cancelled slot instead of sleeping
 - [ ] 4. M9: report Sent changes from the engine instead of snapshots
 
 ## Surprises & Discoveries

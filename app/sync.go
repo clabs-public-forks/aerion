@@ -38,17 +38,10 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 	}
 	a.syncLastRequest[syncKey] = time.Now()
 
-	// Cancel existing sync for this specific folder if any
-	if slot, exists := a.syncContexts[syncKey]; exists {
+	if _, exists := a.syncContexts[syncKey]; exists {
 		log.Debug().Str("account", accountID).Str("folder", folderID).Msg("Cancelling existing sync for restart")
-		slot.cancel()
-		// Small delay to let goroutines clean up
-		a.syncMu.Unlock()
-		time.Sleep(100 * time.Millisecond)
-		a.syncMu.Lock()
 	}
-
-	ctx, release := a.registerFolderSyncLocked(syncKey)
+	ctx, release := a.replaceFolderSyncLocked(syncKey, slotReleaseWait)
 
 	a.syncMu.Unlock()
 
@@ -408,7 +401,12 @@ func (a *App) SyncAllComplete() error {
 // release checks, so a replaced sync never removes its successor's entry.
 type syncSlot struct {
 	cancel context.CancelFunc
+	done   chan struct{} // closed by the slot's release
 }
+
+// slotReleaseWait caps how long SyncFolder waits for a cancelled sync to
+// release its slot before replacing it anyway.
+const slotReleaseWait = 5 * time.Second
 
 // beginFolderSync claims the sync slot for key unless a sync already holds
 // it. release cancels ctx and frees the slot if this call still owns it.
@@ -430,17 +428,40 @@ func (a *App) registerFolderSyncLocked(key string) (context.Context, func()) {
 		old.cancel()
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
-	slot := &syncSlot{cancel: cancel}
+	slot := &syncSlot{cancel: cancel, done: make(chan struct{})}
 	a.syncContexts[key] = slot
-	release := func() {
+	release := gosync.OnceFunc(func() {
 		cancel()
 		a.syncMu.Lock()
 		defer a.syncMu.Unlock()
 		if a.syncContexts[key] == slot {
 			delete(a.syncContexts, key)
 		}
-	}
+		close(slot.done)
+	})
 	return ctx, release
+}
+
+// replaceFolderSyncLocked cancels the sync registered under key, if any, and
+// waits up to maxWait for it to release its slot, so the two syncs don't
+// overlap; then it registers a new sync as registerFolderSyncLocked does.
+// The caller holds syncMu, which is dropped while waiting.
+func (a *App) replaceFolderSyncLocked(key string, maxWait time.Duration) (context.Context, func()) {
+	timeout := time.NewTimer(maxWait)
+	defer timeout.Stop()
+	// Re-check after each wait: another sync may have claimed the slot.
+	for old, ok := a.syncContexts[key]; ok; old, ok = a.syncContexts[key] {
+		old.cancel()
+		a.syncMu.Unlock()
+		select {
+		case <-old.done:
+			a.syncMu.Lock()
+		case <-timeout.C:
+			a.syncMu.Lock()
+			return a.registerFolderSyncLocked(key)
+		}
+	}
+	return a.registerFolderSyncLocked(key)
 }
 
 // syncPeriodDays returns the account's sync period, or the 30-day default

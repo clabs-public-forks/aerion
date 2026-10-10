@@ -46,12 +46,6 @@ has not yet been confirmed against the code.
   folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
   which would also retire the 30 s throttle state; cheaper: a shorter Sent
   poll interval.
-- **M8 low** `app/sync.go` `SyncFolder`: after cancelling an existing slot it
-  drops `syncMu` for a 100 ms sleep. In that window the cancelled slot still
-  looks busy, so `beginFolderSync` (IDLE body fetch) skips its work, and a
-  caller that claims the slot is then cancelled by `registerFolderSyncLocked`.
-  Present before the issues pass. Fix: wait for the cancelled slot's release
-  instead of sleeping, or re-check the slot after relocking.
 - **M9 low** `app/idle_sent.go` `syncSentAfterIdle`: whether to emit
   `sent:synced` is guessed by comparing the folder's highest UID, message
   count and UIDVALIDITY before and after the sync. A sync that only fetches
