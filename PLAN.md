@@ -68,7 +68,7 @@ removing its fixed entry from ISSUES.md. Land the branch after the last one.
 ## Progress
 
 - [x] 1. M2: stop consuming a FETCH after a failed literal read
-- [ ] 2. M7: read each body once in the embedded-attachment backfill
+- [x] 2. M7: read each body once in the embedded-attachment backfill
 - [ ] 3. M8: SyncFolder waits for the cancelled slot instead of sleeping
 - [ ] 4. M9: report Sent changes from the engine instead of snapshots
 

@@ -46,12 +46,6 @@ has not yet been confirmed against the code.
   folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
   which would also retire the 30 s throttle state; cheaper: a shorter Sent
   poll interval.
-- **M7 low** `internal/database/backfill.go` `backfillEmbeddedAttachments`
-  (migration 49): the query joins `body_html` onto every inline attachment
-  row, so a message with several inline parts has its whole body read once
-  per part, all inside the migration transaction. A large mailbox can stall
-  the first startup after upgrading. Fix: select the distinct messages with
-  inline parts first, read each body once, then match its parts.
 - **M8 low** `app/sync.go` `SyncFolder`: after cancelling an existing slot it
   drops `syncMu` for a 100 ms sleep. In that window the cancelled slot still
   looks busy, so `beginFolderSync` (IDLE body fetch) skips its work, and a

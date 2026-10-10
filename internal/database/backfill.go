@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/hkdb/aerion/internal/cid"
@@ -11,38 +12,54 @@ import (
 // Content-ID their message's body_html embeds, then recomputes
 // has_attachments for those messages from the parts left listed.
 func backfillEmbeddedAttachments(tx *sql.Tx) error {
+	// Collect the parts first, without bodies: body_html can be large, and a
+	// join would read it once per inline part rather than once per message.
+	type inlinePart struct{ id, messageID, contentID string }
 	rows, err := tx.Query(`
-		SELECT a.id, a.message_id, a.content_id, m.body_html
-		FROM attachments a
-		JOIN messages m ON m.id = a.message_id
-		WHERE a.is_inline = 1 AND a.content_id IS NOT NULL AND a.content_id != ''
-		ORDER BY a.message_id
+		SELECT id, message_id, content_id FROM attachments
+		WHERE is_inline = 1 AND content_id IS NOT NULL AND content_id != ''
+		ORDER BY message_id
 	`)
 	if err != nil {
 		return fmt.Errorf("query inline parts: %w", err)
 	}
-	var embeddedIDs []string
-	var lastMessageID string
-	var embedded map[string]struct{}
+	var parts []inlinePart
 	for rows.Next() {
-		var id, messageID, contentID string
-		var bodyHTML sql.NullString
-		if err := rows.Scan(&id, &messageID, &contentID, &bodyHTML); err != nil {
+		var p inlinePart
+		if err := rows.Scan(&p.id, &p.messageID, &p.contentID); err != nil {
 			rows.Close()
 			return fmt.Errorf("scan inline part: %w", err)
 		}
-		if messageID != lastMessageID {
-			lastMessageID = messageID
-			embedded = cid.Embedded(bodyHTML.String)
-		}
-		if _, ok := embedded[contentID]; ok {
-			embeddedIDs = append(embeddedIDs, id)
-		}
+		parts = append(parts, p)
 	}
 	err = rows.Err()
 	rows.Close()
 	if err != nil {
 		return fmt.Errorf("read inline parts: %w", err)
+	}
+
+	bodyStmt, err := tx.Prepare(`SELECT body_html FROM messages WHERE id = ?`)
+	if err != nil {
+		return fmt.Errorf("prepare body read: %w", err)
+	}
+	defer bodyStmt.Close()
+	var embeddedIDs []string
+	var lastMessageID string
+	var embedded map[string]struct{}
+	for _, p := range parts {
+		if p.messageID != lastMessageID {
+			lastMessageID = p.messageID
+			var bodyHTML sql.NullString
+			// A part whose message is gone has nothing to embed it.
+			err := bodyStmt.QueryRow(p.messageID).Scan(&bodyHTML)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("read body of %s: %w", p.messageID, err)
+			}
+			embedded = cid.Embedded(bodyHTML.String)
+		}
+		if _, ok := embedded[p.contentID]; ok {
+			embeddedIDs = append(embeddedIDs, p.id)
+		}
 	}
 
 	markStmt, err := tx.Prepare(`UPDATE attachments SET embedded = 1 WHERE id = ?`)
