@@ -19,6 +19,16 @@ has not yet been confirmed against the code.
   imports: EXT_RULES R1, R2 and R5. The bridge gets a token closure and the
   core DB, and the extension imports `internal/*`. This is architectural
   (see C12).
+- **A5 low** `app/compose.go` OAuth token path: every refresh failure emits
+  `oauth:reauth-required` and reports "re-authorization required", although
+  only `oauth2.ErrInvalidGrant` needs a new consent; a network error or a
+  provider outage prompts a pointless re-auth. Also, `oauth2.GetProvider`
+  returns a provider with an empty `ClientID` when no credentials are
+  configured, so `RefreshTokenWithProvider` posts no `client_id` and Google
+  answers `invalid_request - Could not determine client ID from request`
+  (seen on every launch of a dev build without OAuth credentials in `.env`;
+  re-auth cannot fix it). Fail early with a "not configured" error, as
+  `StartAuthFlowWithProvider` does, and prompt only on `ErrInvalidGrant`.
 
 ### Contacts
 
