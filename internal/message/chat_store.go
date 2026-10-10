@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -70,6 +72,9 @@ type DueSnooze struct {
 	AccountID  string
 	ThreadKey  string
 	WokeByMail bool // a new inbox message arrived during the snooze
+	// The thread now belongs to a sender chat, so it has no chat row of its
+	// own; its snooze ends without a wake-up.
+	InSenderChat bool
 
 	// Latest inbox message of the thread; empty when none remain.
 	LatestMessageID string
@@ -96,15 +101,22 @@ func threadKeyArgs(key string) []any {
 	return []any{key, "<" + key + ">", key}
 }
 
-// threadKeysMatch is threadKeyMatch for a JSON array of keys; it takes args
-// threadKeysArgs(keysJSON) and avoids SQLite's variable limit.
+// threadKeysMatch is threadKeyMatch for many keys, passed as one JSON array;
+// it takes args threadKeysArgs(keys) and avoids SQLite's variable limit.
 func threadKeysMatch(prefix string) string {
 	return fmt.Sprintf(`(%[1]sthread_id IN (SELECT value FROM json_each(?) UNION ALL SELECT '<' || value || '>' FROM json_each(?))
 		OR (%[1]sthread_id IS NULL AND %[1]sid IN (SELECT value FROM json_each(?))))`, prefix)
 }
 
-func threadKeysArgs(keysJSON string) []any {
-	return []any{keysJSON, keysJSON, keysJSON}
+func threadKeysArgs(keys []string) []any {
+	j := keysJSON(keys)
+	return []any{j, j, j}
+}
+
+// keysJSON encodes keys as a JSON array for json_each.
+func keysJSON(keys []string) string {
+	b, _ := json.Marshal(keys) // a []string always encodes
+	return string(b)
 }
 
 // chatKeyRows maps messages to chat keys. It selects (mid, thread_key,
@@ -188,7 +200,7 @@ var chatListColumns = `
 				MIN(` + isLowExpr + `) AS is_low,
 				MAX(REPLACE(SUBSTR(m.received_at, 1, 19), 'T', ' ')) AS latest_received,
 				` + recipientsJSONExpr + ` AS recipients_json,
-				json_group_array(DISTINCT ck.thread_key) AS thread_keys,
+				CASE WHEN ` + isSenderKey("ck.chat_key") + ` THEN json_group_array(DISTINCT ck.thread_key) END AS thread_keys,
 				CASE WHEN ` + isSenderKey("ck.chat_key") + ` THEN MAX(m.date || char(31) || COALESCE(m.subject, '')) END AS latest_subject
 `
 
@@ -295,11 +307,17 @@ func (s *Store) ListChats(scope, section string, now time.Time, offset, limit in
 		c.Snippet = snippet.String
 		c.SenderEmail = senderOfChatKey(c.ThreadKey)
 		if latestSubject.Valid {
-			// date, U+001F, subject: the newest message's subject.
+			// date, U+001F, subject: the newest message's subject. Dates
+			// share one storage format, so text order is date order.
 			_, c.Subject, _ = strings.Cut(latestSubject.String, "\x1f")
 		}
-		if err := json.Unmarshal([]byte(threadKeys.String), &c.threadKeys); err != nil {
-			return nil, fmt.Errorf("failed to parse chat thread keys: %w", err)
+		// Only sender chats aggregate their thread keys; a thread chat's
+		// key is its one thread key.
+		c.threadKeys = []string{c.ThreadKey}
+		if threadKeys.Valid {
+			if err := json.Unmarshal([]byte(threadKeys.String), &c.threadKeys); err != nil {
+				return nil, fmt.Errorf("failed to parse chat thread keys: %w", err)
+			}
 		}
 		if latestDate.String != "" {
 			c.LatestDate = parseTimeString(latestDate.String)
@@ -362,6 +380,7 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 
 	var results []*ChatSearchResult
 	byChat := map[string]*ChatSearchResult{}
+	senderFirst := map[string]*ChatSearchResult{} // first thread key -> sender chat
 	byThread := make([]*ChatSearchResult, len(found))
 	for i, c := range found {
 		chatKey, ok := chatKeys[keys[i]]
@@ -375,6 +394,7 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 			r.IsStarred = r.IsStarred || c.IsStarred
 			r.IsEncrypted = r.IsEncrypted || c.IsEncrypted
 			r.MessageIDs = append(r.MessageIDs, c.MessageIDs...)
+			r.Participants = mergeParticipants(r.Participants, c.Participants)
 			byThread[i] = r
 			continue
 		}
@@ -382,6 +402,12 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 		byChat[chatKey] = r
 		byThread[i] = r
 		results = append(results, r)
+		if r.SenderEmail != "" {
+			senderFirst[keys[i]] = r
+		}
+	}
+	if err := s.fillLatestSubjects(folderID, query, senderFirst); err != nil {
+		return nil, err
 	}
 	if found[0].FolderType != "sent" {
 		return results, nil
@@ -394,7 +420,6 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 	for i, r := range byThread {
 		if seen[r] == nil {
 			seen[r] = map[string]bool{}
-			r.Recipients = recipients[keys[i]][:0:0] // keeps empty vs absent
 		}
 		for _, a := range recipients[keys[i]] {
 			email := strings.ToLower(a.Email)
@@ -408,15 +433,51 @@ func (s *Store) SearchChats(folderID, query string, offset, limit int, filter st
 	return results, nil
 }
 
+// fillLatestSubjects gives each sender chat result the subject of its newest
+// message, as ListChats does. Results are newest first, so that message is in
+// the result's first thread; first maps that thread's key to its result.
+func (s *Store) fillLatestSubjects(folderID, query string, first map[string]*ChatSearchResult) error {
+	if len(first) == 0 {
+		return nil
+	}
+	rows, err := s.db.Query(`
+		SELECT `+threadKeyExpr("m.")+` AS thread_key, MAX(m.date || char(31) || COALESCE(m.subject, ''))
+		FROM messages m
+		WHERE m.folder_id = ? AND `+threadKeysMatch("m.")+`
+		GROUP BY thread_key`, append([]any{folderID}, threadKeysArgs(slices.Collect(maps.Keys(first)))...)...)
+	if err != nil {
+		return fmt.Errorf("failed to query latest subjects: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key, latest string
+		if err := rows.Scan(&key, &latest); err != nil {
+			return fmt.Errorf("failed to scan latest subject: %w", err)
+		}
+		if r := first[key]; r != nil {
+			_, r.Subject, _ = strings.Cut(latest, "\x1f")
+			r.HighlightedSubject = highlightMatches(r.Subject, query)
+		}
+	}
+	return rows.Err()
+}
+
+// mergeParticipants appends the addresses in more not already in list,
+// comparing emails case-insensitively.
+func mergeParticipants(list, more []Address) []Address {
+	for _, a := range more {
+		if !slices.ContainsFunc(list, func(b Address) bool { return strings.EqualFold(a.Email, b.Email) }) {
+			list = append(list, a)
+		}
+	}
+	return list
+}
+
 // threadChatKeys returns the sender chat key of each given thread that maps
 // to one within the scope cond (with one arg, scopeArg); other threads are
 // absent.
 func (s *Store) threadChatKeys(cond string, scopeArg any, keys []string) (map[string]string, error) {
-	keysJSON, err := json.Marshal(keys)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode thread keys: %w", err)
-	}
-	args := append([]any{scopeArg}, threadKeysArgs(string(keysJSON))...)
+	args := append([]any{scopeArg}, threadKeysArgs(keys)...)
 	rows, err := s.db.Query(`
 		SELECT DISTINCT ck.thread_key, ck.chat_key
 		FROM (`+chatKeyRows(cond+" AND "+threadKeysMatch("m."))+`) ck
@@ -439,17 +500,12 @@ func (s *Store) threadChatKeys(cond string, scopeArg any, keys []string) (map[st
 // threadRecipients returns the Sent recipients of threads in a folder, by
 // thread key, aggregated as in the chat list.
 func (s *Store) threadRecipients(folderID string, keys []string) (map[string][]Address, error) {
-	conds := make([]string, len(keys))
-	args := []any{folderID}
-	for i, key := range keys {
-		conds[i] = threadKeyMatch("m.")
-		args = append(args, threadKeyArgs(key)...)
-	}
+	args := append([]any{folderID}, threadKeysArgs(keys)...)
 	query := `
 		SELECT ` + threadKeyExpr("m.") + ` AS thread_key, ` + recipientsJSONExpr + `
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id
-		WHERE m.folder_id = ? AND (` + strings.Join(conds, " OR ") + `)
+		WHERE m.folder_id = ? AND ` + threadKeysMatch("m.") + `
 		GROUP BY thread_key`
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -517,30 +573,23 @@ func (s *Store) fillLastFromMe(chats []*Chat) error {
 	}
 	rows.Close()
 
-	// Latest Sent date per chat on this page. Thread chats match their key
-	// directly so the thread_id index is used; sender chats pass their
-	// thread keys as one JSON array.
+	// Latest Sent date per chat on this page, matching each account's thread
+	// keys as one JSON array.
 	type threadRef struct{ accountID, key string }
 	chatOf := map[threadRef]*Chat{}
-	conds := make([]string, 0, len(chats))
-	args := make([]any, 0, len(chats)*4)
+	keysOf := map[string][]string{}
 	for _, c := range chats {
 		for _, k := range c.threadKeys {
 			chatOf[threadRef{c.AccountID, k}] = c
+			keysOf[c.AccountID] = append(keysOf[c.AccountID], k)
 		}
-		if c.SenderEmail == "" {
-			conds = append(conds, "(m.account_id = ? AND "+threadKeyMatch("m.")+")")
-			args = append(args, c.AccountID)
-			args = append(args, threadKeyArgs(c.ThreadKey)...)
-			continue
-		}
-		keys, err := json.Marshal(c.threadKeys)
-		if err != nil {
-			return fmt.Errorf("failed to encode chat thread keys: %w", err)
-		}
+	}
+	conds := make([]string, 0, len(keysOf))
+	args := make([]any, 0, len(keysOf)*4)
+	for accountID, keys := range keysOf {
 		conds = append(conds, "(m.account_id = ? AND "+threadKeysMatch("m.")+")")
-		args = append(args, c.AccountID)
-		args = append(args, threadKeysArgs(string(keys))...)
+		args = append(args, accountID)
+		args = append(args, threadKeysArgs(keys)...)
 	}
 	rows, err = s.db.Query(`
 		SELECT m.account_id, `+threadKeyExpr("m.")+` AS k, m.date
@@ -650,7 +699,8 @@ func (s *Store) ListDueSnoozes(now time.Time) ([]DueSnooze, error) {
 	}
 	rows, err := s.db.Query(`
 		SELECT account_id, thread_key, COALESCE(snoozed_at, 0) FROM conversation_state
-		WHERE snoozed_until IS NOT NULL AND snoozed_until <= ?`, now.Unix())
+		WHERE snoozed_until IS NOT NULL AND snoozed_until <= ?
+		ORDER BY account_id, thread_key`, now.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to query due snoozes: %w", err)
 	}
@@ -665,9 +715,33 @@ func (s *Store) ListDueSnoozes(now time.Time) ([]DueSnooze, error) {
 	}
 	rows.Close()
 
+	// Find thread snoozes now inside a sender chat, one query per account.
+	senderChats, err := s.hasSenderChats()
+	if err != nil {
+		return nil, err
+	}
+	inSenderChat := map[string]map[string]string{}
+	if senderChats {
+		threadKeys := map[string][]string{}
+		for _, d := range dues {
+			if senderOfChatKey(d.threadKey) == "" {
+				threadKeys[d.accountID] = append(threadKeys[d.accountID], d.threadKey)
+			}
+		}
+		for accountID, keys := range threadKeys {
+			if inSenderChat[accountID], err = s.threadChatKeys("f.folder_type = 'inbox' AND f.account_id = ?", accountID, keys); err != nil {
+				return nil, err
+			}
+		}
+	}
 	result := make([]DueSnooze, 0, len(dues))
 	for _, d := range dues {
 		ds := DueSnooze{AccountID: d.accountID, ThreadKey: d.threadKey}
+		if inSenderChat[d.accountID][d.threadKey] != "" {
+			ds.InSenderChat = true
+			result = append(result, ds)
+			continue
+		}
 		var threadID, fromName, fromEmail sql.NullString
 		var woke bool
 		// A sender chat's latest message is found across its mapped threads.
@@ -697,8 +771,9 @@ func (s *Store) ListDueSnoozes(now time.Time) ([]DueSnooze, error) {
 }
 
 // CleanupChatState deletes pin/snooze rows whose thread has no messages left,
-// and sender chat rows whose sender is no longer combined or whose sender
-// chat has no inbox messages left.
+// and sender chat rows whose sender is no longer combined. A combined
+// sender's state is kept while its chat has no inbox mail, since it shows
+// again when mail arrives.
 func (s *Store) CleanupChatState() (int64, error) {
 	threads, err := s.db.Exec(`
 		DELETE FROM conversation_state
@@ -715,10 +790,10 @@ func (s *Store) CleanupChatState() (int64, error) {
 	senders, err := s.db.Exec(`
 		DELETE FROM conversation_state
 		WHERE ` + isSenderKey("thread_key") + `
-			AND (account_id, thread_key) NOT IN (
-				SELECT DISTINCT ck.account_id, ck.chat_key
-				FROM (` + chatKeyRows("f.folder_type = 'inbox' AND f.account_id IN (SELECT account_id FROM sender_chat)") + `) ck
-				WHERE ` + isSenderKey("ck.chat_key") + `
+			AND NOT EXISTS (
+				SELECT 1 FROM sender_chat sch
+				WHERE sch.account_id = conversation_state.account_id
+					AND '` + SenderChatPrefix + `' || sch.email = conversation_state.thread_key
 			)`)
 	if err != nil {
 		return 0, fmt.Errorf("failed to clean up sender chat state: %w", err)

@@ -1,7 +1,6 @@
 package message
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -24,15 +23,10 @@ func (s *Store) GetSenderConversation(accountID, email, folderID string) (*Conve
 	}
 	chatKey := SenderChatKey(email)
 
-	keys, err := s.senderChatThreadKeys(cond, scopeArgs, chatKey)
+	keys, err := s.senderChatThreadKeys(cond, scopeArgs, accountID, email)
 	if err != nil || len(keys) == 0 {
 		return nil, err
 	}
-	b, err := json.Marshal(keys)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode thread keys: %w", err)
-	}
-	keysJSON := string(b)
 
 	inScope := map[string]bool{}
 	rows, err := s.db.Query(`SELECT f.id FROM folders f WHERE `+cond, scopeArgs...)
@@ -55,16 +49,19 @@ func (s *Store) GetSenderConversation(accountID, email, folderID string) (*Conve
 
 	// Like GetConversation, also match messages whose Message-ID or
 	// In-Reply-To is a thread key, such as a reply stored without a thread ID.
-	args := append([]any{accountID}, threadKeysArgs(keysJSON)...)
-	args = append(args, keysJSON, keysJSON)
+	// Matching the bare and bracketed forms keeps both columns' indexes usable.
+	const bracketedKeys = `SELECT value FROM json_each(?) UNION ALL SELECT '<' || value || '>' FROM json_each(?)`
+	args := append([]any{accountID}, threadKeysArgs(keys)...)
+	j := keysJSON(keys)
+	args = append(args, j, j, j, j)
 	args = append(args, scopeArgs...)
 	rows, err = s.db.Query(`
 		SELECT `+conversationColumns+`
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id
 		WHERE m.account_id = ? AND (`+threadKeysMatch("m.")+`
-			OR REPLACE(REPLACE(m.message_id, '<', ''), '>', '') IN (SELECT value FROM json_each(?))
-			OR REPLACE(REPLACE(m.in_reply_to, '<', ''), '>', '') IN (SELECT value FROM json_each(?)))
+			OR m.message_id IN (`+bracketedKeys+`)
+			OR m.in_reply_to IN (`+bracketedKeys+`))
 			AND ((`+cond+`) OR f.folder_type IN ('sent', 'drafts'))
 		ORDER BY m.date ASC`, args...)
 	if err != nil {
@@ -105,22 +102,47 @@ func (s *Store) GetSenderConversation(accountID, email, folderID string) (*Conve
 }
 
 // senderChatThreadKeys returns the thread keys in scope cond (with
-// scopeArgs) that map to chatKey.
-func (s *Store) senderChatThreadKeys(cond string, scopeArgs []any, chatKey string) ([]string, error) {
-	rows, err := s.db.Query(`
-		SELECT DISTINCT ck.thread_key FROM (`+chatKeyRows(cond)+`) ck
-		WHERE ck.chat_key = ?`, append(slices.Clone(scopeArgs), chatKey)...)
+// scopeArgs) that map to chatKey. Only a combined sender's threads can, and
+// only those holding a message from the sender, so the starter check runs
+// over those threads alone.
+func (s *Store) senderChatThreadKeys(cond string, scopeArgs []any, accountID, email string) ([]string, error) {
+	combined, err := s.IsSenderChat(accountID, email)
+	if err != nil || !combined {
+		return nil, err
+	}
+	key := threadKeyExpr("m.")
+	candidates, err := s.queryStrings(`
+		SELECT DISTINCT `+key+` FROM messages m
+		INNER JOIN folders f ON m.folder_id = f.id
+		WHERE `+cond+` AND LOWER(m.from_email) = ?`, append(slices.Clone(scopeArgs), email)...)
+	if err != nil || len(candidates) == 0 {
+		return nil, err
+	}
+	args := append(slices.Clone(scopeArgs), threadKeysArgs(candidates)...)
+	return s.queryStrings(`
+		SELECT thread_key FROM (
+			SELECT `+key+` AS thread_key, LOWER(m.from_email) AS sender,
+				ROW_NUMBER() OVER (PARTITION BY `+key+` ORDER BY m.date, m.id) AS n
+			FROM messages m
+			INNER JOIN folders f ON m.folder_id = f.id
+			WHERE `+cond+` AND `+threadKeysMatch("m.")+`
+		) WHERE n = 1 AND sender = ?`, append(args, email)...)
+}
+
+// queryStrings runs a query selecting one text column.
+func (s *Store) queryStrings(query string, args ...any) ([]string, error) {
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sender chat threads: %w", err)
 	}
 	defer rows.Close()
-	var keys []string
+	var out []string
 	for rows.Next() {
-		var key string
-		if err := rows.Scan(&key); err != nil {
+		var v string
+		if err := rows.Scan(&v); err != nil {
 			return nil, fmt.Errorf("failed to scan thread key: %w", err)
 		}
-		keys = append(keys, key)
+		out = append(out, v)
 	}
-	return keys, rows.Err()
+	return out, rows.Err()
 }

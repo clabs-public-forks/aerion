@@ -302,3 +302,14 @@ func TestChatReplyEmpty(t *testing.T) {
 		t.Error("SendChatReply with empty text: want error")
 	}
 }
+
+// SetSenderChat refuses an unknown account before writing anything.
+func TestSetSenderChatUnknownAccount(t *testing.T) {
+	a := newChatReplyTestApp(t)
+	if err := a.SetSenderChat("nope", "bob@example.com", true); err == nil {
+		t.Fatal("SetSenderChat for unknown account: want error")
+	}
+	if on, err := a.messageStore.IsSenderChat("nope", "bob@example.com"); err != nil || on {
+		t.Errorf("IsSenderChat = %v, %v; want false", on, err)
+	}
+}

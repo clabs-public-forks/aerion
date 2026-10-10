@@ -496,7 +496,7 @@ func TestSearchChatsSentRecipients(t *testing.T) {
 		{"sent thread merges recipients", "sent-1", "quarterly", map[string][]Address{
 			"<q@x>": {{"Dana", "dana@example.com"}, {"Eve", "eve@example.com"}},
 		}},
-		{"invalid to list", "sent-1", "roadmap", map[string][]Address{"r1": {}}},
+		{"invalid to list", "sent-1", "roadmap", map[string][]Address{"r1": nil}},
 		{"inbox has none", inboxID, "quarterly", map[string][]Address{"<q@x>": nil}},
 		{"no match", "sent-1", "nothingmatches", map[string][]Address{}},
 	}

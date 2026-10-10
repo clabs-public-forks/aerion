@@ -36,6 +36,9 @@ func TestGetSenderConversation(t *testing.T) {
 		// A reply stored without a thread ID, matched by In-Reply-To.
 		{ID: "r3", AccountID: accountID, FolderID: "sent-1", UID: 302, InReplyTo: "<t@x>", Subject: "Re: Forum post",
 			FromEmail: "test@example.com", Date: now.Add(-15 * time.Hour), IsRead: true},
+		// The same, with an unbracketed In-Reply-To.
+		{ID: "r4", AccountID: accountID, FolderID: "sent-1", UID: 303, InReplyTo: "t@x", Subject: "Re: Forum post",
+			FromEmail: "test@example.com", Date: now.Add(-14*time.Hour - 30*time.Minute), IsRead: true},
 	} {
 		if err := s.Create(m); err != nil {
 			t.Fatal(err)
@@ -47,7 +50,7 @@ func TestGetSenderConversation(t *testing.T) {
 		}
 	}
 
-	all := []string{"n1", "n2", "n3", "t1", "t2", "r1", "r3"}
+	all := []string{"n1", "n2", "n3", "t1", "t2", "r1", "r3", "r4"}
 	tests := []struct {
 		name, account, email, folder string
 		want                         []string
@@ -84,7 +87,7 @@ func TestGetSenderConversation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.UnreadCount != 3 || c.Subject != "Re: Forum post" || !c.LatestDate.Equal(now.Add(-15*time.Hour)) {
+	if c.UnreadCount != 3 || c.Subject != "Re: Forum post" || !c.LatestDate.Equal(now.Add(-14*time.Hour - 30*time.Minute)) {
 		t.Errorf("UnreadCount, Subject, LatestDate = %d, %q, %v", c.UnreadCount, c.Subject, c.LatestDate)
 	}
 	var senders []string

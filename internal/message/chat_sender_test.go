@@ -262,6 +262,26 @@ func TestSenderChatSearch(t *testing.T) {
 			r.ThreadKey, r.SenderEmail, r.MessageCount, r.UnreadCount, ids, lmsKey, lms)
 	}
 
+	// The merged row takes its newest message's subject and every thread's
+	// participants.
+	results, err = s.SearchChats(inboxID, "post", 0, 50, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("results = %d, want 1 merged sender chat", len(results))
+	}
+	r = results[0]
+	var emails []string
+	for _, p := range r.Participants {
+		emails = append(emails, p.Email)
+	}
+	sort.Strings(emails)
+	if r.Subject != "Re: Forum post" || r.HighlightedSubject == "" || r.MessageCount != 4 ||
+		!reflect.DeepEqual(emails, []string{"carol@example.com", lms}) {
+		t.Errorf("result = subject %q highlighted %q count %d participants %v", r.Subject, r.HighlightedSubject, r.MessageCount, emails)
+	}
+
 	results, err = s.SearchChats(inboxID, "question", 0, 50, "")
 	if err != nil {
 		t.Fatal(err)
@@ -276,15 +296,24 @@ func TestSenderChatDueSnooze(t *testing.T) {
 	if err := s.SetSenderChat(accountID, lms, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetChatState(accountID, lmsKey, ChatState{SnoozedUntil: ptr(now.Add(-time.Minute)), SnoozedAt: ptr(now.Add(-17 * time.Hour))}); err != nil {
-		t.Fatal(err)
+	// t@x maps to the sender chat; o@x, started by alice, keeps its own row.
+	snoozed := ChatState{SnoozedUntil: ptr(now.Add(-time.Minute)), SnoozedAt: ptr(now.Add(-17 * time.Hour))}
+	for _, key := range []string{lmsKey, "t@x", "o@x"} {
+		if err := s.SetChatState(accountID, key, snoozed); err != nil {
+			t.Fatal(err)
+		}
 	}
 	due, err := s.ListDueSnoozes(now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []DueSnooze{{AccountID: accountID, ThreadKey: lmsKey, WokeByMail: true, LatestMessageID: "t2", FolderID: inboxID,
-		ThreadID: "<t@x>", Subject: "Re: Forum post", FromEmail: "carol@example.com"}}
+	want := []DueSnooze{
+		{AccountID: accountID, ThreadKey: "o@x", WokeByMail: true, LatestMessageID: "o2", FolderID: inboxID,
+			ThreadID: "<o@x>", Subject: "Re: Question", FromEmail: lms},
+		{AccountID: accountID, ThreadKey: lmsKey, WokeByMail: true, LatestMessageID: "t2", FolderID: inboxID,
+			ThreadID: "<t@x>", Subject: "Re: Forum post", FromEmail: "carol@example.com"},
+		{AccountID: accountID, ThreadKey: "t@x", InSenderChat: true},
+	}
 	if !reflect.DeepEqual(due, want) {
 		t.Errorf("due = %+v, want %+v", due, want)
 	}
@@ -311,7 +340,11 @@ func TestSenderChatCleanup(t *testing.T) {
 		removed int64
 		kept    bool // sender chat state for lms
 	}{
-		{"flag set with messages keeps state, no-message sender dropped", func() error { return nil }, 1, true},
+		{"combined senders keep state, with or without messages", func() error { return nil }, 0, true},
+		{"messages leaving the inbox keep state", func() error {
+			_, err := s.db.Exec(`UPDATE messages SET folder_id = 'sent-1' WHERE from_email LIKE ?`, lms)
+			return err
+		}, 0, true},
 		{"flag off drops state", func() error { return s.SetSenderChat(accountID, lms, false) }, 1, false},
 	}
 	for _, st := range steps {

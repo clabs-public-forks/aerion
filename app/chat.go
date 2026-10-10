@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -106,6 +107,13 @@ func (a *App) SetSenderChat(accountID, email string, combined bool) error {
 	if email == "" {
 		return fmt.Errorf("sender email is required")
 	}
+	acc, err := a.accountStore.Get(accountID)
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return fmt.Errorf("account %s not found", accountID)
+	}
 	a.chatStateMu.Lock()
 	defer a.chatStateMu.Unlock()
 	previous, err := a.messageStore.IsSenderChat(accountID, email)
@@ -133,19 +141,29 @@ func (a *App) SetSenderChat(accountID, email string, combined bool) error {
 }
 
 // applySenderChat sets the combine flag. Combining writes state to the sender
-// chat; splitting clears its state and draft link.
+// chat; splitting clears its state and draft link. If a later write fails,
+// the flag is set back so the chat keeps its previous form.
 func (a *App) applySenderChat(accountID, email string, combined bool, state message.ChatState) error {
 	if err := a.messageStore.SetSenderChat(accountID, email, combined); err != nil {
 		return err
 	}
 	key := message.SenderChatKey(email)
-	if combined {
-		return a.restoreChatState(accountID, key, state)
+	var err error
+	if !combined {
+		state = message.ChatState{}
+		err = a.draftStore.DeleteChatLink(accountID, key)
 	}
-	if err := a.draftStore.DeleteChatLink(accountID, key); err != nil {
-		return err
+	if err == nil {
+		err = a.restoreChatState(accountID, key, state)
 	}
-	return a.restoreChatState(accountID, key, message.ChatState{})
+	if err == nil {
+		return nil
+	}
+	if rbErr := a.messageStore.SetSenderChat(accountID, email, !combined); rbErr != nil {
+		return errors.Join(err, rbErr)
+	}
+	a.emitChatsChanged(accountID)
+	return err
 }
 
 // senderChatRestorer adapts App to undo.SenderChatRestorer without adding a
@@ -214,7 +232,10 @@ func (a *App) emitChatsChanged(accountID string) {
 func (a *App) initChatState() {
 	defer recoverPanic("app.chat", "init chat state")
 	log := logging.WithComponent("app.chat")
-	if n, err := a.messageStore.CleanupChatState(); err != nil {
+	a.chatStateMu.Lock()
+	n, err := a.messageStore.CleanupChatState()
+	a.chatStateMu.Unlock()
+	if err != nil {
 		log.Warn().Err(err).Msg("Failed to clean up chat state")
 	} else if n > 0 {
 		log.Info().Int64("rows", n).Msg("Removed chat state for deleted threads")
@@ -257,7 +278,9 @@ func (a *App) stopSnoozeTimer() {
 
 // wakeSnoozes ends due snoozes: it clears the snooze (keeping any pin),
 // marks the thread's latest inbox message unread, and notifies. Threads
-// already woken by new mail were announced by the new-mail notification.
+// already woken by new mail were announced by the new-mail notification;
+// threads now inside a sender chat have no row to wake, so their snooze is
+// only cleared.
 func (a *App) wakeSnoozes() {
 	defer recoverPanic("app.chat", "wake snoozed chats")
 	minWait := time.Second
@@ -278,6 +301,9 @@ func (a *App) wakeSnoozes() {
 			continue
 		}
 		if !cleared {
+			continue
+		}
+		if d.InSenderChat {
 			continue
 		}
 		a.emitChatsChanged(d.AccountID)

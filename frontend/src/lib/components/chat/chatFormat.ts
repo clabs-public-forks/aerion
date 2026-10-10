@@ -209,7 +209,8 @@ export interface ThreadItem {
   newDay: boolean
   // First message of a same-sender run: show avatar and name.
   groupStart: boolean
-  // Set where the subject changes (sender chats only): label the bubble.
+  // Set where the subject changes after the first (sender chats only):
+  // label the bubble.
   subject?: string
 }
 
@@ -221,16 +222,17 @@ function baseSubject(subject: string): string {
 }
 
 // buildThreadItems groups messages into bubble runs. labelSubjects (a
-// sender chat, which mixes threads) labels each subject change and starts a
-// new run there.
+// sender chat, which mixes threads) labels each change from the previous
+// non-empty subject and starts a new run there.
 export function buildThreadItems(messages: messageModels.Message[], labelSubjects = false): ThreadItem[] {
   const items: ThreadItem[] = []
   let prev: ThreadItem | null = null
   let prevBase: string | null = null
   for (const msg of messages) {
-    const base = labelSubjects ? baseSubject(msg.subject || '') : null
-    const subject = labelSubjects && base !== prevBase ? msg.subject || '' : undefined
-    prevBase = base
+    // The first subject and empty subjects get no label.
+    const base = labelSubjects ? baseSubject(msg.subject || '') : ''
+    const subject = base && prevBase !== null && base !== prevBase ? msg.subject : undefined
+    if (base) prevBase = base
     const date = new Date(msg.date)
     const mine = !!msg.mine
     const newDay = !prev || dayKey(prev.date) !== dayKey(date)

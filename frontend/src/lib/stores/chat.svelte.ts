@@ -111,7 +111,8 @@ export function senderEmailOf(threadId: string | null | undefined): string {
 }
 
 // mergeRows appends a page, folding a row whose chat is already listed into
-// it: SearchChats merges a sender chat's threads only within one page.
+// it: SearchChats merges a sender chat's threads only within one page. The
+// folded row keeps the newer row's subject and snippet.
 function mergeRows(items: ChatItem[], page: ChatItem[]): ChatItem[] {
   const byKey = new Map(items.map((c, i) => [c.key, i]))
   const out = [...items]
@@ -126,8 +127,16 @@ function mergeRows(items: ChatItem[], page: ChatItem[]): ChatItem[] {
     const have = new Set(o.messageIds)
     const ids = c.messageIds.filter((id) => !have.has(id))
     if (ids.length === 0) continue
+    const people = new Set(o.participants.map((p) => p.email.toLowerCase()))
+    const newer = c.latestDate > o.latestDate ? c : o
     out[i] = {
       ...o,
+      subject: newer.subject,
+      snippet: newer.snippet,
+      latestDate: newer.latestDate,
+      highlightedSubject: newer.highlightedSubject,
+      highlightedSnippet: newer.highlightedSnippet,
+      participants: [...o.participants, ...c.participants.filter((p) => !people.has(p.email.toLowerCase()))],
       messageIds: [...o.messageIds, ...ids],
       messageCount: o.messageCount + ids.length,
       unreadCount: o.unreadCount + c.unreadCount,
