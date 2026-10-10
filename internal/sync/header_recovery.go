@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
+	"fmt"
 	"net/mail"
 	"strings"
 	"time"
@@ -89,10 +89,11 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 				internalDate = data.Time
 			case imapclient.FetchItemDataBodySection:
 				if data.Literal != nil {
-					b, rerr := io.ReadAll(data.Literal)
+					b, rerr := readLiteral(data.Literal, maxMessageSize)
 					if rerr != nil {
-						e.log.Warn().Err(rerr).Uint32("uid", uint32(fetchedUID)).Msg("Failed to read header literal in recovery")
-						continue
+						// Don't consume the command further (see readLiteral).
+						client.Close()
+						return recovered, fmt.Errorf("%w: header literal for UID %d: %w", errStreamBroken, fetchedUID, rerr)
 					}
 					headerBytes = b
 				}
@@ -137,6 +138,7 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 			e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save recovered message header")
 			continue
 		}
+		e.changeSeq.bump(folderID)
 		recovered = append(recovered, m)
 	}
 

@@ -102,6 +102,9 @@ type Engine struct {
 	// reconciles and body fetches lock under separate key namespaces so a
 	// header sync never queues behind a long body download.
 	folderLocks folderLocks
+
+	// Per-folder count of stored-content changes (see FolderChangeSeq).
+	changeSeq folderChangeSeq
 }
 
 // NewEngine creates a new sync engine

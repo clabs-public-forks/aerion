@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"io"
 	"strings"
 
 	"github.com/emersion/go-imap/v2"
@@ -131,7 +130,6 @@ func fetchHeaderFields(ctx context.Context, client *imapclient.Client, uids imap
 		}},
 	})
 	out := make(map[uint32][]byte)
-	var readErr error
 	for {
 		if ctx.Err() != nil {
 			_ = cmd.Close()
@@ -152,10 +150,12 @@ func fetchHeaderFields(ctx context.Context, client *imapclient.Client, uids imap
 					continue
 				}
 				// A short read would classify the message from partial
-				// headers; fail the batch so its rows stay NULL.
+				// headers; fail the batch so its rows stay NULL, and don't
+				// consume the command further (see readLiteral).
 				var err error
-				if raw, err = io.ReadAll(data.Literal); err != nil && readErr == nil {
-					readErr = err
+				if raw, err = readLiteral(data.Literal, maxMessageSize); err != nil {
+					client.Close()
+					return nil, err
 				}
 			}
 		}
@@ -165,9 +165,6 @@ func fetchHeaderFields(ctx context.Context, client *imapclient.Client, uids imap
 	}
 	if err := cmd.Close(); err != nil {
 		return nil, err
-	}
-	if readErr != nil {
-		return nil, readErr
 	}
 	return out, nil
 }

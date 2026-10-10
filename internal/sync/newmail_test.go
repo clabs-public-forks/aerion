@@ -1,14 +1,12 @@
 package sync
 
 import (
-	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/hkdb/aerion/internal/account"
-	"github.com/hkdb/aerion/internal/database"
 	"github.com/hkdb/aerion/internal/folder"
 	"github.com/hkdb/aerion/internal/message"
 	"github.com/rs/zerolog"
@@ -18,23 +16,7 @@ import (
 // above the pre-sync highest UID or last UIDNEXT, and nothing on a first
 // sync or after a UIDVALIDITY change.
 func TestNewMail(t *testing.T) {
-	db, err := database.Open(filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatalf("database.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	if err := db.Migrate(); err != nil {
-		t.Fatalf("Migrate: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
-		VALUES ('acct-1', 'Test', 'me@example.com', 'imap.example.com', 'smtp.example.com', 'me')`); err != nil {
-		t.Fatalf("seed account: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO folders (id, account_id, name, path, folder_type)
-		VALUES ('inbox-1', 'acct-1', 'INBOX', 'INBOX', 'inbox')`); err != nil {
-		t.Fatalf("seed folder: %v", err)
-	}
-	store := message.NewStore(db)
+	store := newTestMessageStore(t)
 	s := &Scheduler{engine: &Engine{messageStore: store}, log: zerolog.Nop()}
 	acc := &account.Account{ID: "acct-1", Name: "Test"}
 	add := func(id string, uid uint32) {

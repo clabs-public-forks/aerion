@@ -3,8 +3,8 @@ package sync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"time"
@@ -105,6 +105,7 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 		if err := e.messageStore.DeleteByFolder(folderID); err != nil {
 			return fmt.Errorf("failed to delete messages: %w", err)
 		}
+		e.changeSeq.bump(folderID)
 		f.UIDValidity = mailbox.UIDValidity
 		// The old modseq refers to a different universe of UIDs after a
 		// mailbox recreation; treat this cycle as first-sync.
@@ -127,6 +128,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 			e.log.Warn().Err(err).Msg("Failed to delete old messages")
 		} else if deleted > 0 {
 			e.log.Info().Int("deleted", deleted).Msg("Deleted messages older than sync period")
+			// The deletion spans the account; this folder's readers are the
+			// ones comparing around this sync.
+			e.changeSeq.bump(folderID)
 		}
 	}
 
@@ -243,7 +247,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 
 		if err := e.messageStore.DeleteByUID(folderID, uid); err != nil {
 			e.log.Warn().Err(err).Uint32("uid", uid).Msg("Failed to delete message")
+			continue
 		}
+		e.changeSeq.bump(folderID)
 	}
 
 	// Sync flags for existing messages (messages that exist both locally and on server)
@@ -317,8 +323,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 					return ctx.Err()
 				}
 
-				// Check if this is a connection error
-				if imapPkg.IsConnectionError(err) {
+				// Check if this is a connection error. errStreamBroken means
+				// fetchMessageHeaders already closed the client.
+				if imapPkg.IsConnectionError(err) || errors.Is(err, errStreamBroken) {
 					headerConnectionFailures++
 					batchRetries++
 
@@ -753,7 +760,9 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 	// This allows cancellation between messages and prevents indefinite blocking
 	var savedMessages []*message.Message
 	fetchedCount := 0
+	var streamErr error
 
+fetchLoop:
 	for {
 		// Check for cancellation between messages
 		if ctx.Err() != nil {
@@ -800,9 +809,13 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 				// Read header bytes from literal reader
 				if data.Literal != nil {
 					var err error
-					headerBytes, err = io.ReadAll(data.Literal)
-					if err != nil {
-						e.log.Warn().Err(err).Uint32("uid", uint32(fetchedUID)).Msg("Failed to read header literal")
+					if headerBytes, err = readLiteral(data.Literal, maxMessageSize); err != nil {
+						// Skip this message and don't consume the command
+						// further (see readLiteral); the caller retries the
+						// batch on a new connection.
+						client.Close()
+						streamErr = fmt.Errorf("%w: header literal for UID %d: %w", errStreamBroken, fetchedUID, err)
+						break fetchLoop
 					}
 				}
 			}
@@ -859,11 +872,17 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 			e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save message header")
 			continue
 		}
+		e.changeSeq.bump(folderID)
 		savedMessages = append(savedMessages, m)
 		fetchedCount++
 	}
 
-	if err := fetchCmd.Close(); err != nil {
+	if streamErr != nil {
+		e.log.Warn().Err(streamErr).
+			Int("fetched", fetchedCount).
+			Int("requested", len(uids)).
+			Msg("Header fetch stream broken, keeping saved messages")
+	} else if err := fetchCmd.Close(); err != nil {
 		e.log.Warn().Err(err).
 			Int("fetched", fetchedCount).
 			Int("requested", len(uids)).
@@ -887,6 +906,9 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 			recovered, recErr := e.recoverFailedHeaderBatch(ctx, client, accountID, folderID, missing)
 			if recErr != nil {
 				e.log.Warn().Err(recErr).Msg("Header recovery returned error")
+				if errors.Is(recErr, errStreamBroken) {
+					streamErr = recErr
+				}
 			}
 			savedMessages = append(savedMessages, recovered...)
 			fetchedCount += len(recovered)
@@ -915,7 +937,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		}
 	}
 
-	return nil
+	return streamErr
 }
 
 /*

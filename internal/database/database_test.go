@@ -711,10 +711,12 @@ func TestMigrationV49_EmbeddedAttachments(t *testing.T) {
 		{"prefix-only", `<img src="cid:part10">`, 1},
 		{"no-inline", `<img src="cid:other">`, 1},
 		{"no-rows", `<img src="cid:logo@x">`, 1},
+		{"two-inline", `<img src="cid:ref@x">`, 1},
+		{"no-html", "", 1},
 	}
 	for i, m := range messages {
 		if _, err := db.Exec(`INSERT INTO messages (id, account_id, folder_id, uid, subject, from_name, from_email, date, body_html, has_attachments)
-			VALUES (?, 'acct-1', 'f-1', ?, 'S', 'A', 'a@x', CURRENT_TIMESTAMP, ?, ?)`, m.id, i+1, m.html, m.hasAtts); err != nil {
+			VALUES (?, 'acct-1', 'f-1', ?, 'S', 'A', 'a@x', CURRENT_TIMESTAMP, NULLIF(?, ''), ?)`, m.id, i+1, m.html, m.hasAtts); err != nil {
 			t.Fatalf("seed message %s: %v", m.id, err)
 		}
 	}
@@ -728,6 +730,9 @@ func TestMigrationV49_EmbeddedAttachments(t *testing.T) {
 		{"a-unref", "unreferenced-inline", "orphan@x", 1},
 		{"a-part1", "prefix-only", "part1", 1},
 		{"a-noinline", "no-inline", "other", 0},
+		{"a-two-ref", "two-inline", "ref@x", 1},
+		{"a-two-unref", "two-inline", "unref@x", 1},
+		{"a-nohtml", "no-html", "logo@x", 1},
 	}
 	for _, a := range atts {
 		if _, err := db.Exec(`INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline)
@@ -740,7 +745,8 @@ func TestMigrationV49_EmbeddedAttachments(t *testing.T) {
 		t.Fatalf("migrate to v49: %v", err)
 	}
 
-	wantEmbedded := map[string]int{"a-logo": 1, "a-logo2": 1, "a-pdf": 0, "a-unref": 0, "a-part1": 0, "a-noinline": 0}
+	wantEmbedded := map[string]int{"a-logo": 1, "a-logo2": 1, "a-pdf": 0, "a-unref": 0, "a-part1": 0, "a-noinline": 0,
+		"a-two-ref": 1, "a-two-unref": 0, "a-nohtml": 0}
 	for id, want := range wantEmbedded {
 		var got int
 		if err := db.QueryRow(`SELECT embedded FROM attachments WHERE id = ?`, id).Scan(&got); err != nil {
@@ -750,7 +756,8 @@ func TestMigrationV49_EmbeddedAttachments(t *testing.T) {
 			t.Errorf("attachment %s embedded = %d, want %d", id, got, want)
 		}
 	}
-	wantHasAtts := map[string]int{"logo-only": 0, "logo-and-pdf": 1, "unreferenced-inline": 1, "prefix-only": 1, "no-inline": 1, "no-rows": 1}
+	wantHasAtts := map[string]int{"logo-only": 0, "logo-and-pdf": 1, "unreferenced-inline": 1, "prefix-only": 1, "no-inline": 1, "no-rows": 1,
+		"two-inline": 1, "no-html": 1}
 	for id, want := range wantHasAtts {
 		var got int
 		if err := db.QueryRow(`SELECT has_attachments FROM messages WHERE id = ?`, id).Scan(&got); err != nil {

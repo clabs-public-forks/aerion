@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestBeginFolderSync(t *testing.T) {
@@ -52,4 +53,56 @@ func (a *App) hasSyncSlot(key string) bool {
 	defer a.syncMu.Unlock()
 	_, ok := a.syncContexts[key]
 	return ok
+}
+
+func TestReplaceFolderSyncWaitsForRelease(t *testing.T) {
+	const key = "acc:inbox"
+	tests := []struct {
+		name        string
+		releaseOld  bool // the old sync releases its slot once cancelled
+		maxWait     time.Duration
+		wantMinWait time.Duration
+	}{
+		{name: "old sync releases", releaseOld: true, maxWait: 10 * time.Second},
+		{name: "old sync hangs", maxWait: 50 * time.Millisecond, wantMinWait: 50 * time.Millisecond},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &App{ctx: context.Background(), syncContexts: make(map[string]*syncSlot)}
+			oldCtx, oldRelease, _ := a.beginFolderSync(key)
+			released := make(chan struct{})
+			go func() {
+				<-oldCtx.Done()
+				if tt.releaseOld {
+					time.Sleep(20 * time.Millisecond) // winding down
+					oldRelease()
+				}
+				close(released)
+			}()
+
+			start := time.Now()
+			a.syncMu.Lock()
+			ctx, release := a.replaceFolderSyncLocked(key, tt.maxWait)
+			a.syncMu.Unlock()
+			waited := time.Since(start)
+			<-released
+
+			if tt.releaseOld && waited >= tt.maxWait {
+				t.Fatalf("waited %v: want return on release, before the %v cap", waited, tt.maxWait)
+			}
+			if waited < tt.wantMinWait {
+				t.Fatalf("waited %v: want at least %v", waited, tt.wantMinWait)
+			}
+
+			// A late release by the old sync must not remove the new slot.
+			oldRelease()
+			if !a.hasSyncSlot(key) || ctx.Err() != nil {
+				t.Fatal("old release disturbed the new sync")
+			}
+			release()
+			if a.hasSyncSlot(key) {
+				t.Fatal("release left its own entry in place")
+			}
+		})
+	}
 }

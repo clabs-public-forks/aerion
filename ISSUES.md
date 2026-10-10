@@ -46,36 +46,6 @@ has not yet been confirmed against the code.
   folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
   which would also retire the 30 s throttle state; cheaper: a shorter Sent
   poll interval.
-- **M2 low, confirmed upstream** go-imap v2 `imapclient.fetchLiteralReader`
-  (beta.8 and HEAD c328f5e): when a FETCH literal read fails early (dropped
-  connection, read timeout), it releases the read goroutine while its inner
-  `LimitReader` still has bytes left. The next `Next`/`Close` then discards
-  them from the shared `bufio.Reader`, so the two goroutines race on it.
-  `fetchMessageBodiesBatch` now stops consuming after a failed literal. The
-  other literal readers in `internal/sync` (`bulk.go`, `header_recovery.go`,
-  `messages.go`, `search.go`, and `fetch.go`'s single-body fetch) still race.
-  Fix: apply the same stop there, or report the bug upstream and upgrade
-  once it is fixed.
-- **M7 low** `internal/database/backfill.go` `backfillEmbeddedAttachments`
-  (migration 49): the query joins `body_html` onto every inline attachment
-  row, so a message with several inline parts has its whole body read once
-  per part, all inside the migration transaction. A large mailbox can stall
-  the first startup after upgrading. Fix: select the distinct messages with
-  inline parts first, read each body once, then match its parts.
-- **M8 low** `app/sync.go` `SyncFolder`: after cancelling an existing slot it
-  drops `syncMu` for a 100 ms sleep. In that window the cancelled slot still
-  looks busy, so `beginFolderSync` (IDLE body fetch) skips its work, and a
-  caller that claims the slot is then cancelled by `registerFolderSyncLocked`.
-  Present before the issues pass. Fix: wait for the cancelled slot's release
-  instead of sleeping, or re-check the slot after relocking.
-- **M9 low** `app/idle_sent.go` `syncSentAfterIdle`: whether to emit
-  `sent:synced` is guessed by comparing the folder's highest UID, message
-  count and UIDVALIDITY before and after the sync. A sync that only fetches
-  bodies for messages already stored changes none of these, and another
-  writer (a manual `SyncFolder`) can change Sent between the snapshots;
-  either can leave chat views stale until the next scheduled sync. Fix:
-  have `SyncMessages` and `FetchBodiesInBackground` report whether they
-  stored or removed anything, and drop `folderSnapshot`.
 
 ### Upstream independence
 

@@ -106,6 +106,8 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 		e.log.Warn().Str("messageID", messageID).Uint32("uid", uid).Msg("Message not found on server, deleting ghost")
 		if delErr := e.messageStore.Delete(messageID); delErr != nil {
 			e.log.Debug().Err(delErr).Str("messageID", messageID).Msg("Failed to delete ghost message")
+		} else {
+			e.changeSeq.bump(folderID)
 		}
 		return nil, fmt.Errorf("message not found on server")
 	}
@@ -114,6 +116,7 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	if err := e.messageStore.UpdateBody(messageID, result.BodyHTML, result.BodyText, result.Snippet, result.HasAttachments); err != nil {
 		return nil, fmt.Errorf("failed to update message body: %w", err)
 	}
+	e.changeSeq.bump(folderID)
 
 	// Replace attachments so a re-fetch doesn't list them twice
 	if e.attachmentStore != nil {
@@ -141,9 +144,26 @@ func (e *Engine) replaceConn(ctx context.Context, old *imapPkg.PooledConnection,
 	return conn, nil
 }
 
-// errStreamBroken reports that a body literal ended early and the client was
+// errStreamBroken reports that a FETCH literal ended early and the client was
 // closed. The results returned alongside it are still valid.
-var errStreamBroken = errors.New("body literal ended early, connection closed")
+var errStreamBroken = errors.New("FETCH literal ended early, connection closed")
+
+// readLiteral reads a FETCH literal, up to limit bytes. A dropped connection
+// can end the literal early without an error, so a read shorter than the
+// literal's declared size is reported as io.ErrUnexpectedEOF.
+//
+// After an error, the caller must not call Next or Close on the message or
+// the fetch command. go-imap v2's fetchLiteralReader has already handed its
+// buffered reader back to the read goroutine, and discarding the literal's
+// unread bytes would race with it. Close the client instead; the pool then
+// drops the connection.
+func readLiteral(lit imap.LiteralReader, limit int64) ([]byte, error) {
+	raw, err := io.ReadAll(io.LimitReader(lit, limit))
+	if want := min(lit.Size(), limit); err == nil && int64(len(raw)) < want {
+		err = fmt.Errorf("read %d of %d literal bytes: %w", len(raw), want, io.ErrUnexpectedEOF)
+	}
+	return raw, err
+}
 
 // fetchMessageBodiesBatch fetches bodies for multiple messages in a single IMAP command
 // The mailbox must already be selected by the caller.
@@ -231,13 +251,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				gotBodySection = true
 				// Read body from literal reader with size limit to prevent memory exhaustion
 				if data.Literal != nil {
-					lr := io.LimitReader(data.Literal, maxMessageSize)
-					rawBytes, readErr = io.ReadAll(lr)
-					// A dropped connection can end the literal early
-					// without an error; compare with its declared size.
-					if want := min(data.Literal.Size(), maxMessageSize); readErr == nil && int64(len(rawBytes)) < want {
-						readErr = fmt.Errorf("read %d of %d literal bytes: %w", len(rawBytes), want, io.ErrUnexpectedEOF)
-					}
+					rawBytes, readErr = readLiteral(data.Literal, maxMessageSize)
 					if readErr != nil {
 						e.log.Warn().
 							Err(readErr).
@@ -259,12 +273,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			}
 		}
 
-		// A failed literal read has already handed go-imap's buffered
-		// reader back to its read goroutine, but the literal still has
-		// unread bytes. msg.Next, fetchCmd.Next and fetchCmd.Close would
-		// discard them from that same buffer and race with the goroutine
-		// (go-imap v2 fetchLiteralReader), so stop consuming the command
-		// and close the connection; the pool's health check then drops it.
+		// After a failed read, stop consuming the command (see readLiteral).
 		streamBroken = readErr != nil
 
 		// Log if we didn't receive a body section at all
@@ -643,6 +652,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 					failed += result.fetchedCount
 				} else {
 					fetched += result.fetchedCount
+					e.changeSeq.bump(folderID)
 					e.log.Debug().Int("fetched", fetched).Int("total", totalWithoutBody).Msg("DB update successful")
 				}
 			} else {
@@ -901,6 +911,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				failed += result.fetchedCount
 			} else {
 				fetched += result.fetchedCount
+				e.changeSeq.bump(folderID)
 			}
 		}
 		if len(result.bodyUpdates) > 0 {
@@ -990,10 +1001,10 @@ func (e *Engine) FetchRawMessage(ctx context.Context, accountID, folderID string
 
 		if data, ok := item.(imapclient.FetchItemDataBodySection); ok {
 			if data.Literal != nil {
-				lr := io.LimitReader(data.Literal, maxMessageSize)
-				rawBytes, err = io.ReadAll(lr)
+				rawBytes, err = readLiteral(data.Literal, maxMessageSize)
 				if err != nil {
-					fetchCmd.Close()
+					// Don't consume the command further (see readLiteral).
+					conn.Client().RawClient().Close()
 					return nil, fmt.Errorf("failed to read message body: %w", err)
 				}
 				break
