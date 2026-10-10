@@ -27,7 +27,6 @@
     accountId: string
     folderId: string
     folderType: string
-    focused: boolean
     onFocusChange: (focused: boolean) => void
     onReply?: (mode: ReplyMode, messageId: string, imagesLoaded?: boolean) => void
     onComposeToAddress?: (to: string) => void
@@ -39,7 +38,7 @@
   }
 
   let {
-    item, thread, accountId, folderId, folderType, focused, onFocusChange,
+    item, thread, accountId, folderId, folderType, onFocusChange,
     onReply, onComposeToAddress, onEditDraft, onImagesLoaded, imagesLoaded, onActionComplete, onOpenLink,
   }: Props = $props()
 
@@ -153,7 +152,7 @@
   {onReply}
 >
   <div
-    class="group flex gap-2 px-4 {item.groupStart ? 'mt-3' : 'mt-0.5'} {item.mine ? 'flex-row-reverse' : ''}"
+    class="group flex gap-2 px-4 {item.groupStart ? (mode === 'full' && !item.newDay ? 'mt-3 pt-3 border-t border-border' : 'mt-3') : 'mt-0.5'} {item.mine ? 'flex-row-reverse' : ''}"
     data-message-id={msg.id}
     tabindex="-1"
     role="article"
@@ -189,7 +188,7 @@
         <ChatSecurityBanners {msg} {thread} />
 
         <div
-          class="relative w-full rounded-2xl {focused ? 'ring-2 ring-primary/40' : ''} {mode === 'bubble' && !bare ? (item.mine ? 'w-auto bg-primary text-primary-foreground rounded-br-md' : 'w-auto bg-muted text-foreground rounded-bl-md') : ''}"
+          class="relative w-full rounded-2xl group-focus-visible:ring-2 group-focus-visible:ring-primary/40 {mode === 'bubble' && !bare ? (item.mine ? 'w-auto bg-primary text-primary-foreground rounded-br-md' : 'w-auto bg-muted text-foreground rounded-bl-md') : ''}"
         >
           {#if notFetched && thread.bodyErrors.has(msg.id)}
             <div class="flex items-center gap-2 px-3.5 py-2 text-sm text-muted-foreground bg-muted rounded-2xl">
@@ -226,11 +225,11 @@
           {:else if mode === 'card'}
             <ChatRichCard subject={msg.subject} preview={msg.chat?.text ?? ''} expanded={cardExpanded} onToggle={() => (cardExpanded = !cardExpanded)} body={emailBody} />
           {:else}
-            <div class="rounded-xl border border-border overflow-hidden">{@render emailBody()}</div>
+            <div class="overflow-hidden">{@render emailBody()}</div>
           {/if}
 
           <!-- Hover / focus actions -->
-          <div class="absolute {actionsPos} flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <div class="absolute {actionsPos} flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-has-focus-visible:opacity-100 transition-opacity">
             {#if msg.isDraft && onEditDraft}
               <button class="p-1 rounded hover:bg-muted" title={$_('viewer.editDraft')} onclick={() => onEditDraft(msg.id)}>
                 <Icon icon="mdi:pencil" class="w-4 h-4 text-muted-foreground" />

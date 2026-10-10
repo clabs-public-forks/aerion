@@ -365,7 +365,6 @@
             accountId={accountId ?? ''}
             folderId={folderId ?? ''}
             folderType={effectiveFolderType}
-            focused={scroll.focusedId === item.msg.id}
             onFocusChange={(f) => { if (f) scroll.focusedId = item.msg.id; else if (scroll.focusedId === item.msg.id) scroll.focusedId = null }}
             {onReply}
             {onComposeToAddress}

@@ -187,7 +187,7 @@ Validation:
 - [x] M1 — Chat list row and header (visual checks outstanding: dev mode forces Nord Dark on the real mailbox, so row heights, light-theme hover and screenshots need the owner)
 - [x] M2 — Selection follows pane focus (contrast verified by script, lowest ratio 4.61 across all 28 theme variants after `_selection.css`; screenshots and the click-to-switch check not done, no display in this session, so the owner needs to check them)
 - [x] M3 — ChatView extraction (moved scroll/anchor/message focus to `chatScroll.svelte.ts` and triage actions to `chatActions.svelte.ts`; ChatView 499 → 397 lines; lint and check pass; walkthrough not done, no display in this session)
-- [ ] M4 — Reading pane polish
+- [x] M4 — Reading pane polish (full-body messages drop the border box and get a `border-t border-border` hairline unless they start a day (the day separator divides there); ring and per-message actions use `group-focus-visible` / `group-has-focus-visible`, so the unused `focused` prop is gone; header shows subject as `text-base` heading with participants below, sender chats unchanged; lint and check pass; no display in this session, so before/after screenshots and the measured spacing are not done and need the owner)
 - [ ] M5 — Themed status tokens
 
 ## Surprises & Discoveries
@@ -199,6 +199,8 @@ Validation:
 - `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.
 
 ## Decision Log
+
+- M4 baseline (from code, not measured): group gap `mt-3` (12px), same-sender `mt-0.5`; header block `pt-3 pb-1` with a 32px avatar row and `text-sm` title. Target: same gaps plus `pt-3` and a 1px hairline above full-body groups; header title `text-base`.
 
 - M2: `--primary`/`--primary-foreground` and the 80% text both reach 4.5:1 in only 7 of the 28 theme variants (lowest 2.01, breeze). Rather than retune every theme's primary, which colors buttons everywhere, a new `--selection`/`--selection-foreground` pair (`themes/_selection.css`, falling back to the primary tokens in `app.css`) overrides 21 variants with a shifted lightness and a pure white or black foreground.
 
