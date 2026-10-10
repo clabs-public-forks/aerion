@@ -195,13 +195,13 @@ Adjust how much space each message takes in the list:
 For privacy, Aerion blocks remote images in emails by default. These images can be used to track when you open an email.
 
 To load images in a specific message:
-- Click **Load Images** or press `Ctrl+L`
+- Click the small **Load Images** button above the message body or press `Ctrl+L`
 
 To always load images from a sender:
-- Click the dropdown arrow next to Load Images or pres `Ctrl-Shift-L`
+- Click the dropdown arrow next to Load Images or press `Ctrl+Shift+L`
 - Select:
     - **For this domain** - Trusting all e-mails from this domain from now on
-    - **For this e-mail address**) - Trusting all e-mails from this e-mail address from now on
+    - **For this e-mail address** - Trusting all e-mails from this e-mail address from now on
 
 ## Tracking Element Removal
 
