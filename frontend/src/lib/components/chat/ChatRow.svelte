@@ -7,7 +7,7 @@
   import { tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
-  import { formatRelativeDate } from '$lib/utils/date'
+  import { formatListDate } from '$lib/utils/date'
   import Avatar from '$lib/components/kit/Avatar.svelte'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { ContextMenuItem } from '$lib/components/ui/context-menu'
@@ -70,7 +70,7 @@
   const hasUnread = $derived(chat.unreadCount > 0)
   // Search results always show the matching text.
   const showPreview = $derived(getShowMessagePreview() || !!chat.highlightedSnippet)
-  const time = $derived(formatRelativeDate(chat.latestDate))
+  const time = $derived(formatListDate(chat.latestDate))
   const snoozeTime = $derived(chat.snoozedUntil ? formatSnoozedUntil(chat.snoozedUntil) : '')
 
   const subject = $derived(chat.subject || $_('viewer.noSubject'))
@@ -167,7 +167,7 @@
     tabindex="-1"
     data-chat-row
     draggable={getLayoutMode() !== 'narrow'}
-    class="chat-row relative flex items-center gap-3 px-3 py-2.5 mx-1.5 my-0.5 rounded-lg cursor-pointer outline-hidden transition-colors {selected ? 'bg-primary/20' : 'hover:bg-muted/60'}"
+    class="chat-row relative flex items-center gap-3 px-3 py-2.5 mx-1.5 my-0.5 rounded-lg cursor-pointer outline-hidden transition-colors {selected ? 'bg-primary/20 group-data-[focused]/list:ring-2 group-data-[focused]/list:ring-inset group-data-[focused]/list:ring-primary' : 'hover:bg-muted'} {showPreview ? 'chat-row-tall' : 'chat-row-short'}"
     onclick={onSelect}
     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
     ondragstart={handleDragStart}
@@ -197,10 +197,9 @@
         <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'}">{title}</span>
         <span class="shrink-0 text-xs {hasUnread ? 'text-primary font-medium' : 'text-muted-foreground'}">{time}</span>
       </div>
-      <!-- Subject (up to two lines, always reserved so rows share a height),
-           with the status icons on its first line when the latest line is hidden -->
-      <div class="flex items-start gap-1.5">
-        <span class="flex-1 min-w-0 line-clamp-2 break-words text-xs leading-5 min-h-10 {!showPreview && hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
+      <!-- Subject (one line), with the status icons when the latest line is hidden -->
+      <div class="flex items-center gap-1.5">
+        <span class="flex-1 min-w-0 truncate text-sm leading-5 {hasUnread ? 'text-foreground' : 'text-foreground/80'}">
           {#if !showPreview && chat.lastFromMe}{@render repliedIcon()}{/if}
           <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
           {#if chat.highlightedSubject}{@html chat.highlightedSubject}{:else}{subject}{/if}
@@ -210,7 +209,7 @@
       {#if showPreview}
         <!-- Latest line + status icons -->
         <div class="flex items-center gap-1.5">
-          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground' : 'text-muted-foreground'}">
+          <span class="flex-1 min-w-0 truncate text-sm {hasUnread ? 'text-foreground/90' : 'text-muted-foreground'}">
             {#if chat.lastFromMe}{@render repliedIcon()}{/if}
             <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlightMatches only inserts <mark> around already-escaped text -->
             {#if chat.highlightedSnippet}{@html chat.highlightedSnippet}{:else}{chat.snippet}{/if}
@@ -253,6 +252,11 @@
   /* Skip layout and paint for off-screen rows in long lists. */
   .chat-row {
     content-visibility: auto;
-    contain-intrinsic-size: auto 68px;
+  }
+  .chat-row-tall {
+    contain-intrinsic-size: auto 80px;
+  }
+  .chat-row-short {
+    contain-intrinsic-size: auto 60px;
   }
 </style>

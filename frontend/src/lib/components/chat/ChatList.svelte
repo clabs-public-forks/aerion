@@ -81,6 +81,20 @@
     return accountStore.accounts.find((a) => a.account.id === accountId)?.account.name || folderName
   })
 
+  // Message counts of the current folder, or summed over the inboxes when unified.
+  const counts = $derived.by(() => {
+    if (chatList.isSearch) return null
+    const folders = chatList.isUnified
+      ? accountStore.accounts.map((a) => accountStore.getInbox(a.account.id))
+      : [accountId && folderId ? accountStore.getFolder(accountId, folderId) : undefined]
+    const known = folders.filter((f) => !!f)
+    if (known.length === 0) return null
+    return {
+      total: known.reduce((n, f) => n + f.totalCount, 0),
+      unread: known.reduce((n, f) => n + f.unreadCount, 0),
+    }
+  })
+
   // Rows by group. Only the All filter groups; other filters are flat.
   const grouped = $derived(chatList.filter === 'all' && !chatList.isSearch)
   const groups = $derived.by(() => {
@@ -401,6 +415,7 @@
   <ChatListHeader
     bind:this={headerRef}
     {scopeLabel}
+    {counts}
     isUnified={chatList.isUnified}
     {folderId}
     filter={chatList.effectiveFilter}
@@ -418,7 +433,7 @@
 
   <div
     bind:this={listRef}
-    class="flex-1 overflow-y-auto py-1 outline-hidden"
+    class="group/list flex-1 overflow-y-auto py-1 outline-hidden"
     role="listbox"
     tabindex="0"
     aria-label={`${$_('chat.listLabel')}: ${scopeLabel}`}

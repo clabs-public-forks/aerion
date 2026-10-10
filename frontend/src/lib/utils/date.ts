@@ -1,4 +1,4 @@
-import { format, isToday, isYesterday, isThisWeek, isThisYear } from 'date-fns'
+import { differenceInCalendarDays, format, isToday, isYesterday, isThisWeek, isThisYear } from 'date-fns'
 import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
 
@@ -36,6 +36,35 @@ export function formatRelativeDate(date: Date): string {
   }
 
   if (isThisWeek(date)) {
+    return format(date, 'EEEE')
+  }
+
+  if (isThisYear(date)) {
+    return format(date, 'MMM d')
+  }
+
+  return format(date, 'MMM d, yyyy')
+}
+
+/**
+ * Format a date for chat list rows
+ * - Today: clock time ("14:05" or "2:05 PM" per locale)
+ * - Yesterday: "Yesterday"
+ * - Within the last 7 days: weekday ("Monday")
+ * - This year: "Dec 15"
+ * - Older: "Dec 15, 2023"
+ */
+export function formatListDate(date: Date): string {
+  if (isToday(date)) {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  }
+
+  if (isYesterday(date)) {
+    return get(_)('date.yesterday')
+  }
+
+  const daysAgo = differenceInCalendarDays(new Date(), date)
+  if (daysAgo > 0 && daysAgo < 7) {
     return format(date, 'EEEE')
   }
 

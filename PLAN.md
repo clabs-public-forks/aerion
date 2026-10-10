@@ -184,7 +184,7 @@ Validation:
 
 ## Progress
 
-- [ ] M1 — Chat list row and header
+- [x] M1 — Chat list row and header (visual checks outstanding: dev mode forces Nord Dark on the real mailbox, so row heights, light-theme hover and screenshots need the owner)
 - [ ] M2 — Selection follows pane focus
 - [ ] M3 — ChatView extraction
 - [ ] M4 — Reading pane polish
@@ -192,7 +192,9 @@ Validation:
 
 ## Surprises & Discoveries
 
-_None yet._
+- Subtitle `totalCount` is only refreshed on account reload (only `unreadCount` is patched in place), so the total can lag after deletes or syncs.
+- `contain-intrinsic-size` (80px/60px) is computed from the row layout, not measured.
+- `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.
 
 ## Decision Log
 
