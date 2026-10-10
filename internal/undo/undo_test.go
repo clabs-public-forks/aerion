@@ -215,3 +215,50 @@ func TestChatStateCommandUndo(t *testing.T) {
 		})
 	}
 }
+
+type fakeSenderChatStore struct {
+	combined map[string]bool
+	states   map[string]message.ChatState
+}
+
+func (f *fakeSenderChatStore) RestoreSenderChat(accountID, email string, combined bool, state message.ChatState) error {
+	f.combined[accountID+"/"+email] = combined
+	f.states[accountID+"/"+email] = state
+	return nil
+}
+
+func TestSenderChatCommandUndo(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	tests := []struct {
+		name     string
+		previous bool
+		state    message.ChatState
+	}{
+		{"undo combine", false, message.ChatState{}},
+		{"undo split restores pin", true, message.ChatState{PinnedAt: &now}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &fakeSenderChatStore{
+				combined: map[string]bool{"acct/a@x": !tt.previous},
+				states:   map[string]message.ChatState{},
+			}
+			stack := NewStack(10, time.Minute)
+			stack.Push(NewSenderChatCommand(store, "acct", "a@x", tt.previous, tt.state, tt.name))
+
+			cmd := stack.Pop()
+			if cmd == nil || cmd.Description() != tt.name {
+				t.Fatalf("Pop = %v", cmd)
+			}
+			if err := cmd.Undo(); err != nil {
+				t.Fatalf("Undo: %v", err)
+			}
+			if got := store.combined["acct/a@x"]; got != tt.previous {
+				t.Errorf("combined after undo = %v, want %v", got, tt.previous)
+			}
+			if got := store.states["acct/a@x"]; !reflect.DeepEqual(got, tt.state) {
+				t.Errorf("state after undo = %+v, want %+v", got, tt.state)
+			}
+		})
+	}
+}

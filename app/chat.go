@@ -83,6 +83,66 @@ func (a *App) SetSenderCategory(accountID, email, category string) error {
 	return nil
 }
 
+// SetSenderChat combines (or splits again) the threads a sender starts into
+// one sender chat. Splitting drops the sender chat's pin/snooze state and
+// releases its chat draft link (the draft is kept). Undoable.
+func (a *App) SetSenderChat(accountID, email string, combined bool) error {
+	email = message.NormalizeSenderEmail(email)
+	if email == "" {
+		return fmt.Errorf("sender email is required")
+	}
+	a.chatStateMu.Lock()
+	defer a.chatStateMu.Unlock()
+	previous, err := a.messageStore.IsSenderChat(accountID, email)
+	if err != nil {
+		return err
+	}
+	if previous == combined {
+		return nil
+	}
+	var state message.ChatState
+	if previous {
+		if state, err = a.messageStore.GetChatState(accountID, message.SenderChatKey(email)); err != nil {
+			return err
+		}
+	}
+	if err := a.applySenderChat(accountID, email, combined, message.ChatState{}); err != nil {
+		return err
+	}
+	description := "Combine sender chat"
+	if !combined {
+		description = "Split sender chat"
+	}
+	a.undoStack.Push(undo.NewSenderChatCommand(senderChatRestorer{a}, accountID, email, previous, state, description))
+	return nil
+}
+
+// applySenderChat sets the combine flag. Combining writes state to the sender
+// chat; splitting clears its state and draft link.
+func (a *App) applySenderChat(accountID, email string, combined bool, state message.ChatState) error {
+	if err := a.messageStore.SetSenderChat(accountID, email, combined); err != nil {
+		return err
+	}
+	key := message.SenderChatKey(email)
+	if combined {
+		return a.restoreChatState(accountID, key, state)
+	}
+	if err := a.draftStore.DeleteChatLink(accountID, key); err != nil {
+		return err
+	}
+	return a.restoreChatState(accountID, key, message.ChatState{})
+}
+
+// senderChatRestorer adapts App to undo.SenderChatRestorer without adding a
+// frontend binding.
+type senderChatRestorer struct{ a *App }
+
+func (r senderChatRestorer) RestoreSenderChat(accountID, email string, combined bool, state message.ChatState) error {
+	r.a.chatStateMu.Lock()
+	defer r.a.chatStateMu.Unlock()
+	return r.a.applySenderChat(accountID, email, combined, state)
+}
+
 // chatStateRestorer adapts App to undo.ChatStateRestorer without adding a
 // frontend binding.
 type chatStateRestorer struct{ a *App }

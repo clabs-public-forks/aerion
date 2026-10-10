@@ -671,6 +671,8 @@ export function SetSMIMESignPolicy(arg1:string,arg2:string):Promise<void>;
 
 export function SetSenderCategory(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function SetSenderChat(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
 export function SetShowMessageListCircles(arg1:boolean):Promise<void>;
 
 export function SetShowMessageListProfilePics(arg1:boolean):Promise<void>;

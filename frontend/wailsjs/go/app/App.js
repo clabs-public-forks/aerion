@@ -1306,6 +1306,10 @@ export function SetSenderCategory(arg1, arg2, arg3) {
   return window['go']['app']['App']['SetSenderCategory'](arg1, arg2, arg3);
 }
 
+export function SetSenderChat(arg1, arg2, arg3) {
+  return window['go']['app']['App']['SetSenderChat'](arg1, arg2, arg3);
+}
+
 export function SetShowMessageListCircles(arg1) {
   return window['go']['app']['App']['SetShowMessageListCircles'](arg1);
 }

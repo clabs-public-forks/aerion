@@ -2223,6 +2223,7 @@ export namespace message {
 	    accountColor?: string;
 	    folderId?: string;
 	    threadKey: string;
+	    senderEmail?: string;
 	    isPinned: boolean;
 	    // Go type: time
 	    snoozedUntil?: any;
@@ -2253,6 +2254,7 @@ export namespace message {
 	        this.accountColor = source["accountColor"];
 	        this.folderId = source["folderId"];
 	        this.threadKey = source["threadKey"];
+	        this.senderEmail = source["senderEmail"];
 	        this.isPinned = source["isPinned"];
 	        this.snoozedUntil = this.convertValues(source["snoozedUntil"], null);
 	        this.isLowPriority = source["isLowPriority"];
@@ -2301,6 +2303,8 @@ export namespace message {
 	    highlightedFromName: string;
 	    folderName: string;
 	    folderType: string;
+	    threadKey: string;
+	    senderEmail?: string;
 	    recipients?: Address[];
 	
 	    static createFrom(source: any = {}) {
@@ -2330,6 +2334,8 @@ export namespace message {
 	        this.highlightedFromName = source["highlightedFromName"];
 	        this.folderName = source["folderName"];
 	        this.folderType = source["folderType"];
+	        this.threadKey = source["threadKey"];
+	        this.senderEmail = source["senderEmail"];
 	        this.recipients = this.convertValues(source["recipients"], Address);
 	    }
 	

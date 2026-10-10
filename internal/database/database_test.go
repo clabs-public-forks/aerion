@@ -623,3 +623,52 @@ func TestMigrationV46_ChatTriage(t *testing.T) {
 		}
 	}
 }
+
+// TestMigrationV48_SenderChat upgrades a v47 database: sender_chat enforces
+// one row per (account, email) and follows account deletion.
+func TestMigrationV48_SenderChat(t *testing.T) {
+	db := openTestDB(t)
+
+	for _, stmt := range []string{
+		`DROP TABLE sender_chat`,
+		`DELETE FROM migrations WHERE version >= 48`,
+		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+			VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("prepare v47 state (%s): %v", stmt, err)
+		}
+	}
+
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("migrate to v48: %v", err)
+	}
+
+	execs := []struct {
+		name    string
+		sql     string
+		wantErr bool
+	}{
+		{"insert sender", `INSERT INTO sender_chat (account_id, email) VALUES ('acct-1', 'a@x')`, false},
+		{"duplicate sender", `INSERT INTO sender_chat (account_id, email) VALUES ('acct-1', 'a@x')`, true},
+		{"second sender", `INSERT INTO sender_chat (account_id, email) VALUES ('acct-1', 'b@x')`, false},
+		{"unknown account", `INSERT INTO sender_chat (account_id, email) VALUES ('nope', 'a@x')`, true},
+	}
+	for _, tt := range execs {
+		_, err := db.Exec(tt.sql)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("%s: err = %v, wantErr %v", tt.name, err, tt.wantErr)
+		}
+	}
+
+	if _, err := db.Exec(`DELETE FROM accounts WHERE id = 'acct-1'`); err != nil {
+		t.Fatalf("delete account: %v", err)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sender_chat`).Scan(&n); err != nil {
+		t.Fatalf("count sender_chat: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("sender_chat has %d rows after account delete, want 0", n)
+	}
+}
