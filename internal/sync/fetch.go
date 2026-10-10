@@ -106,6 +106,8 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 		e.log.Warn().Str("messageID", messageID).Uint32("uid", uid).Msg("Message not found on server, deleting ghost")
 		if delErr := e.messageStore.Delete(messageID); delErr != nil {
 			e.log.Debug().Err(delErr).Str("messageID", messageID).Msg("Failed to delete ghost message")
+		} else {
+			e.changeSeq.bump(folderID)
 		}
 		return nil, fmt.Errorf("message not found on server")
 	}
@@ -114,6 +116,7 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	if err := e.messageStore.UpdateBody(messageID, result.BodyHTML, result.BodyText, result.Snippet, result.HasAttachments); err != nil {
 		return nil, fmt.Errorf("failed to update message body: %w", err)
 	}
+	e.changeSeq.bump(folderID)
 
 	// Replace attachments so a re-fetch doesn't list them twice
 	if e.attachmentStore != nil {
@@ -649,6 +652,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 					failed += result.fetchedCount
 				} else {
 					fetched += result.fetchedCount
+					e.changeSeq.bump(folderID)
 					e.log.Debug().Int("fetched", fetched).Int("total", totalWithoutBody).Msg("DB update successful")
 				}
 			} else {
@@ -907,6 +911,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				failed += result.fetchedCount
 			} else {
 				fetched += result.fetchedCount
+				e.changeSeq.bump(folderID)
 			}
 		}
 		if len(result.bodyUpdates) > 0 {

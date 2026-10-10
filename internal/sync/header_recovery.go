@@ -138,6 +138,7 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 			e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save recovered message header")
 			continue
 		}
+		e.changeSeq.bump(folderID)
 		recovered = append(recovered, m)
 	}
 

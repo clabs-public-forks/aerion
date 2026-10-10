@@ -411,6 +411,7 @@ func (e *Engine) FetchServerMessage(ctx context.Context, accountID, folderID str
 	if err := e.messageStore.Create(m); err != nil {
 		return nil, fmt.Errorf("failed to save message: %w", err)
 	}
+	e.changeSeq.bump(folderID)
 
 	// Extract and store attachments
 	if m.HasAttachments && len(rawBytes) > 0 && e.attachmentStore != nil {

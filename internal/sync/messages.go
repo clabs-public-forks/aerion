@@ -105,6 +105,7 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 		if err := e.messageStore.DeleteByFolder(folderID); err != nil {
 			return fmt.Errorf("failed to delete messages: %w", err)
 		}
+		e.changeSeq.bump(folderID)
 		f.UIDValidity = mailbox.UIDValidity
 		// The old modseq refers to a different universe of UIDs after a
 		// mailbox recreation; treat this cycle as first-sync.
@@ -127,6 +128,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 			e.log.Warn().Err(err).Msg("Failed to delete old messages")
 		} else if deleted > 0 {
 			e.log.Info().Int("deleted", deleted).Msg("Deleted messages older than sync period")
+			// The deletion spans the account; this folder's readers are the
+			// ones comparing around this sync.
+			e.changeSeq.bump(folderID)
 		}
 	}
 
@@ -243,7 +247,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 
 		if err := e.messageStore.DeleteByUID(folderID, uid); err != nil {
 			e.log.Warn().Err(err).Uint32("uid", uid).Msg("Failed to delete message")
+			continue
 		}
+		e.changeSeq.bump(folderID)
 	}
 
 	// Sync flags for existing messages (messages that exist both locally and on server)
@@ -866,6 +872,7 @@ fetchLoop:
 			e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save message header")
 			continue
 		}
+		e.changeSeq.bump(folderID)
 		savedMessages = append(savedMessages, m)
 		fetchedCount++
 	}

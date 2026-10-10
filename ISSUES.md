@@ -46,15 +46,6 @@ has not yet been confirmed against the code.
   folder set in `internal/imap`'s IDLE) routed to the same incremental sync,
   which would also retire the 30 s throttle state; cheaper: a shorter Sent
   poll interval.
-- **M9 low** `app/idle_sent.go` `syncSentAfterIdle`: whether to emit
-  `sent:synced` is guessed by comparing the folder's highest UID, message
-  count and UIDVALIDITY before and after the sync. A sync that only fetches
-  bodies for messages already stored changes none of these, and another
-  writer (a manual `SyncFolder`) can change Sent between the snapshots;
-  either can leave chat views stale until the next scheduled sync. Fix:
-  have `SyncMessages` and `FetchBodiesInBackground` report whether they
-  stored or removed anything, and drop `folderSnapshot`.
-
 ### Upstream independence
 
 This fork may eventually stop tracking upstream Aerion. Until then, some code
