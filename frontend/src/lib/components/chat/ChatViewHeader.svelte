@@ -99,7 +99,7 @@
 {#snippet iconButton(icon: string, label: string, onclick: () => void, active?: boolean, disabled = false)}
   <!-- aria-pressed only for toggles (active passed); plain actions omit it. -->
   <button
-    class="p-2 rounded-md hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none"
+    class="p-2 rounded-md hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden disabled:opacity-50 disabled:pointer-events-none"
     title={label}
     aria-label={label}
     aria-pressed={active}
@@ -201,7 +201,7 @@
     </div>
   </div>
 
-  <div class="flex items-center gap-3 min-w-0 px-4 pt-3 pb-1">
+  <div class="flex items-center gap-3 min-w-0 px-4 py-3 border-b border-border">
     <div class="flex -space-x-1 shrink-0" aria-hidden="true">
       {#each people.slice(0, MAX_AVATARS) as p (p.email)}
         {@const photo = contactPhotos.get(p.email)}
