@@ -3,7 +3,6 @@ package sync
 import (
 	"context"
 	"fmt"
-	"io"
 	"sort"
 	"time"
 
@@ -382,10 +381,10 @@ func (e *Engine) FetchServerMessage(ctx context.Context, accountID, folderID str
 			rfc822Size = data.Size
 		case imapclient.FetchItemDataBodySection:
 			if data.Literal != nil {
-				lr := io.LimitReader(data.Literal, maxMessageSize)
-				rawBytes, err = io.ReadAll(lr)
-				if err != nil {
-					e.log.Warn().Err(err).Uint32("uid", uint32(fetchedUID)).Msg("Failed to read body literal")
+				if rawBytes, err = readLiteral(data.Literal, maxMessageSize); err != nil {
+					// Don't consume the command further (see readLiteral).
+					client.Close()
+					return nil, fmt.Errorf("failed to read message body: %w", err)
 				}
 			}
 		}
