@@ -37,6 +37,24 @@ has not yet been confirmed against the code.
   replacing the frontend's error-string regex and the second `Probe` request
   (which also misses certificates only discovery redirects reach).
 
+### Chat mail
+
+From the mail UI polish plan (`feat/mail-ui-polish`).
+
+- **CM12 low** `frontend/src/lib/utils/date.ts` `formatListDate`: today's
+  rows show clock time, but the label is computed once per date change, so it
+  goes stale after midnight until the list refreshes. Weekday and month names
+  are English (date-fns default), as in `formatRelativeDate`.
+- **CM13 low** `ChatList.svelte` subtitle: `totalCount` refreshes only on
+  account reload (only `unreadCount` is patched in place), so the total can
+  lag after deletes or syncs.
+- **CM14 low** `ChatRow.svelte`: the `contain-intrinsic-size` estimates
+  (80px with preview, 60px without) come from the layout, not measurement.
+- **CM15** visual checks no session has done (no display): light themes;
+  signed, encrypted and bad-signature messages; the Load Images split
+  button; measured row heights; clicking a message then pressing Delete
+  trashes only that message, with no focus ring on click.
+
 ### Mail sync
 
 - **M6 low** `app/idle_sent.go`: Sent activity from other clients is

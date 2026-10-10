@@ -186,9 +186,9 @@ Validation:
 
 - [x] M1 — Chat list row and header (visual checks outstanding: dev mode forces Nord Dark on the real mailbox, so row heights, light-theme hover and screenshots need the owner)
 - [x] M2 — Selection follows pane focus (contrast verified by script, lowest ratio 4.61 across all 28 theme variants after `_selection.css`; screenshots and the click-to-switch check not done, no display in this session, so the owner needs to check them)
-- [x] M3 — ChatView extraction (moved scroll/anchor/message focus to `chatScroll.svelte.ts` and triage actions to `chatActions.svelte.ts`; ChatView 499 → 397 lines; lint and check pass; walkthrough not done, no display in this session)
+- [x] M3 — ChatView extraction (moved scroll/anchor/message focus to `chatScroll.svelte.ts` and triage actions to `chatActions.svelte.ts`; ChatView 499 → 396 lines; lint and check pass; walkthrough not done, no display in this session)
 - [x] M4 — Reading pane polish (full-body messages drop the border box and get a `border-t border-border` hairline unless they start a day (the day separator divides there); ring and per-message actions use `group-focus-visible` / `group-has-focus-visible`, so the unused `focused` prop is gone; header shows subject as `text-base` heading with participants below, sender chats unchanged; lint and check pass; no display in this session, so before/after screenshots and the measured spacing are not done and need the owner)
-- [x] M5 — Themed status tokens (`themes/_status.css` defines the six tokens for light and dark via `:root`/`.dark`, mapped in `app.css`; `ChatSecurityBanners` and the `EmailBody` banner use them, grep prints nothing; signed/encrypted are badges in the meta line via new `chatSecurity.ts`; banner text ≥ 5.17:1 on every theme background and card by `/tmp/contrast/status.py`; lint, check and build pass; no display in this session, so the signed/encrypted/bad-signature/remote-images checks on three themes need the owner)
+- [x] M5 — Themed status tokens (`themes/_status.css` defines the six tokens for light and dark via `:root`/`.dark`, mapped in `app.css`; `ChatSecurityBanners` uses them (the `EmailBody` banner later became a neutral Load Images button), grep prints nothing; signed/encrypted are badges in the meta line via new `chatSecurity.ts`; banner text ≥ 5.17:1 on every theme background and card by `/tmp/contrast/status.py`; lint, check and build pass; no display in this session, so the signed/encrypted/bad-signature/remote-images checks on three themes need the owner)
 
 ## Surprises & Discoveries
 
@@ -196,11 +196,8 @@ Validation:
 
 - M5 review: `viewer/ConversationViewer.svelte` (classic, unmounted) still has hard-coded blue/green/amber banners and its own status mapping; left out of scope (ISSUES.md U1). The solid-button pairing (`bg-*-foreground` with `text-background`) is covered by the contrast script rows tagged `btn` (≥ 5.17).
 - M3 review found that `_selection.css`'s `:root` rule gave the 7 unlisted themes the light purple instead of the `--primary` fallback; fixed by scoping that rule to `[data-theme="light"]` (`applyTheme` always sets `data-theme`).
+- Open findings (stale list time after midnight, lagging total count, English date names, unmeasured row heights, outstanding visual checks) moved to ISSUES.md CM12–CM15.
 - Simplify review found the M4 bubble `onfocus` checked `:focus-visible`, so a mouse click no longer set `focusedId` and Delete, Reply and message navigation acted on the thread or last message instead of the clicked one; reverted to `onFocusChange(true)`, since the CSS `group-focus-visible` variants already hide the ring on mouse focus.
-- `formatListDate` today branch uses `formatTime` (OS locale) and goes stale after midnight; not fixed.
-- Subtitle `totalCount` is only refreshed on account reload (only `unreadCount` is patched in place), so the total can lag after deletes or syncs.
-- `contain-intrinsic-size` (80px/60px) is computed from the row layout, not measured.
-- `formatListDate` weekday and month names are English (date-fns default), like `formatRelativeDate`.
 
 ## Decision Log
 
@@ -218,7 +215,19 @@ Validation:
 - Rows keep a one-line snippet and a one-line subject, targeting 72–80px.
 - Refactors get their own milestone (M3) so each milestone is one commit and
   visual diffs stay reviewable.
+- After M5, the `EmailBody` remote-images warning banner became a compact
+  split button (Load Images, chevron for Always Load) with the privacy note in
+  its tooltip. Shortcuts are unchanged; the user guide was updated.
 
 ## Outcomes & Retrospective
 
-_Not started._
+All five milestones are done. Chat rows are denser with list dates and folder
+counts; selection follows pane focus with contrast-checked `--selection`
+tokens on all 28 theme variants; ChatView's scroll and triage logic live in
+`chatScroll.svelte.ts` and `chatActions.svelte.ts`; the reading pane has
+borderless full bodies, a subject-first header and keyboard-only focus rings
+(shared `focus-ring` utility); security states use themed status tokens, with
+positive states as meta-line badges. A simplify pass deduplicated the
+selection, security and date code and restored click-to-target for message
+shortcuts. Gap: every session lacked a usable display beyond one Nord Dark
+pass, so the visual checks are open in ISSUES.md CM15.
