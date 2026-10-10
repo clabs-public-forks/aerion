@@ -1694,6 +1694,7 @@
         onEditDraft={handleEditDraft}
         onExpandDraft={handleExpandChatDraft}
         onActionComplete={(autoSelectNext) => messageListRef?.handleActionComplete(autoSelectNext)}
+        onToggleSenderChat={() => messageListRef?.toggleSelectedSenderChat()}
         isFocused={getFocusedPane() === 'viewer'}
         isFlashing={isPaneFlashing('viewer')}
         showBackButton={isResponsive()}

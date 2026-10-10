@@ -56,6 +56,23 @@ export function chatPeople(participants: Person[], myEmails: Set<string>, recipi
   return to.length > 0 ? to : all
 }
 
+// chatSender names a sender chat's sender from the people in it.
+export function chatSender(people: Person[], email: string): Person {
+  return people.find((p) => p.email.toLowerCase() === email) ?? { name: '', email }
+}
+
+// rowPeople names a chat row's people: a sender chat just its sender, a
+// Sent row its recipients.
+export function rowPeople(chat: { participants: Person[]; recipients: Person[]; senderEmail: string }, myEmails: Set<string>, sent: boolean): Person[] {
+  return chat.senderEmail ? [chatSender(chat.participants, chat.senderEmail)] : chatPeople(chat.participants, myEmails, chat.recipients, sent)
+}
+
+// canToggleSenderChat: a sender chat can split; a Sent row's people are
+// recipients, so it has no sender to combine.
+export function canToggleSenderChat(senderEmail: string, folderType: string | null | undefined): boolean {
+  return !!senderEmail || folderType !== 'sent'
+}
+
 // myAddresses lists every account address, lowercased, to leave me out of
 // participant and recipient lists. Whether a message is mine comes from the
 // backend's msg.mine flag.
@@ -192,18 +209,34 @@ export interface ThreadItem {
   newDay: boolean
   // First message of a same-sender run: show avatar and name.
   groupStart: boolean
+  // Set where the subject changes (sender chats only): label the bubble.
+  subject?: string
 }
 
-export function buildThreadItems(messages: messageModels.Message[]): ThreadItem[] {
+const SUBJECT_PREFIX_RE = /^\s*((re|fwd?|aw|wg|sv|vs)(\[\d+\])?\s*:\s*)+/i
+
+// baseSubject drops reply and forward prefixes, for comparing subjects.
+function baseSubject(subject: string): string {
+  return subject.replace(SUBJECT_PREFIX_RE, '').trim().toLowerCase()
+}
+
+// buildThreadItems groups messages into bubble runs. labelSubjects (a
+// sender chat, which mixes threads) labels each subject change and starts a
+// new run there.
+export function buildThreadItems(messages: messageModels.Message[], labelSubjects = false): ThreadItem[] {
   const items: ThreadItem[] = []
   let prev: ThreadItem | null = null
+  let prevBase: string | null = null
   for (const msg of messages) {
+    const base = labelSubjects ? baseSubject(msg.subject || '') : null
+    const subject = labelSubjects && base !== prevBase ? msg.subject || '' : undefined
+    prevBase = base
     const date = new Date(msg.date)
     const mine = !!msg.mine
     const newDay = !prev || dayKey(prev.date) !== dayKey(date)
     const sameSender = !!prev && prev.mine === mine && (prev.msg.fromEmail || '').toLowerCase() === (msg.fromEmail || '').toLowerCase()
-    const groupStart = newDay || !sameSender || date.getTime() - prev!.date.getTime() > GROUP_WINDOW_MS
-    const item: ThreadItem = { msg, date, mine, newDay, groupStart }
+    const groupStart = newDay || !sameSender || subject !== undefined || date.getTime() - prev!.date.getTime() > GROUP_WINDOW_MS
+    const item: ThreadItem = { msg, date, mine, newDay, groupStart, subject }
     items.push(item)
     prev = item
   }

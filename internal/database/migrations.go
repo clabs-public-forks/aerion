@@ -1432,4 +1432,16 @@ var migrations = []Migration{
 			);
 		`,
 	},
+	{
+		Version: 48,
+		SQL: `
+			-- Sender chats: threads started by a listed sender (lowercased
+			-- email) combine into one chat keyed 'sender:<email>'.
+			CREATE TABLE IF NOT EXISTS sender_chat (
+				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+				email TEXT NOT NULL,
+				PRIMARY KEY (account_id, email)
+			);
+		`,
+	},
 }

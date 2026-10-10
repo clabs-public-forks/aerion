@@ -80,6 +80,14 @@ has not yet been confirmed against the code.
   whether it is a go-imap v2 beta bug, our misuse of the streaming API, or
   a test-only artifact; production sees dropped connections too.
 
+### Chats
+
+- **C1 low** `internal/message` `SearchUnifiedInbox`: unified-inbox
+  search returns thread rows and does not merge sender chats, so a combined
+  sender's threads show separately there. `SearchChats` merges them, but
+  its merged row keeps the newest thread's subject, not the newest
+  message's subject as in `ListChats`.
+
 ### Upstream independence
 
 This fork may eventually stop tracking upstream Aerion. Until then, some code

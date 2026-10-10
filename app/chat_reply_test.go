@@ -243,6 +243,42 @@ func TestBuildChatReply(t *testing.T) {
 	}
 }
 
+// A sender chat reply targets the chosen message, not the chat's latest one:
+// its threading headers come from that message's thread.
+func TestBuildChatReplySenderChat(t *testing.T) {
+	a := newChatReplyTestApp(t)
+	if err := a.messageStore.Create(&message.Message{
+		ID: "m-2", AccountID: "acct-1", FolderID: "f-1", UID: 2, MessageID: "<later@example.com>",
+		Subject: "Dinner", FromName: "Bob", FromEmail: "bob@example.com", ToList: "me@example.com",
+		Date: time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC), BodyText: "Dinner?", BodyFetched: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.messageStore.SetSenderChat("acct-1", "bob@example.com", true); err != nil {
+		t.Fatal(err)
+	}
+	key := message.SenderChatKey("bob@example.com")
+
+	tests := []struct{ messageID, wantSubject, wantInReplyTo string }{
+		{"m-1", "Re: Lunch", "<orig@example.com>"},
+		{"m-2", "Re: Dinner", "<later@example.com>"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.messageID, func(t *testing.T) {
+			msg, err := a.buildChatReply(ChatReply{AccountID: "acct-1", ThreadKey: key, MessageID: tt.messageID, Text: "Yes"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if msg.Subject != tt.wantSubject || msg.InReplyTo != tt.wantInReplyTo {
+				t.Errorf("Subject, InReplyTo = %q, %q; want %q, %q", msg.Subject, msg.InReplyTo, tt.wantSubject, tt.wantInReplyTo)
+			}
+			if got := strings.Join(msg.References, " "); got != tt.wantInReplyTo {
+				t.Errorf("References = %q, want %q", got, tt.wantInReplyTo)
+			}
+		})
+	}
+}
+
 func TestChatReplyEmpty(t *testing.T) {
 	tests := []struct {
 		name string

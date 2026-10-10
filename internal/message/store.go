@@ -1596,16 +1596,7 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 	// This gives full conversation context without cross-folder bleed
 	// Exclude messages in Trash folder unless we're viewing Trash
 	messagesQuery := fmt.Sprintf(`
-		SELECT m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.in_reply_to, m.references_list, m.thread_id,
-		       m.subject, m.from_name, m.from_email, m.to_list, m.cc_list, m.bcc_list, m.reply_to, m.date,
-		       m.snippet, m.is_read, m.is_starred, m.is_answered, m.is_forwarded, m.is_draft, m.is_deleted,
-		       m.size, m.has_attachments, m.body_text, m.body_html, m.body_fetched,
-		       m.read_receipt_to, m.read_receipt_handled,
-		       m.smime_status, m.smime_signer_email, m.smime_signer_subject,
-		       m.smime_encrypted, (m.smime_raw_body IS NOT NULL) as has_smime,
-		       m.pgp_status, m.pgp_signer_email, m.pgp_signer_key_id,
-		       m.pgp_encrypted, (m.pgp_raw_body IS NOT NULL) as has_pgp,
-		       m.received_at
+		SELECT %s
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id
 		WHERE m.account_id = ? AND (
@@ -1615,7 +1606,7 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		)
 		%s %s
 		ORDER BY m.date ASC
-	`, trashFilter, folderFilter)
+	`, conversationColumns, trashFilter, folderFilter)
 
 	rows, err := s.db.Query(messagesQuery, accountID, normalizedThreadID, normalizedThreadID, normalizedThreadID, folderID)
 	if err != nil {
@@ -1623,6 +1614,41 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 	}
 	defer rows.Close()
 
+	c.Messages, err = s.scanConversationMessages(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Messages = dedupeCopies(c.Messages, func(m *Message) bool { return m.FolderID == folderID })
+	// The summary query's COUNT(*) counts duplicate copies too
+	c.MessageCount = len(c.Messages)
+
+	s.log.Debug().
+		Int("messageCount", len(c.Messages)).
+		Str("threadID", threadID).
+		Msg("GetConversation returning")
+
+	c.Participants = conversationParticipants(c.Messages)
+
+	return c, nil
+}
+
+// conversationColumns are the message columns scanConversationMessages reads,
+// from messages m.
+const conversationColumns = `m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.in_reply_to, m.references_list, m.thread_id,
+		       m.subject, m.from_name, m.from_email, m.to_list, m.cc_list, m.bcc_list, m.reply_to, m.date,
+		       m.snippet, m.is_read, m.is_starred, m.is_answered, m.is_forwarded, m.is_draft, m.is_deleted,
+		       m.size, m.has_attachments, m.body_text, m.body_html, m.body_fetched,
+		       m.read_receipt_to, m.read_receipt_handled,
+		       m.smime_status, m.smime_signer_email, m.smime_signer_subject,
+		       m.smime_encrypted, (m.smime_raw_body IS NOT NULL) as has_smime,
+		       m.pgp_status, m.pgp_signer_email, m.pgp_signer_key_id,
+		       m.pgp_encrypted, (m.pgp_raw_body IS NOT NULL) as has_pgp,
+		       m.received_at`
+
+// scanConversationMessages scans rows selecting conversationColumns.
+func (s *Store) scanConversationMessages(rows *sql.Rows) ([]*Message, error) {
+	var msgs []*Message
 	for rows.Next() {
 		m := &Message{}
 		var messageID, inReplyTo, references, threadIDVal, toList, ccList, bccList, replyTo, snippetVal, bodyText, bodyHTML, readReceiptTo sql.NullString
@@ -1716,19 +1742,24 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 			Str("subject", m.Subject).
 			Int("bodyTextLen", len(m.BodyText)).
 			Int("bodyHTMLLen", len(m.BodyHTML)).
-			Msg("GetConversation found message")
+			Msg("Loaded conversation message")
 
-		c.Messages = append(c.Messages, m)
+		msgs = append(msgs, m)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read messages: %w", err)
+	}
+	return msgs, nil
+}
 
-	// Dedupe copies of the same email (#222): the query spans current
-	// folder + Sent + Drafts, so a self-BCC'd send appears as both the
-	// Sent copy and the delivered copy. Collapse rows sharing a non-empty
-	// Message-ID, preferring current folder > sent > drafts so actions
-	// operate on the copy in the folder being viewed. Stable, keeps
-	// date-ASC order.
+// dedupeCopies collapses copies of the same email (#222): conversation
+// queries span the viewed scope + Sent + Drafts, so a self-BCC'd send appears
+// as both the Sent copy and the delivered copy. Rows sharing a non-empty
+// Message-ID collapse to one, preferring scope > sent > drafts so actions
+// operate on the copy being viewed. Stable, keeps date-ASC order.
+func dedupeCopies(msgs []*Message, inScope func(*Message) bool) []*Message {
 	msgPriority := func(m *Message) int {
-		if m.FolderID == folderID {
+		if inScope(m) {
 			return 0
 		}
 		if m.IsDraft {
@@ -1737,8 +1768,8 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		return 1
 	}
 	byMsgID := make(map[string]int) // normalized Message-ID -> index in deduped
-	deduped := c.Messages[:0]
-	for _, m := range c.Messages {
+	deduped := msgs[:0]
+	for _, m := range msgs {
 		id := normalizeMessageID(m.MessageID)
 		if id == "" {
 			deduped = append(deduped, m)
@@ -1754,30 +1785,24 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 			deduped[existing] = m
 		}
 	}
-	c.Messages = deduped
-	// The summary query's COUNT(*) counts duplicate copies too
-	c.MessageCount = len(c.Messages)
+	return deduped
+}
 
-	s.log.Debug().
-		Int("messageCount", len(c.Messages)).
-		Str("threadID", threadID).
-		Msg("GetConversation returning")
-
-	// Build participants from already-loaded messages (no extra query needed).
-	// Messages are date-ASC; iterate in reverse so Participants[0] is the
-	// latest sender, matching the list-query ordering (#169).
+// conversationParticipants lists date-ASC messages' distinct senders, latest
+// first, matching the list-query ordering (#169).
+func conversationParticipants(msgs []*Message) []Address {
+	var out []Address
 	seen := make(map[string]bool)
-	for i := len(c.Messages) - 1; i >= 0; i-- {
-		msg := c.Messages[i]
+	for i := len(msgs) - 1; i >= 0; i-- {
+		msg := msgs[i]
 		key := strings.ToLower(msg.FromEmail)
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		c.Participants = append(c.Participants, Address{Name: msg.FromName, Email: msg.FromEmail})
+		out = append(out, Address{Name: msg.FromName, Email: msg.FromEmail})
 	}
-
-	return c, nil
+	return out
 }
 
 // normalizeMessageID strips angle brackets from Message-IDs for consistent comparison

@@ -20,8 +20,8 @@
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { getChatAutoAdvance, getChatShowLowGroup } from '$lib/stores/settings.svelte'
   import { SyncFolder, CancelFolderSync } from '../../../../wailsjs/go/app/App'
-  import { chatPeople } from './chatFormat'
-  import { archiveChat, deleteMessagesPermanently, markChatUnread, type ChatRowActions, pinChat, setSenderLow, snoozeChat, trashMessages, unsnoozeChat } from './chatTriage'
+  import { canToggleSenderChat, rowPeople } from './chatFormat'
+  import { archiveChat, deleteMessagesPermanently, markChatUnread, type ChatRowActions, pinChat, setSenderChat, setSenderLow, snoozeChat, trashMessages, unsnoozeChat } from './chatTriage'
   import type { folder } from '../../../../wailsjs/go/models'
 
   interface Props {
@@ -211,9 +211,40 @@
     if (await snoozeChat(c, until, reloadAfterUndo)) afterRemoval(c)
   }
 
+  function chatSenderOf(c: ChatItem) {
+    return rowPeople(c, myEmails, folderType === 'sent')[0]
+  }
+
   function toggleSenderLow(c: ChatItem) {
-    const sender = chatPeople(c.participants, myEmails, c.recipients, folderType === 'sent')[0]
+    const sender = chatSenderOf(c)
     if (sender) void setSenderLow(c.accountId, sender, !c.isLowPriority)
+  }
+
+  // toggleSenderChat combines the row's sender into one sender chat, or
+  // splits a sender chat; a selected row's selection follows the change.
+  async function toggleSenderChat(c: ChatItem) {
+    const sender = chatSenderOf(c)
+    if (!sender || !canToggleSenderChat(c.senderEmail, folderType)) return
+    const combine = !c.senderEmail
+    const ids = new Set(c.messageIds)
+    let followed = c.key === selectedKey ? c.key : ''
+    // follow reloads, then keeps the selection on the chat: the sender chat
+    // when combined, the newest of its threads when split.
+    const follow = async (combined: boolean) => {
+      await chatList.reload(true)
+      if (!followed || followed !== selectedKey) return
+      const next = combined
+        ? chatList.items.find((r) => r.accountId === c.accountId && r.senderEmail === sender.email.toLowerCase())
+        : chatList.items.find((r) => r.accountId === c.accountId && !r.senderEmail && r.messageIds.some((id) => ids.has(id)))
+      if (!next) return
+      followed = next.key
+      open(next)
+    }
+    const afterUndo = () => {
+      onRowActionComplete?.()
+      void follow(!combine)
+    }
+    if (await setSenderChat(c.accountId, sender, combine, afterUndo)) await follow(combine)
   }
 
   function rowActions(c: ChatItem): ChatRowActions {
@@ -224,6 +255,7 @@
       onUnsnooze: () => void unsnoozeChat(c, reloadAfterUndo),
       onMarkUnread: () => void markChatUnread(c.messageIds),
       onToggleSenderLow: () => toggleSenderLow(c),
+      onToggleSenderChat: () => void toggleSenderChat(c),
     }
   }
 
@@ -231,6 +263,7 @@
   export function pinSelected() { if (selected) void pinChat(selected, !selected.isPinned, reloadAfterUndo) }
   export function markSelectedUnread() { if (selected) void markChatUnread(selected.messageIds) }
   export function toggleSelectedSenderLow() { if (selected) toggleSenderLow(selected) }
+  export function toggleSelectedSenderChat() { if (selected) void toggleSenderChat(selected) }
   export function openSnoozeForSelected() { if (selected) void rowRefs[selected.key]?.openSnooze() }
 
   // After an action, refresh in place; autoSelectNext moves the selection

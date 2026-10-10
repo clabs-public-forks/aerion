@@ -24,8 +24,11 @@ export interface ChatPerson {
 // ChatItem is the row model for both chats and search results.
 export interface ChatItem {
   key: string // accountId|threadId; unique across the unified inbox
+  // The thread to open; a sender chat's is its chat key (sender:<email>),
+  // which ChatView loads with GetSenderChat.
   threadId: string
   threadKey: string
+  senderEmail: string // set only for sender chats
   accountId: string
   accountName: string
   accountColor: string
@@ -50,6 +53,7 @@ export interface ChatItem {
 }
 
 const PAGE_SIZE = 50
+const SENDER_CHAT_PREFIX = 'sender:'
 const RELOAD_DELAY_MS = 300
 
 function threadKeyOf(threadId: string): string {
@@ -69,10 +73,13 @@ function toItem(c: message.Chat | message.ChatSearchResult | message.Conversatio
   const chat = c as Partial<message.Chat & message.ChatSearchResult>
   const search = c as Partial<message.ConversationSearchResult>
   const accountId = c.accountId || fallbackAccountId
+  const senderEmail = chat.senderEmail || ''
+  const threadId = senderEmail ? chat.threadKey! : c.threadId
   return {
-    key: `${accountId}|${c.threadId}`,
-    threadId: c.threadId,
+    key: `${accountId}|${threadId}`,
+    threadId,
     threadKey: chat.threadKey || threadKeyOf(c.threadId),
+    senderEmail,
     accountId,
     accountName: c.accountName || '',
     accountColor: c.accountColor || '',
@@ -95,6 +102,41 @@ function toItem(c: message.Chat | message.ChatSearchResult | message.Conversatio
     highlightedSubject: search.highlightedSubject || undefined,
     highlightedSnippet: search.highlightedSnippet || undefined,
   }
+}
+
+// senderEmailOf returns the sender of a ChatItem.threadId that is a sender
+// chat key, or '' for a thread.
+export function senderEmailOf(threadId: string | null | undefined): string {
+  return threadId?.startsWith(SENDER_CHAT_PREFIX) ? threadId.slice(SENDER_CHAT_PREFIX.length) : ''
+}
+
+// mergeRows appends a page, folding a row whose chat is already listed into
+// it: SearchChats merges a sender chat's threads only within one page.
+function mergeRows(items: ChatItem[], page: ChatItem[]): ChatItem[] {
+  const byKey = new Map(items.map((c, i) => [c.key, i]))
+  const out = [...items]
+  for (const c of page) {
+    const i = byKey.get(c.key)
+    if (i === undefined) {
+      byKey.set(c.key, out.length)
+      out.push(c)
+      continue
+    }
+    const o = out[i]
+    const have = new Set(o.messageIds)
+    const ids = c.messageIds.filter((id) => !have.has(id))
+    if (ids.length === 0) continue
+    out[i] = {
+      ...o,
+      messageIds: [...o.messageIds, ...ids],
+      messageCount: o.messageCount + ids.length,
+      unreadCount: o.unreadCount + c.unreadCount,
+      hasAttachments: o.hasAttachments || c.hasAttachments,
+      isStarred: o.isStarred || c.isStarred,
+      isEncrypted: o.isEncrypted || c.isEncrypted,
+    }
+  }
+  return out
 }
 
 function isInboxFolder(accountId: string, folderId: string): boolean {
@@ -123,7 +165,10 @@ class ChatListStore {
 
   readonly isUnified = $derived(this.accountId === 'unified' && this.folderId === 'inbox')
   readonly isSearch = $derived(this.query.trim().length > 0)
-  readonly hasMore = $derived(this.items.length < this.total)
+  // Backend rows fetched so far. A search page counts as full: SearchChats
+  // can return fewer rows than it consumed, after merging sender chats.
+  private fetched = $state(0)
+  readonly hasMore = $derived(this.fetched < this.total)
   readonly effectiveFilter = $derived<ChatFilter>(this.isSearch && !searchSupports(this.filter) ? 'all' : this.filter)
 
   // GetChats scope: "" for the unified inbox, otherwise the folder ID.
@@ -187,6 +232,7 @@ class ChatListStore {
     this.invalidate()
     this.items = []
     this.total = 0
+    this.fetched = 0
     this.error = null
   }
 
@@ -210,7 +256,7 @@ class ChatListStore {
   async reload(keepWindow = false): Promise<void> {
     if (!this.accountId || !this.folderId) return
     const gen = ++this.generation
-    const limit = keepWindow ? Math.max(this.items.length, PAGE_SIZE) : PAGE_SIZE
+    const limit = keepWindow ? Math.max(this.fetched, PAGE_SIZE) : PAGE_SIZE
     this.loading = true
     this.error = null
     try {
@@ -220,8 +266,9 @@ class ChatListStore {
         wantLow ? GetChatCount(this.scopeId, 'low') : Promise.resolve(0),
       ])
       if (gen !== this.generation) return
-      this.items = page.items
+      this.items = mergeRows([], page.items)
       this.total = page.total
+      this.fetched = this.consumed(0, limit, page)
       this.lowCount = lowCount
     } catch (err) {
       if (gen !== this.generation) return
@@ -237,11 +284,12 @@ class ChatListStore {
     const gen = this.generation
     this.loading = true
     try {
-      const page = await this.fetchPage(this.items.length, PAGE_SIZE)
+      const offset = this.fetched
+      const page = await this.fetchPage(offset, PAGE_SIZE)
       if (gen !== this.generation) return
-      const seen = new Set(this.items.map((c) => c.key))
-      this.items = [...this.items, ...page.items.filter((c) => !seen.has(c.key))]
+      this.items = mergeRows(this.items, page.items)
       this.total = page.total
+      this.fetched = this.consumed(offset, PAGE_SIZE, page)
     } catch (err) {
       if (gen !== this.generation) return
       console.error('Failed to load more chats:', err)
@@ -249,6 +297,11 @@ class ChatListStore {
     } finally {
       if (gen === this.generation) this.loading = false
     }
+  }
+
+  // consumed is the backend offset after fetching page at offset.
+  private consumed(offset: number, limit: number, page: { items: ChatItem[]; total: number }): number {
+    return this.isSearch ? Math.min(offset + limit, page.total) : offset + page.items.length
   }
 
   // scheduleReload coalesces bursts of events into one reload, and waits

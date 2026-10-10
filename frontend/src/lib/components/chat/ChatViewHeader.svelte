@@ -14,13 +14,15 @@
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { ContextMenuItem } from '$lib/components/ui/context-menu'
   import { contactPhotos } from '$lib/stores/contactPhotos.svelte'
-  import { displayName, type Person, type ReplyMode } from './chatFormat'
+  import { canToggleSenderChat, chatSender, displayName, type Person, type ReplyMode } from './chatFormat'
   import ChatSnoozeMenu from './ChatSnoozeMenu.svelte'
   import { formatSnoozedUntil } from './chatSnooze'
 
   interface Props {
     subject: string
     people: Person[]
+    // Set for a sender chat: the header names the sender, not a subject.
+    senderEmail: string
     messageIds: string[]
     accountId: string
     folderId: string
@@ -50,14 +52,18 @@
     onUnsnooze: () => void
     onToggleRead: () => void
     onToggleSenderLow: () => void
+    onToggleSenderChat?: () => void
     onActionComplete: (autoSelectNext?: boolean) => void
     onReply?: (mode: ReplyMode, messageId: string) => void
   }
 
   let {
-    subject, people, messageIds, accountId, folderId, folderType, isStarred, allRead, isPinned, snoozedUntil, isLowPriority, canTriage, canReply, isTrash, isSpam,
-    showBackButton, onBack, onCompose, onArchive, onReplyChat, onForward, onExpand, onDelete, onSpam, onPin, onSnooze, onUnsnooze, onToggleRead, onToggleSenderLow, onActionComplete, onReply,
+    subject, people: allPeople, senderEmail, messageIds, accountId, folderId, folderType, isStarred, allRead, isPinned, snoozedUntil, isLowPriority, canTriage, canReply, isTrash, isSpam,
+    showBackButton, onBack, onCompose, onArchive, onReplyChat, onForward, onExpand, onDelete, onSpam, onPin, onSnooze, onUnsnooze, onToggleRead, onToggleSenderLow, onToggleSenderChat, onActionComplete, onReply,
   }: Props = $props()
+
+  // A sender chat shows just its sender.
+  const people = $derived(senderEmail ? [chatSender(allPeople, senderEmail)] : allPeople)
 
   let menuAnchor = $state<HTMLElement | null>(null)
   let snoozeMenu = $state<ChatSnoozeMenu | null>(null)
@@ -122,6 +128,12 @@
       <Icon icon={isLowPriority ? 'mdi:account-arrow-up-outline' : 'mdi:newspaper-variant-outline'} class="mr-2 h-4 w-4" />
       {isLowPriority ? $_('chat.moveSenderToPriority') : $_('chat.moveSenderToLow')}
     </ContextMenuItem>
+    {#if onToggleSenderChat && canToggleSenderChat(senderEmail, folderType)}
+      <ContextMenuItem onSelect={onToggleSenderChat}>
+        <Icon icon={senderEmail ? 'mdi:call-split' : 'mdi:account-multiple-outline'} class="mr-2 h-4 w-4" />
+        {senderEmail ? $_('chat.splitSender') : $_('chat.combineSender')}
+      </ContextMenuItem>
+    {/if}
   {/if}
 {/snippet}
 
@@ -201,8 +213,8 @@
 
     <div class="min-w-0">
       <h2 class="text-sm font-semibold text-foreground truncate" title={people.map((p) => p.email).join(', ')}>{title}</h2>
-      <p class="text-sm text-muted-foreground truncate" title={subject}>
-        {#if snoozeLabel}<Icon icon="mdi:alarm-snooze" class="inline w-3.5 h-3.5 -mt-0.5" /> {$_('chat.snoozedUntil', { values: { time: snoozeLabel } })} · {/if}{subject || $_('viewer.noSubject')}
+      <p class="text-sm text-muted-foreground truncate" title={senderEmail || subject}>
+        {#if snoozeLabel}<Icon icon="mdi:alarm-snooze" class="inline w-3.5 h-3.5 -mt-0.5" /> {$_('chat.snoozedUntil', { values: { time: snoozeLabel } })} · {/if}{senderEmail || subject || $_('viewer.noSubject')}
       </p>
     </div>
   </div>

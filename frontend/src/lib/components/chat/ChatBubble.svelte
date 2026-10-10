@@ -171,6 +171,12 @@
     {/if}
 
     <div class="flex flex-col min-w-0 {mode === 'bubble' ? 'max-w-[75%]' : 'flex-1 max-w-[min(100%,52rem)]'} {item.mine ? 'items-end' : 'items-start'}">
+      {#if item.subject !== undefined}
+        <div class="flex items-center gap-1 max-w-full px-1 mb-0.5 text-xs font-medium text-foreground/70" title={item.subject}>
+          <Icon icon="mdi:email-outline" class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span class="truncate">{item.subject || $_('viewer.noSubject')}</span>
+        </div>
+      {/if}
       {#if item.groupStart}
         <div class="flex items-baseline gap-2 px-1 mb-0.5 text-xs text-muted-foreground" title={recipientsTitle}>
           {#if !item.mine}<span class="font-medium text-foreground/80">{senderName}</span>{/if}

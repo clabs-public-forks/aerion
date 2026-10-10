@@ -16,7 +16,7 @@
   import { getShowMessagePreview } from '$lib/stores/settings.svelte'
   import type { ChatItem, ChatPerson } from '$lib/stores/chat.svelte'
   import ChatSnoozeMenu from './ChatSnoozeMenu.svelte'
-  import { chatPeople, displayName } from './chatFormat'
+  import { canToggleSenderChat, displayName, rowPeople } from './chatFormat'
   import type { ChatRowActions } from './chatTriage'
   import { formatSnoozedUntil } from './chatSnooze'
 
@@ -58,7 +58,7 @@
     contextMenuRef?.toggleFolderPicker(mode)
   }
 
-  const people = $derived(chatPeople(chat.participants, myEmails, chat.recipients, folderType === 'sent'))
+  const people = $derived(rowPeople(chat, myEmails, folderType === 'sent'))
 
   const title = $derived.by(() => {
     if (people.length === 0) return $_('viewer.unknown')
@@ -118,6 +118,12 @@
     <Icon icon={chat.isLowPriority ? 'mdi:account-arrow-up-outline' : 'mdi:newspaper-variant-outline'} class="mr-2 h-4 w-4" />
     {chat.isLowPriority ? $_('chat.moveSenderToPriority') : $_('chat.moveSenderToLow')}
   </ContextMenuItem>
+  {#if canToggleSenderChat(chat.senderEmail, folderType)}
+    <ContextMenuItem onSelect={actions.onToggleSenderChat}>
+      <Icon icon={chat.senderEmail ? 'mdi:call-split' : 'mdi:account-multiple-outline'} class="mr-2 h-4 w-4" />
+      {chat.senderEmail ? $_('chat.splitSender') : $_('chat.combineSender')}
+    </ContextMenuItem>
+  {/if}
 {/snippet}
 
 {#snippet repliedIcon()}

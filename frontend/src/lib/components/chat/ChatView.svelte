@@ -11,7 +11,7 @@
   import { toasts } from '$lib/stores/toast'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
-  import { chatList } from '$lib/stores/chat.svelte'
+  import { chatList, senderEmailOf } from '$lib/stores/chat.svelte'
   import { contactPhotos } from '$lib/stores/contactPhotos.svelte'
   import ChatViewHeader from './ChatViewHeader.svelte'
   import ChatBubble from './ChatBubble.svelte'
@@ -35,6 +35,7 @@
     // Opens a released chat draft in the full composer.
     onExpandDraft?: (draftId: string) => void
     onActionComplete?: (autoSelectNext?: boolean) => void
+    onToggleSenderChat?: () => void
     isFocused?: boolean
     isFlashing?: boolean
     showBackButton?: boolean
@@ -47,7 +48,7 @@
 
   let {
     threadId = null, folderId = null, folderType = null, accountId = null,
-    onReply, onCompose, onComposeToAddress, onEditDraft, onExpandDraft, onActionComplete,
+    onReply, onCompose, onComposeToAddress, onEditDraft, onExpandDraft, onActionComplete, onToggleSenderChat,
     isFocused = false, isFlashing = false, showBackButton = false, onBack, onEscape, focusedMessageIdInFocus = null,
   }: Props = $props()
 
@@ -84,7 +85,7 @@
   // The docked composer shows its own draft; hide draft copies while it has one.
   const shown = $derived(composer.draftId ? thread.messages.filter((m) => !m.isDraft) : thread.messages)
   const items = $derived(
-    buildThreadItems(focusedMessageIdInFocus ? shown.filter((m) => m.id === focusedMessageIdInFocus) : shown),
+    buildThreadItems(focusedMessageIdInFocus ? shown.filter((m) => m.id === focusedMessageIdInFocus) : shown, !!senderEmailOf(threadId)),
   )
   const people = $derived(threadPeople(thread.messages, myEmails))
   const messageIds = $derived(thread.messages.map((m) => m.id))
@@ -414,6 +415,7 @@
     <ChatViewHeader
       bind:this={header}
       subject={thread.conversation.subject}
+      senderEmail={senderEmailOf(threadId)}
       {people}
       {messageIds}
       accountId={accountId ?? ''}
@@ -442,6 +444,7 @@
       onUnsnooze={unsnooze}
       onToggleRead={toggleRead}
       onToggleSenderLow={toggleSenderLow}
+      {onToggleSenderChat}
       onActionComplete={handleMenuActionComplete}
       {onReply}
     />

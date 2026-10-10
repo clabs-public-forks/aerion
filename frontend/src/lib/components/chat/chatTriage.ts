@@ -5,7 +5,7 @@
 import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
 import { toasts } from '$lib/stores/toast'
-import { Archive, DeletePermanently, MarkAsRead, MarkAsUnread, PinChat, SnoozeChat, UnsnoozeChat, SetSenderCategory, Trash, Undo } from '../../../../wailsjs/go/app/App'
+import { Archive, DeletePermanently, MarkAsRead, MarkAsUnread, PinChat, SnoozeChat, UnsnoozeChat, SetSenderCategory, SetSenderChat, Trash, Undo } from '../../../../wailsjs/go/app/App'
 import { displayName, type Person } from './chatFormat'
 import { formatSnoozePreset } from './chatSnooze'
 
@@ -24,6 +24,7 @@ export interface ChatRowActions {
   onUnsnooze: () => void
   onMarkUnread: () => void
   onToggleSenderLow: () => void
+  onToggleSenderChat: () => void
 }
 
 type After = () => void
@@ -152,4 +153,11 @@ export async function setSenderLow(accountId: string, sender: Person, low: boole
     { label: t('common.undo'), onClick: () => void undo() },
   ])
   return true
+}
+
+// setSenderChat combines a sender's threads into one sender chat, or splits
+// it back into threads. Undoable.
+export function setSenderChat(accountId: string, sender: Person, combined: boolean, afterUndo?: After): Promise<boolean> {
+  const msg = t(combined ? 'chat.senderCombinedToast' : 'chat.senderSplitToast', { sender: displayName(sender) })
+  return run(() => SetSenderChat(accountId, sender.email, combined), msg, t('chat.stateChangeFailed'), true, afterUndo)
 }

@@ -4,13 +4,14 @@
 // (which stays untouched for upstream merges); ChatView owns the rendering.
 
 import {
-  GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay,
+  GetConversation, GetSenderChat, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay,
   ProcessSMIMEMessage, ProcessPGPMessage, FetchMessageBody, MarkAsRead,
 } from '../../../../wailsjs/go/app/App'
 // @ts-ignore - wailsjs runtime
 import { EventsOn } from '../../../../wailsjs/runtime/runtime'
 import { message as messageModels } from '../../../../wailsjs/go/models'
 import { isDialogGuardActive } from '$lib/stores/dialogGuard'
+import { senderEmailOf } from '$lib/stores/chat.svelte'
 import { toasts } from '$lib/stores/toast'
 import { _ } from '$lib/i18n'
 import { get } from 'svelte/store'
@@ -179,7 +180,7 @@ export class ChatThread {
   async refreshFlags() {
     if (!this.threadId || !this.folderId) return
     try {
-      this.conversation = await GetConversation(this.threadId, this.folderId)
+      this.conversation = await this.fetch(this.threadId, this.folderId)
     } catch {
       // best-effort
     }
@@ -194,7 +195,7 @@ export class ChatThread {
     this.loading = true
     this.error = null
     try {
-      const result = await GetConversation(tid, this.folderId!)
+      const result = await this.fetch(tid, this.folderId!)
       if (seq !== this.loadSeq) return
       this.conversation = result
       this.afterMessagesChanged(tid, true, markRead)
@@ -208,6 +209,13 @@ export class ChatThread {
         this.hooks.onLoaded()
       }
     }
+  }
+
+  // fetch loads a thread, or a sender chat (threadId sender:<email>) with
+  // the sender's threads in the folder.
+  private fetch(threadId: string, folderId: string) {
+    const sender = senderEmailOf(threadId)
+    return sender ? GetSenderChat(this.accountId ?? '', sender, folderId) : GetConversation(threadId, folderId)
   }
 
   private afterMessagesChanged(tid: string, fetchBodies: boolean, markRead = true) {
@@ -237,7 +245,7 @@ export class ChatThread {
     const tid = this.threadId
     if (!tid || !this.folderId) return
     try {
-      const updated = await GetConversation(tid, this.folderId)
+      const updated = await this.fetch(tid, this.folderId)
       if (this.threadId !== tid) return
       if (!updated?.messages?.length) {
         this.dismiss()

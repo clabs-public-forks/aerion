@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	goSync "sync"
 	"time"
 
@@ -586,6 +587,10 @@ func (a *App) handleNewMailNotification(info sync.NewMailInfo) {
 	info.Count = count
 	if latest != nil {
 		subject, fromName, fromEmail, threadID = latest.Subject, latest.FromName, latest.FromEmail, latest.ThreadID
+		// The chat list opens a sender chat by its chat key.
+		if strings.HasPrefix(latest.ChatKey, message.SenderChatPrefix) {
+			threadID = latest.ChatKey
+		}
 	}
 
 	// Send system notification
