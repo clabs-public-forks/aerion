@@ -98,7 +98,7 @@ cleanup here, so it can be done once the fork is independent.
   lookup, the sync toggle, trash-with-undo) that go with them; the chat
   side uses `accountStore.getFolder`/`getInbox` and
   `components/chat/chatTriage.ts`.
-- **U2** Go sources: `gofmt -l` lists 54 files (for example
+- **U2** Go sources: `gofmt -l` lists 55 files (for example
   `internal/message/store.go`, `app/compose.go`, `app/account.go`, and many
   under `extensions/` and `internal/`), mostly struct-tag alignment and
   import order. They are left unformatted to keep upstream merges clean;
