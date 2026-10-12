@@ -2,7 +2,7 @@
 
 This project has deviated far enough from Aerion 0.35 that upstream syncs are no longer possible. As such, it was been migrated to its own independent project here:
 
-**<https://github.com/CaseyLabs/mailpong>**
+## **<https://github.com/CaseyLabs/mailven>**
 
 <hr>
 
