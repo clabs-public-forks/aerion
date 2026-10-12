@@ -1,3 +1,11 @@
+# NOTE: Project has migrated!
+
+This project has deviated far enough from Aerion 0.35 that upstream syncs are no longer possible. As such, it was been migrated to its own independent project here:
+
+**<https://github.com/CaseyLabs/mailpong>**
+
+<hr>
+
 ![Aerion logo](frontend/src/assets/images/logo-universal.png)
 
 # Aerion Email Client (_Personal Fork_)
